@@ -127,17 +127,19 @@ public static class AuthEndpoints
             return null;
         }
 
-        if (!string.IsNullOrWhiteSpace(body.Email))
+        var hasEmail = !string.IsNullOrWhiteSpace(body.Email);
+        var hasCompanyNumber = !string.IsNullOrWhiteSpace(body.CompanyNumber);
+
+        if (hasEmail == hasCompanyNumber)
         {
-            return new AdminLoginRequest(body.Email, body.Password);
+            // Both identifiers present (invalid) or neither (invalid): the transport
+            // contract forbids both; no precedence between identifiers is invented.
+            return null;
         }
 
-        if (!string.IsNullOrWhiteSpace(body.CompanyNumber))
-        {
-            return new UserLoginRequest(body.CompanyNumber, body.Password);
-        }
-
-        return null;
+        return hasEmail
+            ? new AdminLoginRequest(body.Email!, body.Password)
+            : new UserLoginRequest(body.CompanyNumber!, body.Password);
     }
 
     private static async Task<IResult> EstablishSessionAndRespondAsync(

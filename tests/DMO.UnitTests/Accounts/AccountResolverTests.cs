@@ -28,6 +28,9 @@ public sealed class AccountResolverTests
     private static readonly AuthenticatedIdentity AnyIdentity =
         new("provider-subject-1", AuthenticationPath.Admin);
 
+    private static readonly AuthenticatedIdentity UserPathIdentity =
+        new("provider-subject-user", AuthenticationPath.User);
+
     private static AccountResolver Resolver(params AccountMatch[] matches) =>
         new(new FakeAccountLookup(matches));
 
@@ -48,7 +51,7 @@ public sealed class AccountResolverTests
     public async Task Resolve_SingleActiveUser_ReturnsUser()
     {
         var resolution = await Resolver(new AccountMatch.User(ActiveUser))
-            .ResolveAsync(AnyIdentity, CancellationToken.None);
+            .ResolveAsync(UserPathIdentity, CancellationToken.None);
 
         var user = Assert.IsType<AccountResolution.User>(resolution);
         Assert.Equal("2661", user.Account.CompanyNumber);
@@ -79,10 +82,36 @@ public sealed class AccountResolverTests
     public async Task Resolve_SingleInactiveUser_FailsClosed()
     {
         var resolution = await Resolver(new AccountMatch.User(InactiveUser))
-            .ResolveAsync(AnyIdentity, CancellationToken.None);
+            .ResolveAsync(UserPathIdentity, CancellationToken.None);
 
         var noAccess = Assert.IsType<AccountResolution.NoAccess>(resolution);
         Assert.Equal(NoAccessReason.InactiveUser, noAccess.Reason);
+    }
+
+    [Fact]
+    public async Task Resolve_AdminPathWithUserMatch_FailsClosed()
+    {
+        // Preconditions: ADMIN boundary path but the single lookup match is an active USER
+        // account — the wrong account type for the path that established the identity.
+        var resolution = await Resolver(new AccountMatch.User(ActiveUser))
+            .ResolveAsync(AnyIdentity, CancellationToken.None);
+
+        // Assertions: an active wrong-type account can never rescue the resolution.
+        var noAccess = Assert.IsType<AccountResolution.NoAccess>(resolution);
+        Assert.Equal(NoAccessReason.AuthenticationPathMismatch, noAccess.Reason);
+    }
+
+    [Fact]
+    public async Task Resolve_UserPathWithAdminMatch_FailsClosed()
+    {
+        // Preconditions: USER boundary path but the single lookup match is an active ADMIN
+        // account — the wrong account type for the path that established the identity.
+        var resolution = await Resolver(new AccountMatch.Admin(ActiveAdmin))
+            .ResolveAsync(UserPathIdentity, CancellationToken.None);
+
+        // Assertions: an active wrong-type account can never rescue the resolution.
+        var noAccess = Assert.IsType<AccountResolution.NoAccess>(resolution);
+        Assert.Equal(NoAccessReason.AuthenticationPathMismatch, noAccess.Reason);
     }
 
     [Fact]

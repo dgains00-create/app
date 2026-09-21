@@ -32,8 +32,9 @@ namespace DMO.Web.Auth;
 ///                  publishable keys (sb_publishable_…) are never sent as Bearer tokens.
 /// verification   : GET {ProjectUrl}/auth/v1/user with
 ///                  `Authorization: Bearer &lt;access token&gt;` (plus `apikey`)
-/// errors         : 4xx -> InvalidCredentials; 429 -> ProviderUnavailable;
-///                  5xx -> ProviderError; transport failure -> ProviderUnavailable
+/// errors         : 400/401 -> InvalidCredentials; 429 -> ProviderUnavailable;
+///                  5xx and other unexpected 4xx (403/404/...) -> ProviderError;
+///                  transport failure -> ProviderUnavailable
 /// </code>
 /// <para>
 /// The access token returned by Supabase lives only inside this call and is never persisted,
@@ -184,8 +185,17 @@ public sealed class SupabaseAuthenticationService : IAuthenticationBoundary
             return Failed(AuthenticationFailureReason.ProviderUnavailable);
         }
 
-        _logger.LogInformation("Supabase Auth rejected the presented credentials (HTTP {StatusCode}).", code);
-        return Failed(AuthenticationFailureReason.InvalidCredentials);
+        if (statusCode is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized)
+        {
+            // HTTP 400 / 401 — the provider rejected the presented credentials.
+            _logger.LogInformation("Supabase Auth rejected the presented credentials (HTTP {StatusCode}).", code);
+            return Failed(AuthenticationFailureReason.InvalidCredentials);
+        }
+
+        // Any other unexpected 4xx (403, 404, ...) is a provider/protocol/configuration fact,
+        // never a human-credential fact.
+        _logger.LogWarning("Supabase Auth returned an unexpected client error (HTTP {StatusCode}).", code);
+        return Failed(AuthenticationFailureReason.ProviderError);
     }
 
     private static AuthenticationOutcome Failed(AuthenticationFailureReason reason) =>

@@ -55,7 +55,21 @@ public sealed class AccountResolver : IAccountResolver
             return new AccountResolution.NoAccess(NoAccessReason.AmbiguousMapping);
         }
 
-        return matches[0] switch
+        var match = matches[0];
+
+        // Boundary rule: the account type implied by the single match must be consistent with
+        // the authentication path that established the identity. Checked before any
+        // active/inactive fact, so a wrong-type account can never resolve — even when active.
+        var crossPathMismatch =
+            (identity.AuthenticationPath == AuthenticationPath.Admin && match is AccountMatch.User)
+            || (identity.AuthenticationPath == AuthenticationPath.User && match is AccountMatch.Admin);
+
+        if (crossPathMismatch)
+        {
+            return new AccountResolution.NoAccess(NoAccessReason.AuthenticationPathMismatch);
+        }
+
+        return match switch
         {
             AccountMatch.Admin(var admin) when admin.IsActive => new AccountResolution.Admin(admin),
             AccountMatch.Admin(_) => new AccountResolution.NoAccess(NoAccessReason.InactiveAdmin),

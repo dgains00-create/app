@@ -17,4 +17,10 @@ public enum NoAccessReason
 
     /// <summary>The identity maps to more than one application account.</summary>
     AmbiguousMapping,
+
+    /// <summary>
+    /// The identity's authentication boundary path does not match the account type of its
+    /// single mapped application account.
+    /// </summary>
+    AuthenticationPathMismatch,
 }

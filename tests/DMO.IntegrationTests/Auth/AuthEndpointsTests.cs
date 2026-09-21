@@ -115,6 +115,25 @@ public sealed class AuthEndpointsTests
     }
 
     [Fact]
+    public async Task Login_BothEmailAndCompanyNumber_ReturnsBadRequest()
+    {
+        // Preconditions: host with fake boundaries.
+        using var factory = FactoryWith();
+        using var client = factory.CreateClient();
+
+        // Action: a body carrying BOTH identifiers — the transport contract forbids both,
+        // and no precedence between identifiers is ever invented.
+        var login = await client.PostAsJsonAsync(
+            AuthEndpoints.LoginPath, new { email = "admin@dmo.test", companyNumber = "2661", password = "secret" });
+
+        // Assertions: rejected at the request surface; no session is established.
+        Assert.Equal(HttpStatusCode.BadRequest, login.StatusCode);
+
+        var me = await client.GetFromJsonAsync<JsonElement>(AuthEndpoints.CurrentAccountPath);
+        Assert.Equal("none", me.GetProperty("accountType").GetString());
+    }
+
+    [Fact]
     public async Task Login_WithoutCredentials_ReturnsBadRequest()
     {
         // Preconditions: host with fake boundaries.

@@ -150,6 +150,29 @@ public sealed class SupabaseAuthenticationServiceTests
         Assert.Single(handler.Requests);
     }
 
+    [Theory]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.NotFound)]
+    public async Task UnexpectedNonCredential4xx_MapsToProviderError(HttpStatusCode statusCode)
+    {
+        // Preconditions: the provider returns an unexpected non-credential 4xx (403/404) on
+        // the password grant — a provider/protocol/configuration fact, never a statement about
+        // the human's credentials.
+        var handler = FakeHttpMessageHandler.Returning(FakeHttpMessageHandler.JsonResponse(
+            statusCode, new { message = "nope" }));
+        var service = CreateService(handler);
+
+        // Action: authenticate.
+        var outcome = await service.AuthenticateAsync(
+            new AdminLoginRequest("admin@dmo.test", "correct-password"), CancellationToken.None);
+
+        // Assertions: reported as ProviderError, never InvalidCredentials; only the token
+        // request is issued, with no verification call after the failure.
+        var failed = Assert.IsType<AuthenticationOutcome.Failed>(outcome);
+        Assert.Equal(AuthenticationFailureReason.ProviderError, failed.Reason);
+        Assert.Single(handler.Requests);
+    }
+
     [Fact]
     public async Task ServerError_MapsToProviderError()
     {
