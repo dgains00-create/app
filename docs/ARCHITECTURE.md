@@ -57,6 +57,49 @@ Types are added here only when a concrete task genuinely requires them.
 PostgreSQL connection/configuration, the single persistence context and the migration
 mechanism. Contains no Phase 1 domain schema and no business rule.
 
+## P1-T02 — authentication + account boundary
+
+P1-T02 introduces the authentication/account boundary only. It stops before
+Template/Module/access resolution.
+
+```text
+src/DMO.Application/Authentication   contracts: IAuthenticationBoundary, typed AdminLoginRequest
+                                       (email + password) and UserLoginRequest
+                                       (company_number + password), AuthenticatedIdentity
+                                        (ProviderSubject + AuthenticationPath only)
+src/DMO.Application/Accounts         IAccountResolver + IAccountLookup split; real
+                                       AccountResolver mapping semantics; ADMIN/USER
+                                       account records; NoAccess states
+src/DMO.Application/Session          read-only ICurrentAccountContext + CurrentAccount
+
+src/DMO.Web/Auth                     runtime: SupabaseAuthenticationService (ADMIN path:
+                                       real Supabase Auth DEV/TEST, publishable key only),
+                                       SessionAuthentication (cookie scheme session element),
+                                       CurrentAccountContext (real ICurrentAccountContext)
+src/DMO.Web/Resolution               UnavailableAccountLookup — production P1-T02 lookup:
+                                       no persisted mapping, always fails closed (P1-T03
+                                       replaces it, not resolver semantics)
+src/DMO.Web/Endpoints/AuthEndpoints  POST /auth/login, POST /auth/logout, GET /auth/me
+```
+
+Key decisions recorded here:
+
+- ADMIN authentication is **real** Supabase Auth against the DEV/TEST project
+  (`jixnteypqqrltsxgwzpv`, `eu-west-1`) using only the project URL and the **publishable
+  key** (`apikey` header; publishable keys are never sent as Bearer tokens). No
+  `service_role`, no secret key, no old schema/migration reuse. This project is DEV/TEST
+  only; the future production backend is a separate clean Supabase project.
+- USER authentication has **no provider flow in P1-T02**: the durable
+  `company_number → provider identity` mapping requires P1-T03 persistence. The USER login
+  contract stays `company_number + password`; email is never a USER login identifier.
+- Authentication is separated from account resolution. In P1-T02 production a session is
+  never established because resolution always fails closed (`UnavailableAccountLookup`).
+- Provider identity is internal linkage only; provider claims/roles never classify access.
+- Local configuration uses `dotnet user-secrets` (already initialised); the ignored
+  `*.env` file is never read by the application — no `.env` loader is added. Environment
+  variables (`Supabase__ProjectUrl`, `Supabase__PublishableKey`, `Database__ConnectionString`)
+  are the deployed/test-host form.
+
 ## Reference direction
 
 ```text

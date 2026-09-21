@@ -21,6 +21,12 @@
     <ProjectReference Include="..\..\src\DMO.Domain\DMO.Domain.csproj" />
     <ProjectReference Include="..\..\src\DMO.Application\DMO.Application.csproj" />
     <ProjectReference Include="..\..\src\DMO.Infrastructure\DMO.Infrastructure.csproj" />
+    <!--
+      P1-T02: DMO.Web reference required by the unit tests that exercise the real runtime
+      classes (CurrentAccountContextTests, SupabaseAuthenticationServiceTests). No package
+      additions. (Disclosed deviation: this project reference did not exist at P1-T01.)
+    -->
+    <ProjectReference Include="..\..\src\DMO.Web\DMO.Web.csproj" />
   </ItemGroup>
 
 </Project>
