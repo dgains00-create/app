@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>DMO.Web</RootNamespace>
+    <UserSecretsId>83ff4950-4c2c-41f9-9cfb-8d1ce8d17d5f</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DMO.Infrastructure\DMO.Infrastructure.csproj" />
+    <ProjectReference Include="..\DMO.Application\DMO.Application.csproj" />
+    <ProjectReference Include="..\DMO.Domain\DMO.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DMO.Application/DMO.Application.csproj" />
+    <Project Path="src/DMO.Domain/DMO.Domain.csproj" />
+    <Project Path="src/DMO.Infrastructure/DMO.Infrastructure.csproj" />
+    <Project Path="src/DMO.Web/DMO.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DMO.IntegrationTests/DMO.IntegrationTests.csproj" />
+    <Project Path="tests/DMO.UnitTests/DMO.UnitTests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,29 @@
+## .NET build output
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+## Test results
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+coverage*.json
+coverage*.xml
+
+## Secrets — never commit connection strings or credential files
+*.env
+.env*
+appsettings.*.local.json
+secrets.json
+*.pfx
+
+## Rider / VS Code
+.idea/
+.vscode/
+*.DotSettings.user
+
+## OS
+Thumbs.db
+.DS_Store

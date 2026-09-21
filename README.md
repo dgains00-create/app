@@ -6,6 +6,20 @@ The objective is to build **one application and one runtime**, but as a **modula
 
 This repository starts intentionally small. The current priority is to deliver the modules that are needed at work now, without forcing the full Armazém + Job On architecture before those modules exist.
 
+> **Terminology.** `Module` means an assignable product access unit (the access model).
+> A development/construction unit is a **phase**. A .NET project is neither.
+> See `docs/ARCHITECTURE.md`.
+
+## Current status
+
+The application/runtime skeleton now exists (P1-T01): a real .NET solution with the four
+`src/` projects, two `tests/` projects, configuration binding, PostgreSQL database
+infrastructure and a migration-runner boundary.
+
+**No business functionality is implemented yet.** There is no authentication, no USER/ADMIN
+model, no Template, no Module Registry behaviour, no permissions and no operational or
+industrial schema. Phase 1 business slices follow P1-T01.
+
 ## Construction strategy
 
 Each phase completes one usable module.
@@ -22,37 +36,40 @@ The application can then expand naturally:
 5. **Job On**
 6. Remaining operational modules
 
-The existing modules should be adapted to richer backend relationships when those relationships actually exist. Future compatibility is desirable, but must not be forced by inventing Job On or Armazém behavior early.
+Later phases add capabilities and relationships **around** the identities already created,
+rather than rebuilding the backend. See `docs/CREATION_AND_ASSOCIATION_LOGIC.md` for the
+settled creation/association logic.
 
 ## Core architectural idea
 
 ```text
 DMO Runtime
 │
-├── App
-│   ├── Runtime
-│   ├── Auth
-│   └── ModuleRegistry
+├─ Runtime boundary (application-level mechanics only)
+│   ├─ startup
+│   ├─ authentication/session wiring        (later Phase 1 slice)
+│   ├─ Module Registry                      (later Phase 1 slice)
+│   ├─ access resolution / navigation       (later Phase 1 slice)
+│   └─ shared infrastructure registration
 │
-├── Modules
-│   ├── Admin
-│   ├── Tools
-│   ├── Boquilhas
-│   └── Controlo
+├─ Functional areas (Modules, by phase)
+│   ├─ Admin
+│   ├─ Tools
+│   ├─ Boquilhas
+│   └─ Controlo
 │
-├── Infrastructure
-│   ├── Database
-│   ├── Files
-│   └── Pdf
-│
-└── Shared
-    ├── Contracts
-    └── Common
+└─ Infrastructure
+    ├─ Database
+    ├─ Files
+    └─ Pdf
 ```
 
 The runtime should remain deliberately small. It does not need to understand every industrial workflow or every relationship in the system. Its responsibility is to start the application, establish the current user/session, discover enabled modules and provide shared infrastructure.
 
 Business meaning belongs to modules and to persisted backend relationships.
+
+For the physical project layout and the mapping from the old documentation folders onto the
+real projects, see `docs/ARCHITECTURE.md` and `docs/SKELETON_RATIONALIZATION_P1-T01.md`.
 
 ## Shared backend identities
 
@@ -93,9 +110,16 @@ That context can group records such as:
 
 This is **not a fake Job On**.
 
-A Job On reference/production may be recorded as identifying information where useful, but the application must not invent `jobon_id`, `cm_id`, `bq_id` or other relationships merely to imitate the future architecture.
+A Job On reference/production may be recorded as identifying information where useful. Early
+phases **may** create and reuse the real canonical identities — `tool_id`, a minimal
+`jobon_id`, and the `cm_id` / `mf_id` / `bq_id` occurrence contexts — as soon as a real
+current workflow needs them. They are the real identities defined by the Information Web,
+not temporary adapter IDs. Later modules reuse and enrich those same identities instead of
+replacing them.
 
-When the real Job On module is introduced, it can add those real relationships around the identities that already exist.
+What must not happen is inventing workflow fields or relationships merely to imitate a
+future module. `docs/CREATION_AND_ASSOCIATION_LOGIC.md` is the current reference for this
+logic.
 
 ## Module boundaries
 
@@ -231,8 +255,11 @@ When adapting it:
 
 ## Current status
 
-This repository currently defines the construction skeleton and architectural objective only.
+The construction skeleton and architectural objective are defined, and the application/
+runtime skeleton is implemented (P1-T01): solution, project boundaries, host, configuration,
+PostgreSQL infrastructure and the migration-runner boundary.
 
-Implementation should begin with the existing/nearly-complete Admin / Users / Templates work, then add Boquilhas, then Controlo.
+Phase 1 continues with the Admin / Users / Templates work (P1-T02 onward), then Boquilhas,
+then Controlo.
 
 The detailed domain contracts from `dmo-master` should be brought in deliberately, module by module, rather than copied wholesale into the runtime.
