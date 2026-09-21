@@ -179,3 +179,43 @@ A repeatable migration run against a real database is covered by the proposed te
 | 7 | Migrate, live database | — | not performed; no PostgreSQL available |
 
 **No test method was executed. `dotnet test` was never run.**
+
+---
+
+## Correction pass (Architect review: CORRECTION REQUIRED)
+
+The Architect reviewed the first submission
+(`dmo-work/dev/reviews/P1-T01_APPLICATION_SKELETON_REVIEW.md`) and required two test
+corrections plus one documentation wording correction. Details are in
+`PROPOSED_TESTS_P1-T01.md`.
+
+**No runtime code, database model, migration mechanism or connection configuration contract
+was changed by the correction.** Only documentation and test files were edited.
+
+### Re-verified after the correction
+
+```pwsh
+dotnet build DMO.slnx
+```
+
+Result — exit code 0:
+
+```text
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+```
+
+All six projects recompiled, including both test projects after the corrections.
+
+### Not re-run
+
+The startup/`/health`/migration checks in §1–§7 above were **not** re-run, because the
+correction changed no runtime code — `Program.cs`,
+`InfrastructureServiceCollectionExtensions.cs`, `TechnicalEndpoints.cs` and the migration
+runner are byte-identical to the versions those checks exercised.
+
+### Still not executed
+
+No test method was executed. `dotnet test` was never run, before or after the correction.
+Test execution remains gated pending Architect verification of this correction commit.

@@ -15,6 +15,12 @@ The proposed tests for P1-T01 were **created but NOT executed**, as required by 
 
 > TASK-SPECIFIC TESTS NOT EXECUTED — AWAITING ARCHITECT REVIEW
 
+The Architect reviewed the first submission
+(`dmo-work/dev/reviews/P1-T01_APPLICATION_SKELETON_REVIEW.md`) with status **CORRECTION
+REQUIRED**. The two test corrections (technical endpoint exact shape; startup configuration
+decoupled from the `WebApplicationFactory` exception type) are applied. Execution remains
+gated until the Architect verifies this correction commit.
+
 The projects **compile** (verified with `dotnet build`), so they are known to be mechanically
 valid. Compilation is not execution.
 

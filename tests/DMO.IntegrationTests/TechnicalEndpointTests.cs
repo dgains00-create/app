@@ -7,7 +7,8 @@ using DMO.Web.Endpoints;
 namespace DMO.IntegrationTests;
 
 /// <summary>
-/// Proposed P1-T01 test — the technical startup endpoint answers.
+/// Proposed P1-T01 test — the technical startup endpoint answers with exactly the accepted
+/// technical shape.
 /// </summary>
 /// <remarks>
 /// PROPOSED — NOT EXECUTED. Awaiting Architect review before first execution.
@@ -15,6 +16,16 @@ namespace DMO.IntegrationTests;
 /// </remarks>
 public sealed class TechnicalEndpointTests : IClassFixture<DmoWebApplicationFactory>
 {
+    /// <summary>
+    /// The accepted P1-T01 technical response shape: exactly these fields, nothing else.
+    /// </summary>
+    /// <remarks>
+    /// The endpoint contract is deliberately minimal. Asserting the exact field set is what
+    /// prevents product/application data being added under an unanticipated name while the
+    /// test still passes; a "does not contain X/Y/Z" assertion would not.
+    /// </remarks>
+    private static readonly string[] AcceptedFields = ["status", "environment"];
+
     private readonly DmoWebApplicationFactory _factory;
 
     public TechnicalEndpointTests(DmoWebApplicationFactory factory)
@@ -23,7 +34,7 @@ public sealed class TechnicalEndpointTests : IClassFixture<DmoWebApplicationFact
     }
 
     [Fact]
-    public async Task Health_ReturnsOkWithStatusPayload()
+    public async Task Health_ReturnsOkWithExactlyTheAcceptedTechnicalShape()
     {
         // Preconditions: the host started with database configuration supplied.
         using var client = _factory.CreateClient();
@@ -35,12 +46,24 @@ public sealed class TechnicalEndpointTests : IClassFixture<DmoWebApplicationFact
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("ok", payload.GetProperty("status").GetString());
 
-        // Required non-effect: no account/Template/Module/industrial data is exposed.
-        Assert.False(payload.TryGetProperty("user", out _));
-        Assert.False(payload.TryGetProperty("modules", out _));
-        Assert.False(payload.TryGetProperty("templates", out _));
+        // The response is a JSON object with exactly the accepted technical fields.
+        Assert.Equal(JsonValueKind.Object, payload.ValueKind);
+
+        var actualFields = payload.EnumerateObject()
+            .Select(property => property.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(
+            AcceptedFields.OrderBy(name => name, StringComparer.Ordinal).ToArray(),
+            actualFields);
+
+        // The accepted fields carry the accepted values.
+        Assert.Equal("ok", payload.GetProperty("status").GetString());
+        Assert.False(string.IsNullOrWhiteSpace(payload.GetProperty("environment").GetString()));
+
+        Assert.Equal(2, payload.EnumerateObject().Count());
     }
 
     [Fact]

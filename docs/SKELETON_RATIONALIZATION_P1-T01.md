@@ -20,21 +20,21 @@ maps onto a real project.
 | Previous location | New location | Status of the old folder |
 | --- | --- | --- |
 | `App/Runtime/` | `src/DMO.Web/` | removed — superseded by the real host project |
-| `App/Auth/` | not yet created as a project | removed — see below |
-| `App/ModuleRegistry/` | not yet created as a project | removed — see below |
+| `App/Auth/` | belongs to `src/DMO.Web` (runtime concern) | removed — see below |
+| `App/ModuleRegistry/` | belongs to `src/DMO.Web` (runtime concern) | removed — see below |
 | `Infrastructure/Database/` | `src/DMO.Infrastructure/` | removed — superseded by the real project |
-| `Infrastructure/Files/` | not yet created | removed — see below |
-| `Infrastructure/Pdf/` | not yet created | removed — see below |
-| `Modules/Admin/` | not yet created | removed — see below |
-| `Modules/Boquilhas/` | not yet created | removed — see below |
-| `Modules/Controlo/` | not yet created | removed — see below |
-| `Modules/Tools/` | not yet created | removed — see below |
-| `Shared/Common/` | not yet created | removed — see below |
-| `Shared/Contracts/` | not yet created | removed — see below |
+| `Infrastructure/Files/` | not yet implemented | removed — see below |
+| `Infrastructure/Pdf/` | not yet implemented | removed — see below |
+| `Modules/Admin/` | not yet implemented | removed — see below |
+| `Modules/Boquilhas/` | not yet implemented | removed — see below |
+| `Modules/Controlo/` | not yet implemented | removed — see below |
+| `Modules/Tools/` | not yet implemented | removed — see below |
+| `Shared/Common/` | not yet implemented | removed — see below |
+| `Shared/Contracts/` | not yet implemented | removed — see below |
 
-The old tree's intent is preserved in `docs/ARCHITECTURE.md`, which carries forward the
-forward-looking structure (including the `Modules/` and `Shared/` areas) as the documented
-target for later phases.
+The old tree's intent is recorded in `docs/ARCHITECTURE.md`. These are conceptual areas, not
+a committed assembly layout: the placement of each future boundary is decided by the task
+that owns it.
 
 ## Why the unimplemented boundaries did not become projects
 
@@ -48,7 +48,9 @@ Creating empty `DMO.Modules.Admin`, `DMO.Modules.Boquilhas`, `DMO.Shared.Contrac
 creating project boundaries for behaviour that does not exist yet, and would pre-empt
 decisions that belong to the tasks which own that behaviour (P1-T05 onward, Phase 2, Phase 3).
 
-Each becomes a real project in the task that first has real code for it. The boundary
+Each future boundary is introduced by the task that owns it, and is normally represented
+inside the current four-project solution unless a concrete, Architect-approved need justifies
+a new project/assembly. **No future project split is pre-authorised by P1-T01.** The boundary
 intent is not lost: it is recorded in `docs/ARCHITECTURE.md`.
 
 ## What was deliberately preserved

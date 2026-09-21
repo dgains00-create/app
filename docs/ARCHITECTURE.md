@@ -74,22 +74,22 @@ reflection-based discovery, multiple database contexts, distributed caching.
 
 ## Where future boundaries will live
 
-The following areas are documented targets, not current projects. Each becomes a real
-project in the task that first contains real code for it.
+Future functional/domain boundaries will be introduced by the task that owns them.
 
-| Area | Purpose | Introduced by |
-| --- | --- | --- |
-| `src/DMO.Modules.Admin/` | Admin functional area: Users, Templates, Settings, Audit | P1-T05 onward |
-| `src/DMO.Modules.Tools/` | canonical `tool_id` master data | Phase 2 |
-| `src/DMO.Modules.Boquilhas/` | Boquilhas operational module | Phase 2 |
-| `src/DMO.Modules.Controlo/` | Controlo: Peso, Pegamentos, Resumo, PDF | Phase 3 |
-| `src/DMO.Infrastructure.Files/` | filesystem document output | when document output exists |
-| `src/DMO.Infrastructure.Pdf/` | PDF generation mechanics | when PDF output exists |
-| `src/DMO.Shared.Contracts/` | explicit cross-boundary contracts, only when genuinely needed | when a real cross-boundary capability exists |
+They should normally be represented inside the current four-project solution — as
+namespaces, folders, services and persistence configuration within `DMO.Web`,
+`DMO.Application`, `DMO.Domain` or `DMO.Infrastructure` — unless a concrete,
+Architect-approved need justifies a new project/assembly.
+
+**No future project split is pre-authorised by P1-T01.**
+
+The previous README-only skeleton used `App/`, `Modules/`, `Infrastructure/` and `Shared/` as
+documentation folders. Those names describe conceptual areas. They do **not** fix an assembly
+layout: a future Admin, Boquilhas, Controlo, Tools, Files, Pdf or Contracts boundary is not
+thereby committed to becoming its own .NET project.
 
 Authentication and the Module Registry are **runtime** concerns and belong inside
-`src/DMO.Web` rather than as separate projects, consistent with the runtime-owns-runtime
-boundary.
+`src/DMO.Web`, consistent with the runtime-owns-runtime boundary.
 
 ## Terminology
 

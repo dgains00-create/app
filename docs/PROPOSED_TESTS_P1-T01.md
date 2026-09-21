@@ -1,6 +1,6 @@
 # Proposed tests — P1-T01
 
-> ## TASK-SPECIFIC TESTS NOT EXECUTED — AWAITING ARCHITECT REVIEW
+> ## TASK-SPECIFIC TESTS NOT EXECUTED — AWAITING ARCHITECT VERIFICATION OF THIS CORRECTION
 
 These test files were **created but never executed**. Per §9 of the P1-T01 request, the
 Architect reviews each proposed test first to verify that it tests the intended contract
@@ -10,11 +10,29 @@ The test projects were **compiled** (`dotnet build`) so that they are known to b
 mechanically valid. Compilation is not execution: no test method was run, and no test result
 exists.
 
-The Architect will decide for each test:
+## Architect review outcome
 
-- ACCEPTED FOR EXECUTION;
-- NEEDS CORRECTION;
-- REJECTED.
+The Architect reviewed the first submission
+(`dev/reviews/P1-T01_APPLICATION_SKELETON_REVIEW.md`, status **CORRECTION REQUIRED**):
+
+| Test | Decision |
+| --- | --- |
+| §1 DatabaseConnectionResolverTests | ACCEPTED FOR EXECUTION |
+| §2 StartupCommandsTests | ACCEPTED FOR EXECUTION as technical regression, **not** product acceptance evidence |
+| §3 TechnicalEndpointTests.Health_ReturnsOkWithStatusPayload | **NEEDS CORRECTION** → corrected below |
+| §3b Health_DoesNotExposeTheConnectionString | ACCEPTED FOR EXECUTION |
+| §4 StartupConfigurationTests.Host_WhenConnectionStringAbsent_FailsStartup | **NEEDS CORRECTION** → corrected below |
+| §4b Host_WhenConnectionStringSupplied_StartsSuccessfully | ACCEPTED FOR EXECUTION |
+| §5 MigrationRunnerTests.PersistenceContext_DeclaresNoEntityTypes | ACCEPTED FOR EXECUTION |
+| §5b MigrationRunnerTests.ListPendingAsync_WithNoConfiguredConnection_Throws | ACCEPTED FOR EXECUTION |
+| §6 DatabaseConnectivityTests | ACCEPTED FOR EXECUTION **only** against an explicit disposable PostgreSQL database |
+
+The two corrections are recorded in §3 and §4 below. They are documentation/test-code
+corrections only: no runtime code, database model, migration mechanism or connection
+configuration contract was changed.
+
+**No test has been executed.** Execution remains gated pending Architect verification of this
+correction commit.
 
 Nothing below constitutes acceptance evidence.
 
@@ -78,6 +96,12 @@ File/path:        tests/DMO.UnitTests/Database/DatabaseConnectionResolverTests.c
 
 ## 2. The migration command is selected only by its own argument
 
+> **Architect classification.** ACCEPTED FOR EXECUTION **as technical regression, not as
+> product/Master acceptance evidence.** The existence of a migration mechanism is required by
+> P1-T01; the convention that `migrate` must be the first CLI argument is an implementation
+> choice, not a Master/product contract. A pass protects the chosen technical entry point; it
+> is **not** acceptance evidence for any product behaviour.
+
 ```text
 Test:             StartupCommandsTests (IsMigrationCommand_* family)
 Purpose:          Verify that starting the host does not accidentally run migrations, and
@@ -99,25 +123,39 @@ NOT prove:        That a migration run succeeds against a database; that Program
 File/path:        tests/DMO.IntegrationTests/StartupCommandsTests.cs
 ```
 
-## 3. The technical startup endpoint answers and leaks nothing
+## 3. The technical startup endpoint answers with exactly the accepted shape
+
+> **CORRECTED** following Architect review §4.3 (NEEDS CORRECTION). The previous version
+> asserted only the absence of three named properties (`user`, `modules`, `templates`), which
+> could still pass if unrelated product/application information were added under another
+> name. It now asserts the exact accepted response shape.
 
 ```text
-Test:             TechnicalEndpointTests.Health_ReturnsOkWithStatusPayload
-Purpose:          Verify the runnable host exposes a minimal technical startup surface.
+Test:             TechnicalEndpointTests.Health_ReturnsOkWithExactlyTheAcceptedTechnicalShape
+Purpose:          Verify the runnable host exposes a minimal technical startup surface, and
+                  that the surface is exactly the accepted technical shape.
 Master/plan
 behaviour:        P1-T01 request §3: "provides a minimal technical health/startup endpoint or
                   equivalent"; §4: DMO.Web is the host and owns no industrial business rule.
 Preconditions:    The host started in-process via WebApplicationFactory, with a placeholder
                   (non-connecting) connection string so eager configuration validation passes.
 Action:           GET /health.
-Assertions:       HTTP 200; body contains status = "ok"; body contains no 'user', 'modules'
-                  or 'templates' property.
+Assertions:       HTTP 200; the body is a JSON object;
+                  the field-name set is EXACTLY { "status", "environment" } (compared as an
+                  ordered set, so an added field fails regardless of its name);
+                  status == "ok"; environment is present and non-blank;
+                  the object has exactly 2 members.
 Required
-non-effects:      The endpoint exposes no account, Template, Module or industrial data.
-What this proves: The host starts and serves a minimal technical surface only.
+non-effects:      The endpoint exposes no account, Template, Module, permission or industrial
+                  data — enforced by the exact-shape equality, not by name blacklisting.
+What this proves: The host starts and serves a technical surface whose payload is exactly the
+                  accepted P1-T01 shape. Adding ANY additional field to the response fails
+                  this test, whatever the field is called.
 What this does
 NOT prove:        Database connectivity; any Phase 1 business behaviour; production
-                  readiness; that the endpoint is suitably authenticated for deployment.
+                  readiness; that the endpoint is suitably protected for deployment; that a
+                  future task's deliberate extension of the surface is wrong (a later accepted
+                  task may widen the contract, at which point this assertion is updated).
 File/path:        tests/DMO.IntegrationTests/TechnicalEndpointTests.cs
 ```
 
@@ -139,37 +177,89 @@ NOT prove:        That other (future) endpoints are leak-free; that logs are lea
 File/path:        tests/DMO.IntegrationTests/TechnicalEndpointTests.cs
 ```
 
-## 4. The host fails startup without database configuration
+## 4. Host composition requires database configuration
+
+> **CORRECTED** following Architect review §4.5 (NEEDS CORRECTION). The previous version
+> coupled acceptance to `WebApplicationFactory.CreateClient()` throwing the concrete
+> `DatabaseConfigurationException`. That is not a stable boundary: `Program.cs` catches the
+> exception and converts it to process exit code 1, so an in-process host may surface the
+> failure through hosting mechanics rather than the original exception type.
+>
+> The corrected tests assert the composition boundary directly (Architect option 1), which is
+> the smallest reliable form. The process-level behaviour (exit code 1 plus the
+> operator-facing message) is covered by the manual startup check recorded in
+> `TECHNICAL_CHECKS_P1-T01.md` §F.4, so no heavy process-test infrastructure was introduced.
 
 ```text
-Test:             StartupConfigurationTests.Host_WhenConnectionStringAbsent_FailsStartup
-Purpose:          Verify fail-fast startup, not just fail-fast resolver behaviour.
+Test:             StartupConfigurationTests.AddDmoInfrastructure_WhenConnectionStringAbsent_Throws
+Purpose:          Verify host composition refuses to build without required database
+                  configuration.
 Master/plan
 behaviour:        P1-T01 request §5: fail clearly when required database configuration is
                   absent; never silently substitute a production-looking default.
-Preconditions:    WebApplicationFactory with NO Database:ConnectionString supplied.
-Action:           CreateClient() (forces host startup).
+Preconditions:    An empty in-memory IConfiguration (no Database:ConnectionString).
+Action:           services.AddDmoInfrastructure(configuration).
 Assertions:       DatabaseConfigurationException is thrown and names the configuration key.
 Required
-non-effects:      The host does not start; no default database is targeted.
-What this proves: The failure surfaces at startup, before the process serves traffic.
+non-effects:      Composition does not complete; no default database target is registered.
+What this proves: The stable composition boundary rejects missing configuration, independently
+                  of how a web host would surface the failure.
 What this does
-NOT prove:        Behaviour under a malformed (rather than absent) production value.
+NOT prove:        The process exit code; the operator-facing message text (both covered by the
+                  manual startup check); behaviour under a malformed rather than absent value
+                  (covered by the theory below).
+File/path:        tests/DMO.IntegrationTests/StartupConfigurationTests.cs
+```
+
+```text
+Test:             StartupConfigurationTests.AddDmoInfrastructure_WhenConnectionStringInvalid_Throws
+                  (theory: "", "   ", "not a connection string", "Database=dmo")
+Purpose:          Verify malformed configuration is rejected, not only absent configuration.
+Master/plan
+behaviour:        P1-T01 request §5: fail clearly when required database configuration is
+                  invalid.
+Preconditions:    IConfiguration supplying the key with a blank/unparseable value, or one
+                  missing Host/Database.
+Action:           services.AddDmoInfrastructure(configuration).
+Assertions:       DatabaseConfigurationException is thrown in every case.
+Required
+non-effects:      No implicit or default database target is invented.
+What this proves: The guard covers invalid input, not just missing input.
+What this does
+NOT prove:        That a syntactically valid string points at a reachable database.
+File/path:        tests/DMO.IntegrationTests/StartupConfigurationTests.cs
+```
+
+```text
+Test:             StartupConfigurationTests.AddDmoInfrastructure_WhenConnectionStringSupplied_Succeeds
+Purpose:          Required non-effect partner: prove the guard is not simply rejecting
+                  everything.
+Preconditions:    IConfiguration supplying a valid syntactic connection string.
+Action:           services.AddDmoInfrastructure(configuration).
+Assertions:       No exception; a DatabaseConnectionResolver registration exists.
+Required
+non-effects:      Registering infrastructure does not open a database connection.
+What this proves: The previous tests fail for the intended reason (missing/invalid
+                  configuration), not because composition always fails.
+What this does
+NOT prove:        That the supplied connection string is reachable or correct.
 File/path:        tests/DMO.IntegrationTests/StartupConfigurationTests.cs
 ```
 
 ```text
 Test:             StartupConfigurationTests.Host_WhenConnectionStringSupplied_StartsSuccessfully
-Purpose:          Required non-effect partner: prove the fail-fast guard is not simply
-                  preventing every startup.
+Purpose:          Required non-effect partner at host level: valid configuration does not
+                  prevent host startup and does not force an immediate database connection.
 Preconditions:    WebApplicationFactory WITH a placeholder connection string.
 Action:           CreateClient().
 Assertions:       A client is produced (host started).
 Required
 non-effects:      No database connection is attempted merely by starting.
-What this proves: The previous test fails for the intended reason (missing configuration).
+What this proves: Host startup is not blocked by valid configuration, and starting does not
+                  eagerly connect.
 What this does
-NOT prove:        That the supplied connection string is reachable or correct.
+NOT prove:        That the supplied connection string is reachable or correct; process-level
+                  exit-code behaviour when configuration is absent.
 File/path:        tests/DMO.IntegrationTests/StartupConfigurationTests.cs
 ```
 
@@ -263,5 +353,32 @@ Only test 6 touches a database, and it is skipped unless
 Supabase project — neither DEV (`fsxmxyaghxzhpdydamml`) nor PROD
 (`bddfhbyrmchktqotpzgb`) — and no database was contacted during P1-T01.
 
-If the Architect authorises execution, the connection string should name a disposable
-database explicitly, so the run cannot be mistaken for a DEV or PROD operation.
+### Architect execution conditions for test 6
+
+From `dev/reviews/P1-T01_APPLICATION_SKELETON_REVIEW.md` §4.9:
+
+- `DMO_TEST_POSTGRES_CONNECTION` must point to an **explicitly disposable** database;
+- **never** DEV or PROD;
+- the developer must identify the disposable target in the execution response;
+- if no disposable PostgreSQL target exists, the test is left unexecuted and that fact is
+  reported;
+- no production/development Supabase database may be created or used merely to satisfy it.
+
+At the time of this correction no disposable PostgreSQL target was available in this
+environment, so this test remains unexecuted and the fact will be reported at execution time.
+
+## EF Core migration history — Architect decision
+
+The first response raised `__EFMigrationsHistory` as a possible open conflict. The Architect
+decided (`dev/reviews/P1-T01_APPLICATION_SKELETON_REVIEW.md` §3): **no conflict.**
+
+- EF Core migration bookkeeping is infrastructure, not product schema.
+- It is acceptable for EF Core to create/use `__EFMigrationsHistory` when migrations actually
+  require it.
+- `EfCoreMigrationRunner.ApplyPendingAsync()` returns before `MigrateAsync()` when there are
+  zero pending migrations, so the zero-migration path is intentionally inert.
+- The migration mechanism must **not** be redesigned to avoid the EF history table.
+
+No implementation change was made in response. The §6 test asserts on the public BASE TABLE
+set, so the history table (created only once a migration is actually applied) is outside the
+compared set.
