@@ -217,5 +217,60 @@ runner are byte-identical to the versions those checks exercised.
 
 ### Still not executed
 
-No test method was executed. `dotnet test` was never run, before or after the correction.
-Test execution remains gated pending Architect verification of this correction commit.
+No test method was executed by that correction pass. `dotnet test` was not run at that point;
+test execution remained gated pending Architect verification of the correction commit.
+
+---
+
+## Test execution and test-infrastructure correction
+
+### First authorized test execution
+
+After the Architect accepted the corrections and authorized execution
+(`dmo-work/dev/reviews/P1-T01_TEST_EXECUTION_AUTHORIZATION.md`), the approved tests were run
+once against DMO-MODULAR `67ca5d9`:
+
+```pwsh
+dotnet test DMO.slnx --logger "console;verbosity=detailed"
+```
+
+Result — exit code 1: **19 tests — 14 passed, 4 failed, 1 skipped**.
+
+The four failures were **test-construction defects**, not runtime defects. The startup,
+`/health` and migration checks in §1–§7 above all remain valid: no runtime code was involved
+in any failure. Full detail is in `dmo-work/dev/responses/P1-T01_TEST_EXECUTION_RESPONSE.md`.
+
+### Test-infrastructure correction
+
+A second Architect review (`dmo-work/dev/reviews/P1-T01_TEST_EXECUTION_REVIEW.md`, status
+**CORRECTION REQUIRED — TEST INFRASTRUCTURE ONLY**) required two test-only corrections, both
+applied:
+
+1. `DmoWebApplicationFactory` made parameterless and switched to process-scoped environment
+   injection (restored on dispose), so the real entry point sees the placeholder connection
+   string during eager configuration validation.
+2. `MigrationRunnerTests.ListPendingAsync_WithNoConfiguredConnection_Throws` now places the
+   entire attempted migration-path operation inside the asserted delegate.
+
+**No runtime code, database model, migration mechanism or connection configuration contract
+was changed.** Only test files and documentation were edited.
+
+### Re-verified after the test-infrastructure correction
+
+```pwsh
+dotnet build DMO.slnx
+```
+
+Result — exit code 0:
+
+```text
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+```
+
+### The corrected tests have not been executed
+
+`dotnet test` was **not** run after the test-infrastructure correction. Execution is gated
+pending Architect verification of the corrected test code. The §1–§7 startup/`/health`/migration
+checks were not re-run either, because no runtime code changed.

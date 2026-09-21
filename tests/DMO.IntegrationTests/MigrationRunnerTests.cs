@@ -61,10 +61,24 @@ public sealed class MigrationRunnerTests
         services.AddScoped<IMigrationRunner, EfCoreMigrationRunner>();
 
         await using var provider = services.BuildServiceProvider();
-        await using var scope = provider.CreateAsyncScope();
-        var runner = scope.ServiceProvider.GetRequiredService<IMigrationRunner>();
 
         // Action + assertion: the runner refuses loudly instead of targeting a default database.
-        await Assert.ThrowsAsync<DatabaseConfigurationException>(() => runner.ListPendingAsync());
+        //
+        // The WHOLE attempted migration-path operation is inside the asserted delegate —
+        // creating the scope, resolving IMigrationRunner and calling ListPendingAsync — because
+        // database configuration is validated when the persistence services are resolved, not
+        // only when the runner method executes. The accepted contract is "attempting the
+        // migration path with no database configuration raises DatabaseConfigurationException";
+        // it does not require the exception to originate specifically inside ListPendingAsync.
+        var exception = await Assert.ThrowsAsync<DatabaseConfigurationException>(async () =>
+        {
+            await using var scope = provider.CreateAsyncScope();
+            var runner = scope.ServiceProvider.GetRequiredService<IMigrationRunner>();
+            await runner.ListPendingAsync();
+        });
+
+        // Required non-effect: the failure names the missing configuration rather than
+        // silently targeting an implicit or default database.
+        Assert.Contains(DatabaseOptions.ConnectionStringKey, exception.Message, StringComparison.Ordinal);
     }
 }

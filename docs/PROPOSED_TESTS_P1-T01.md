@@ -1,16 +1,48 @@
 # Proposed tests — P1-T01
 
-> ## TASK-SPECIFIC TESTS NOT EXECUTED — AWAITING ARCHITECT VERIFICATION OF THIS CORRECTION
+> ## CORRECTED TEST INFRASTRUCTURE — NOT YET RE-EXECUTED
+> ## AWAITING ARCHITECT VERIFICATION
 
-These test files were **created but never executed**. Per §9 of the P1-T01 request, the
-Architect reviews each proposed test first to verify that it tests the intended contract
-rather than merely the implementation chosen.
+These test files were **created but not executed** in the first submission. Per §9 of the
+P1-T01 request, the Architect reviews each proposed test first to verify that it tests the
+intended contract rather than merely the implementation chosen.
 
-The test projects were **compiled** (`dotnet build`) so that they are known to be
-mechanically valid. Compilation is not execution: no test method was run, and no test result
-exists.
+The test projects are **compiled** (`dotnet build`) so that they are known to be mechanically
+valid. Compilation is not execution.
 
-## Architect review outcome
+## Execution history
+
+**First authorized execution run** (`dev/responses/P1-T01_TEST_EXECUTION_RESPONSE.md`,
+DMO-MODULAR `67ca5d9`): 19 tests — 14 passed, **4 failed**, 1 skipped.
+
+The failures were **test-construction defects**, not runtime defects, and remain part of the
+durable history. They are not deleted or rewritten.
+
+| Failing test | Cause |
+| --- | --- |
+| TechnicalEndpointTests (2) | `DmoWebApplicationFactory` had a `bool supplyConnectionString` constructor parameter, which xUnit cannot resolve for a class fixture |
+| StartupConfigurationTests.Host_WhenConnectionStringSupplied_StartsSuccessfully | the `ConfigureAppConfiguration` hook ran too late for the entry point's eager database configuration validation, so the host exited before building an `IHost` |
+| MigrationRunnerTests.ListPendingAsync_WithNoConfiguredConnection_Throws | the exception surfaced during `GetRequiredService<IMigrationRunner>()`, outside the asserted delegate |
+
+**Second Architect review** (`dev/reviews/P1-T01_TEST_EXECUTION_REVIEW.md`, status
+**CORRECTION REQUIRED — TEST INFRASTRUCTURE ONLY**) required two test-infrastructure
+corrections, both applied:
+
+1. **`DmoWebApplicationFactory` is now parameterless** and injects the placeholder connection
+   string through **process-scoped environment configuration** before the real entry point
+   runs, preserving and restoring any pre-existing process-scoped value on dispose. User and
+   Machine scopes are never read or modified. The old "missing DB config" factory mode was
+   removed, since that case is tested directly at the composition boundary.
+2. **`MigrationRunnerTests.ListPendingAsync_WithNoConfiguredConnection_Throws`** now places the
+   entire attempted migration-path operation — scope creation, `IMigrationRunner` resolution
+   and `ListPendingAsync()` — inside the asserted delegate.
+
+**The corrected tests have NOT been executed.** No runtime code, database model, migration
+mechanism or connection configuration contract was changed by either correction.
+
+Nothing below constitutes acceptance evidence.
+
+## Architect review outcome (first review)
 
 The Architect reviewed the first submission
 (`dev/reviews/P1-T01_APPLICATION_SKELETON_REVIEW.md`, status **CORRECTION REQUIRED**):
@@ -31,8 +63,8 @@ The two corrections are recorded in §3 and §4 below. They are documentation/te
 corrections only: no runtime code, database model, migration mechanism or connection
 configuration contract was changed.
 
-**No test has been executed.** Execution remains gated pending Architect verification of this
-correction commit.
+**The corrected tests have not been executed.** Execution is gated pending Architect
+verification of the corrected test code (see "Execution history" above).
 
 Nothing below constitutes acceptance evidence.
 
@@ -250,7 +282,9 @@ File/path:        tests/DMO.IntegrationTests/StartupConfigurationTests.cs
 Test:             StartupConfigurationTests.Host_WhenConnectionStringSupplied_StartsSuccessfully
 Purpose:          Required non-effect partner at host level: valid configuration does not
                   prevent host startup and does not force an immediate database connection.
-Preconditions:    WebApplicationFactory WITH a placeholder connection string.
+Preconditions:    The parameterless DmoWebApplicationFactory, which injects the placeholder
+                  connection string into PROCESS-scoped configuration before the real entry
+                  point runs.
 Action:           CreateClient().
 Assertions:       A client is produced (host started).
 Required
@@ -293,13 +327,21 @@ Purpose:          Verify the migration runner respects the same fail-fast config
 Master/plan
 behaviour:        P1-T01 request §5, applied to the migration mechanism.
 Preconditions:    DI container with infrastructure registered and no connection string.
-Action:           IMigrationRunner.ListPendingAsync().
-Assertions:       DatabaseConfigurationException is thrown.
+Action:           The ENTIRE attempted migration-path operation, inside the asserted
+                  delegate: creating the scope, resolving IMigrationRunner, and calling
+                  ListPendingAsync().
+Assertions:       DatabaseConfigurationException is thrown; its message names the
+                  configuration key.
 Required
 non-effects:      The runner does not fall back to a default database.
 What this proves: The migration path cannot silently target an unintended database.
 What this does
 NOT prove:        Migration behaviour against a real database.
+Note:             Database configuration is validated when the persistence services are
+                  resolved, not only when the runner method executes. The accepted contract
+                  is "attempting the migration path with no database configuration raises
+                  DatabaseConfigurationException"; it does not require the exception to
+                  originate specifically inside ListPendingAsync().
 File/path:        tests/DMO.IntegrationTests/MigrationRunnerTests.cs
 ```
 

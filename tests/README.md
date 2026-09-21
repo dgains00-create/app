@@ -11,15 +11,31 @@ Test projects, ready for Architect-approved tests.
 
 ## P1-T01 status
 
-The proposed tests for P1-T01 were **created but NOT executed**, as required by the task:
+> CORRECTED TEST INFRASTRUCTURE — NOT YET RE-EXECUTED — AWAITING ARCHITECT VERIFICATION
 
-> TASK-SPECIFIC TESTS NOT EXECUTED — AWAITING ARCHITECT REVIEW
+The proposed tests were reviewed by the Architect
+(`dmo-work/dev/reviews/P1-T01_APPLICATION_SKELETON_REVIEW.md`), corrected, and then
+**authorized for execution**. The first authorized run
+(`dmo-work/dev/responses/P1-T01_TEST_EXECUTION_RESPONSE.md`, DMO-MODULAR `67ca5d9`) produced:
 
-The Architect reviewed the first submission
-(`dmo-work/dev/reviews/P1-T01_APPLICATION_SKELETON_REVIEW.md`) with status **CORRECTION
-REQUIRED**. The two test corrections (technical endpoint exact shape; startup configuration
-decoupled from the `WebApplicationFactory` exception type) are applied. Execution remains
-gated until the Architect verifies this correction commit.
+```text
+19 tests — 14 passed, 4 failed, 1 skipped
+```
+
+The four failures were **test-construction defects** (a class-fixture constructor argument and
+two assertion boundaries), not runtime defects. A second Architect review
+(`dmo-work/dev/reviews/P1-T01_TEST_EXECUTION_REVIEW.md`) required a test-infrastructure
+correction, which is applied here:
+
+- `Host/DmoWebApplicationFactory.cs` is now **parameterless**, and injects the placeholder
+  connection string through **process-scoped environment configuration** before the real entry
+  point runs, preserving and restoring any pre-existing process-scoped value on dispose. User
+  and Machine scopes are never read or modified.
+- `MigrationRunnerTests.ListPendingAsync_WithNoConfiguredConnection_Throws` now places the
+  entire attempted migration-path operation inside the asserted delegate.
+
+**The corrected tests have not been executed.** Execution is gated pending Architect
+verification of the corrected test code.
 
 The projects **compile** (verified with `dotnet build`), so they are known to be mechanically
 valid. Compilation is not execution.

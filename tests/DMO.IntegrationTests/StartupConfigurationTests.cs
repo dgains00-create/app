@@ -84,7 +84,11 @@ public sealed class StartupConfigurationTests
     {
         // The host starts in-process when valid configuration is present, and starting it
         // does not force an immediate database connection.
-        using var factory = new DmoWebApplicationFactory(supplyConnectionString: true);
+        //
+        // The factory injects the placeholder connection string into process-scoped
+        // environment configuration before the real entry point runs, because the entry point
+        // validates database configuration eagerly during composition.
+        using var factory = new DmoWebApplicationFactory();
 
         using var client = factory.CreateClient();
 
