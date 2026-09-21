@@ -22,6 +22,7 @@ namespace DMO.IntegrationTests;
 /// original exception type is not the acceptance contract.
 /// </para>
 /// </remarks>
+[Collection(ProcessEnvironmentCollection.Name)]
 public sealed class StartupConfigurationTests
 {
     private static IConfiguration ConfigurationWith(params (string Key, string? Value)[] settings)

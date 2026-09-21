@@ -274,3 +274,41 @@ Build succeeded.
 `dotnet test` was **not** run after the test-infrastructure correction. Execution is gated
 pending Architect verification of the corrected test code. The §1–§7 startup/`/health`/migration
 checks were not re-run either, because no runtime code changed.
+
+### Process-environment serialization correction
+
+A third Architect review
+(`dmo-work/dev/reviews/P1-T01_TEST_INFRASTRUCTURE_CORRECTION_PLAN_V2_REVIEW.md`, status
+**PLAN ACCEPT**) required one further test-only correction, applied as a narrow follow-up:
+
+`DmoWebApplicationFactory` sets the process-global `Database__ConnectionString` for its
+lifetime. xUnit may run different test classes concurrently, so two factories alive at once
+could interleave their capture/restore sequences and leave the process in the wrong state. A
+new `tests/DMO.IntegrationTests/Host/ProcessEnvironmentCollection.cs` declares a named xUnit
+collection (`ProcessEnvironment`, `DisableParallelization = true`), and the two classes that
+construct or use the factory — `TechnicalEndpointTests` and `StartupConfigurationTests` — are
+placed in it. `MigrationRunnerTests` is deliberately excluded (it only reads the compile-time
+constant `PlaceholderConnectionString`).
+
+With the collection in place, no two factories are ever alive concurrently, which makes the
+capture/restore of the process value deterministic.
+
+**No runtime code, database model, migration mechanism or connection configuration contract
+was changed.** Only test files and documentation were edited.
+
+### Re-verified after the serialization correction
+
+```pwsh
+dotnet build DMO.slnx
+```
+
+Result — exit code 0:
+
+```text
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+```
+
+`dotnet test` was **not** run. No test result exists for the serialization correction. The
+§1–§7 startup/`/health`/migration checks were not re-run; no runtime code changed.

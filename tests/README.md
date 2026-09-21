@@ -23,19 +23,45 @@ The proposed tests were reviewed by the Architect
 ```
 
 The four failures were **test-construction defects** (a class-fixture constructor argument and
-two assertion boundaries), not runtime defects. A second Architect review
-(`dmo-work/dev/reviews/P1-T01_TEST_EXECUTION_REVIEW.md`) required a test-infrastructure
-correction, which is applied here:
+two assertion boundaries), not runtime defects. Two further Architect reviews
+(`P1-T01_TEST_EXECUTION_REVIEW.md`, then `P1-T01_TEST_INFRASTRUCTURE_CORRECTION_PLAN_V2_REVIEW.md`)
+required a test-infrastructure correction, which is applied here:
 
-- `Host/DmoWebApplicationFactory.cs` is now **parameterless**, and injects the placeholder
+- `Host/DmoWebApplicationFactory.cs` is **parameterless**, and injects the placeholder
   connection string through **process-scoped environment configuration** before the real entry
   point runs, preserving and restoring any pre-existing process-scoped value on dispose. User
   and Machine scopes are never read or modified.
-- `MigrationRunnerTests.ListPendingAsync_WithNoConfiguredConnection_Throws` now places the
-  entire attempted migration-path operation inside the asserted delegate.
+- `MigrationRunnerTests.ListPendingAsync_WithNoConfiguredConnection_Throws` places the entire
+  attempted migration-path operation inside the asserted delegate.
+- `Host/ProcessEnvironmentCollection.cs` declares a named xUnit collection with
+  `DisableParallelization = true`, and `TechnicalEndpointTests` + `StartupConfigurationTests`
+  are placed in it — see "Serialized collection" below.
 
 **The corrected tests have not been executed.** Execution is gated pending Architect
 verification of the corrected test code.
+
+## Serialized collection
+
+`Host/ProcessEnvironmentCollection.cs` (`Name = "ProcessEnvironment"`,
+`DisableParallelization = true`) serializes the test classes that touch the process-global
+`Database__ConnectionString`.
+
+`DmoWebApplicationFactory` sets that variable for its lifetime, so two factories alive at the
+same time would interleave their capture/restore sequences and could leave the process in the
+wrong state. xUnit may run different test classes concurrently unless collection
+parallelization is constrained, so serialization is declared rather than assumed away.
+
+| Class | In collection? | Why |
+| --- | --- | --- |
+| `TechnicalEndpointTests` | **Yes** | constructs the factory via `IClassFixture<DmoWebApplicationFactory>` |
+| `StartupConfigurationTests` | **Yes** | constructs the factory directly (`new DmoWebApplicationFactory()`) |
+| `MigrationRunnerTests` | No | reads only the compile-time constant `PlaceholderConnectionString`; never constructs the factory, never mutates `Database__ConnectionString`, never depends on the factory lifetime, never observes process environment state |
+| `StartupCommandsTests` | No | no factory reference, no process state |
+| `DatabaseConnectivityTests` | No | no factory reference; uses `DMO_TEST_POSTGRES_CONNECTION` |
+
+Excluding `MigrationRunnerTests` is a deliberate Architect decision (plan V2 review §1):
+serializing it would add no safety. Assembly-wide parallelization disable was rejected as
+broader than the actual hazard.
 
 The projects **compile** (verified with `dotnet build`), so they are known to be mechanically
 valid. Compilation is not execution.

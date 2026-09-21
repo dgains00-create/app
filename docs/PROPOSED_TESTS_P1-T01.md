@@ -40,6 +40,24 @@ corrections, both applied:
 **The corrected tests have NOT been executed.** No runtime code, database model, migration
 mechanism or connection configuration contract was changed by either correction.
 
+**Third Architect review** (`dev/reviews/P1-T01_TEST_INFRASTRUCTURE_CORRECTION_PLAN_V2_REVIEW.md`,
+status **PLAN ACCEPT**) required one further test-infrastructure correction, applied as a
+narrow follow-up commit on top of `c9aee9b`:
+
+3. **Process-environment serialization.** `DmoWebApplicationFactory` sets the process-global
+   `Database__ConnectionString` for its lifetime. Because xUnit may run different test classes
+   concurrently, two factories alive at once could interleave their capture/restore sequences
+   and leave the process in the wrong state. A new
+   `tests/DMO.IntegrationTests/Host/ProcessEnvironmentCollection.cs` declares a named xUnit
+   collection (`ProcessEnvironment`) with `DisableParallelization = true`, and
+   `TechnicalEndpointTests` and `StartupConfigurationTests` — the two classes that construct
+   or use the factory — are placed in it. `MigrationRunnerTests` is deliberately **not** in the
+   collection (Architect decision, plan V2 review §1): it reads only the compile-time constant
+   `PlaceholderConnectionString` and never constructs the factory, mutates the variable,
+   depends on the factory lifetime or observes process environment state, so serializing it
+   would add no safety. With this collection, no two factories are ever alive concurrently,
+   which makes the capture/restore sequence deterministic.
+
 Nothing below constitutes acceptance evidence.
 
 ## Architect review outcome (first review)
@@ -171,6 +189,8 @@ behaviour:        P1-T01 request §3: "provides a minimal technical health/start
                   equivalent"; §4: DMO.Web is the host and owns no industrial business rule.
 Preconditions:    The host started in-process via WebApplicationFactory, with a placeholder
                   (non-connecting) connection string so eager configuration validation passes.
+                  Runs inside the serialized ProcessEnvironment collection, so no other
+                  factory is alive concurrently.
 Action:           GET /health.
 Assertions:       HTTP 200; the body is a JSON object;
                   the field-name set is EXACTLY { "status", "environment" } (compared as an
@@ -284,7 +304,9 @@ Purpose:          Required non-effect partner at host level: valid configuration
                   prevent host startup and does not force an immediate database connection.
 Preconditions:    The parameterless DmoWebApplicationFactory, which injects the placeholder
                   connection string into PROCESS-scoped configuration before the real entry
-                  point runs.
+                  point runs. The class runs inside the serialized ProcessEnvironment
+                  collection, so no other factory is alive concurrently and the
+                  capture/restore of the process value is deterministic.
 Action:           CreateClient().
 Assertions:       A client is produced (host started).
 Required

@@ -14,6 +14,7 @@ namespace DMO.IntegrationTests;
 /// PROPOSED — NOT EXECUTED. Awaiting Architect review before first execution.
 /// See <c>docs/PROPOSED_TESTS_P1-T01.md</c> for the full test protocol record.
 /// </remarks>
+[Collection(ProcessEnvironmentCollection.Name)]
 public sealed class TechnicalEndpointTests : IClassFixture<DmoWebApplicationFactory>
 {
     /// <summary>
