@@ -68,6 +68,10 @@ public static class InfrastructureServiceCollectionExtensions
         // and the repository primitives (one DmoDbContext, scoped per request).
         services.AddPersistenceFoundation();
 
+        // P1-T04 module access foundation: canonical Module Registry (explicit current-build
+        // registration), scoped access resolver and access service.
+        services.AddModuleAccess();
+
         return services;
     }
 }

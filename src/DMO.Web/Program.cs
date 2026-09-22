@@ -5,6 +5,7 @@ using DMO.Application.Session;
 using DMO.Infrastructure;
 using DMO.Infrastructure.Database;
 using DMO.Web.Auth;
+using DMO.Web.Authorization;
 using DMO.Web.Endpoints;
 using DMO.Web.Startup;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -60,6 +61,14 @@ try
     builder.Services.AddScoped<IAccountResolver, AccountResolver>();
     builder.Services.AddScoped<ISessionAuthentication, SessionAuthentication>();
     builder.Services.AddScoped<ICurrentAccountContext, CurrentAccountContext>();
+
+    // ---- P1-T04 server-side Module gate ---------------------------------------------
+    // Authorization policies are a thin ASP.NET projection of the canonical Module ids:
+    // one policy per ModuleCatalog identity, each carrying exactly one
+    // ModuleAuthorizationRequirement. The handler resolves effective access through the
+    // Module access service (registry + persisted Template); it grants nothing from claims,
+    // roles, Template names or navigation visibility.
+    builder.Services.AddModuleAuthorization();
 
     // ---- P1-T03 single-ADMIN bootstrap (deployment-only command) -------------------
     // Exactly three inputs (env/user-secrets only): AdminBootstrap__Email,
