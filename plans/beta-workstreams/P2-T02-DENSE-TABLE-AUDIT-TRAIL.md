@@ -117,3 +117,13 @@ P2-T04 (Job On history), P2-T05/P2-T06 (Controlo lists), P2-T07 (Boquilhas Histo
 ## 12. Regression guard
 
 Do not modify protected foundation; do not weaken existing tests.
+
+## 13. Authored contract (planning gate)
+
+The formal implementation contract for this workstream is
+`plans/contracts/P2-T02_DENSE_DATA_TABLE_AUDIT_TRAIL_CONTRACT.md`, with authoring response
+`dev/responses/P2_T02_CONTRACT_AUTHORING_RESPONSE.md`.
+
+Status: **CONTRACT AUTHORED — AWAITING ARCHITECT PLAN ACCEPT.** Implementation is not authorized
+and has not started. This handoff remains the scope summary; the contract is the binding
+implementation specification once the Architect returns `PLAN ACCEPT`.

@@ -631,6 +631,19 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   empty/lookup-failed distinction.
 - **Acceptance criteria:** the six bullet behaviors above each have a failing-if-removed test;
   no consumer URL is constructed by the component; no attribution synthesis is observable.
+- **STATUS: CONTRACT AUTHORED — AWAITING ARCHITECT PLAN ACCEPT** (not implemented). The formal
+  implementation contract is
+  `plans/contracts/P2-T02_DENSE_DATA_TABLE_AUDIT_TRAIL_CONTRACT.md`; authoring response
+  `dev/responses/P2_T02_CONTRACT_AUTHORING_RESPONSE.md`. The contract pins both components to the
+  binding DMO fixed desktop layout policy (canonical 1366 × 768; no breakpoint reflow, no
+  table-to-card conversion, no required-column hiding, no action relocation; keyboard-reachable
+  local horizontal scroll), reuses the accepted P2-T01 state/status/action primitives without
+  modification, protects the P2-T03 boundary (no ToolPicker/ToolSummaryRow/MeasurementRows/
+  DecisionBar/ProductionContextStrip), defines no backend/persistence/route/authorization seam,
+  and leaves 3 non-blocking CONTRACT QUESTIONS (Q1 browser-level JS verification, Q2 optional
+  per-entry audit status, Q3 plain-text vs rendered cell content). No implementation, no
+  application change, no self-acceptance: P2-T02 remains unauthorized until an Architect
+  `PLAN ACCEPT` on the contract per `dmo-beta-master/WORKFLOW.md` steps 4–7.
 - **Downstream dependents:** P2-T04 (Job On history), P2-T05/P2-T06 (Controlo lists),
   P2-T07 (Boquilhas History), P2-T08 (audit/decision history rendering).
 
