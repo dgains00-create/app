@@ -1,0 +1,26 @@
+@page "{id:guid}"
+@model DMO.Web.Pages.Administration.Users.DeleteModel
+@{
+    ViewData["Title"] = "Delete user";
+    var ficha = Model.Ficha!;
+}
+<link rel="stylesheet" href="~/css/dmo-admin-users.css" asp-append-version="true" />
+
+<div asp-validation-summary="All" class="msg err"></div>
+
+<p>
+    <strong>Confirm deletion of</strong> @ficha.Name (@ficha.CompanyNumber).
+</p>
+<p>
+    The provider identity will be deleted first and then the application row will be removed.
+    This user will no longer be able to log in. Edits made concurrently with the confirmation
+    are never silently overwritten.
+</p>
+
+<form method="post">
+    <input asp-for="ExpectedVersion" type="hidden" />
+    <div class="row">
+        <button type="submit">Delete user</button>
+        <a asp-page="Edit" asp-route-id="@ficha.UserId">Cancel</a>
+    </div>
+</form>

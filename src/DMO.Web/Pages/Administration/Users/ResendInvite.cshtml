@@ -1,0 +1,27 @@
+@page "{id:guid}"
+@model DMO.Web.Pages.Administration.Users.ResendInviteModel
+@{
+    ViewData["Title"] = "Resend setup invitation";
+    var ficha = Model.Ficha!;
+}
+<link rel="stylesheet" href="~/css/dmo-admin-users.css" asp-append-version="true" />
+
+<div asp-validation-summary="All" class="msg err"></div>
+
+<p>
+    <strong>Confirm re-sending the setup invitation to</strong> @ficha.Name (@ficha.CompanyNumber)
+    at @ficha.Email.
+</p>
+<p>
+    The provider sends a fresh setup link while the user has not yet confirmed. If the user has
+    already confirmed, the provider rejects the re-send and the password reset action should be
+    used instead. No password is handled by either action.
+</p>
+
+<form method="post">
+    <input asp-for="ExpectedVersion" type="hidden" />
+    <div class="row">
+        <button type="submit">Re-send invitation</button>
+        <a asp-page="Edit" asp-route-id="@ficha.UserId">Cancel</a>
+    </div>
+</form>

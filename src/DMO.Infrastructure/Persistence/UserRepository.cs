@@ -2,6 +2,7 @@ using DMO.Application.Accounts;
 using DMO.Application.Persistence;
 using DMO.Application.Repositories;
 using DMO.Infrastructure.Persistence.Entities;
+using DMO.Infrastructure.Persistence.EntityConfigurations;
 using Microsoft.EntityFrameworkCore;
 
 namespace DMO.Infrastructure.Persistence;
@@ -174,6 +175,56 @@ public sealed class UserRepository : IUserRepository
         await SaveAsync(cancellationToken);
     }
 
+    // ---- P1-T05 additive reads/writes (no schema impact) -------------------------------
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<UserAccount>> ListAsync(CancellationToken cancellationToken)
+    {
+        // Order at the entity level BEFORE the domain projection so the ordering translates.
+        var ordered = _context.Users
+            .OrderBy(user => user.Name)
+            .ThenBy(user => user.CompanyNumber);
+
+        return await Project(ordered).ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task<UserAccount?> GetByEmailAsync(string email, CancellationToken cancellationToken)
+        => Project(_context.Users.Where(user => user.Email == email))
+            .FirstOrDefaultAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<string?> GetAuthIdentityIdAsync(Guid userId, CancellationToken cancellationToken)
+        => await _context.Users
+            .Where(user => user.UserId == userId)
+            .Select(user => (string?)user.AuthIdentityId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task DeleteAsync(Guid userId, int expectedVersion, CancellationToken cancellationToken)
+    {
+        // Version-compare + delete atomically: a stale concurrent write matches zero rows and
+        // is never silently deleted. The explicit WHERE carries the expected version (the
+        // version is the same concurrency boundary the other write primitives use).
+        var deleted = await _context.Users
+            .Where(user => user.UserId == userId && user.Version == expectedVersion)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        if (deleted == 0)
+        {
+            var exists = await _context.Users.AnyAsync(user => user.UserId == userId, cancellationToken);
+            if (exists)
+            {
+                throw new ConcurrencyConflictException(
+                    $"USER account '{userId}' was modified concurrently (expected version {expectedVersion}); " +
+                    "reload and retry.");
+            }
+
+            // No row: it was already deleted concurrently. The caller interprets this state
+            // (the P1-T05 delete flow treats it as the operation logically completing).
+        }
+    }
+
     private async Task<UserEntity> LoadTrackedAsync(Guid userId, CancellationToken cancellationToken)
     {
         return await _context.Users
@@ -203,5 +254,75 @@ public sealed class UserRepository : IUserRepository
         {
             throw ConcurrencyConflictExceptionMapping.ToDomainConflict(exception);
         }
+        catch (DbUpdateException exception) when (TryMapConstraintViolation(exception, out var failure))
+        {
+            throw failure;
+        }
+    }
+
+    /// <summary>
+    /// Maps the database constraint violations the P1-T05 flows can hit onto the typed
+    /// <see cref="UserPersistenceException"/> so Application services can drive the accepted
+    /// compensation posture without referencing EF/Npgsql.
+    /// </summary>
+    /// <remarks>
+    /// Only <c>users</c> constraint failures are mapped (unique company number, unique provider
+    /// subject, Template FK). Everything else propagates unchanged. Constraint names are the
+    /// explicit database names from <see cref="UserEntityConfiguration"/>.
+    /// </remarks>
+    private static bool TryMapConstraintViolation(
+        DbUpdateException exception,
+        out UserPersistenceException failure)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+
+        var postgresException = exception.InnerException as Npgsql.PostgresException
+            ?? exception.InnerException?.InnerException as Npgsql.PostgresException;
+
+        if (postgresException is null)
+        {
+            failure = null!;
+            return false;
+        }
+
+        switch (postgresException.SqlState)
+        {
+            case "23505": // unique_violation
+                if (string.Equals(
+                        postgresException.ConstraintName,
+                        UserEntityConfiguration.CompanyNumberUniqueConstraintName,
+                        StringComparison.Ordinal))
+                {
+                    failure = new UserPersistenceException(
+                        UserPersistenceFailureReason.DuplicateCompanyNumber,
+                        "The company number already exists; the USER write was rejected.",
+                        exception);
+                    return true;
+                }
+
+                if (string.Equals(
+                        postgresException.ConstraintName,
+                        UserEntityConfiguration.AuthIdentityIdUniqueConstraintName,
+                        StringComparison.Ordinal))
+                {
+                    failure = new UserPersistenceException(
+                        UserPersistenceFailureReason.DuplicateProviderSubject,
+                        "The provider subject is already mapped to a USER; the write was rejected.",
+                        exception);
+                    return true;
+                }
+
+                break;
+
+            case "23503": // foreign_key_violation — the only FK on users is template_id.
+                failure = new UserPersistenceException(
+                    UserPersistenceFailureReason.InvalidTemplateReference,
+                    "The Template reference does not exist; the USER write was rejected.",
+                    exception);
+                return true;
+        }
+
+        failure = null!;
+        return false;
     }
 }

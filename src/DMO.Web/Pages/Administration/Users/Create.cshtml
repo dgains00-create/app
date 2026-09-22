@@ -1,0 +1,50 @@
+@page
+@model DMO.Web.Pages.Administration.Users.CreateModel
+@{
+    ViewData["Title"] = "Create user";
+}
+<link rel="stylesheet" href="~/css/dmo-admin-users.css" asp-append-version="true" />
+
+<p>
+    The user will be created through the provider invitation flow: the provider sends a setup
+    link and the user chooses their own password. The administrator never supplies or sees the
+    password.
+</p>
+
+<div asp-validation-summary="All" class="msg err"></div>
+
+<form method="post">
+    <label asp-for="CreateName">Name</label>
+    <input asp-for="CreateName" type="text" />
+
+    <label asp-for="CreateCompanyNumber">Company number (login identifier)</label>
+    <input asp-for="CreateCompanyNumber" type="text" />
+
+    <label asp-for="CreateEmail">Carrier email (provider identity)</label>
+    <input asp-for="CreateEmail" type="email" />
+
+    <label asp-for="CreateRole">Role label (presentation only)</label>
+    <input asp-for="CreateRole" type="text" />
+
+    <label asp-for="CreateTemplateId">Template (optional)</label>
+    <select asp-for="CreateTemplateId">
+        <option value="">No Template</option>
+        @foreach (var template in Model.TemplateOptions)
+        {
+            <option value="@template.TemplateId">@template.Name</option>
+        }
+    </select>
+
+    <label class="row">
+        <input asp-for="CreateActive" type="checkbox" />
+        Account is active
+    </label>
+
+    <label asp-for="CreateInviteRedirectUrl">Invite redirect URL (optional)</label>
+    <input asp-for="CreateInviteRedirectUrl" type="text" />
+
+    <div class="row">
+        <button type="submit">Create and send invitation</button>
+        <a asp-page="List">Cancel</a>
+    </div>
+</form>

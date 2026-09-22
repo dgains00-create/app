@@ -9,6 +9,15 @@ namespace DMO.Infrastructure.Persistence.EntityConfigurations;
 /// </summary>
 public sealed class UserEntityConfiguration : IEntityTypeConfiguration<UserEntity>
 {
+    /// <summary>Database name of the unique provider-subject index.</summary>
+    public const string AuthIdentityIdUniqueConstraintName = "users_auth_identity_id_key";
+
+    /// <summary>Database name of the unique company-number index.</summary>
+    public const string CompanyNumberUniqueConstraintName = "users_company_number_key";
+
+    /// <summary>Database name of the Template foreign key (EF-conventional).</summary>
+    public const string TemplateForeignKeyConstraintName = "users_template_id_fkey";
+
     /// <inheritdoc />
     public void Configure(EntityTypeBuilder<UserEntity> builder)
     {
@@ -31,7 +40,7 @@ public sealed class UserEntityConfiguration : IEntityTypeConfiguration<UserEntit
             .IsRequired();
         builder.HasIndex(user => user.AuthIdentityId)
             .IsUnique()
-            .HasDatabaseName("users_auth_identity_id_key");
+            .HasDatabaseName(AuthIdentityIdUniqueConstraintName);
 
         builder.Property(user => user.Name)
             .HasColumnName("name")
@@ -42,7 +51,7 @@ public sealed class UserEntityConfiguration : IEntityTypeConfiguration<UserEntit
             .IsRequired();
         builder.HasIndex(user => user.CompanyNumber)
             .IsUnique()
-            .HasDatabaseName("users_company_number_key");
+            .HasDatabaseName(CompanyNumberUniqueConstraintName);
 
         builder.Property(user => user.Email)
             .HasColumnName("email")

@@ -1,0 +1,94 @@
+@page "{id:guid}"
+@model DMO.Web.Pages.Administration.Users.EditModel
+@{
+    ViewData["Title"] = "User details";
+    var ficha = Model.Ficha!;
+}
+<link rel="stylesheet" href="~/css/dmo-admin-users.css" asp-append-version="true" />
+
+@if (TempData["message"] is string message)
+{
+    <div class="msg ok">@message</div>
+}
+@if (TempData["error"] is string error)
+{
+    <div class="msg err">@error</div>
+}
+
+<div asp-validation-summary="All" class="msg err"></div>
+
+<p>
+    <strong>@ficha.Name</strong> (@ficha.CompanyNumber)
+    @if (ficha.Active)
+    {
+        <span class="badge on">active</span>
+    }
+    else
+    {
+        <span class="badge off">inactive</span>
+    }
+    · Template: @(ficha.TemplateName ?? "no Template")
+</p>
+
+<fieldset>
+    <legend>Edit facts</legend>
+    <form method="post">
+        <label asp-for="EditName">Name</label>
+        <input asp-for="EditName" type="text" />
+
+        <label asp-for="EditCompanyNumber">Company number (login identifier)</label>
+        <input asp-for="EditCompanyNumber" type="text" />
+
+        <label asp-for="EditEmail">Carrier email (provider identity)</label>
+        <input asp-for="EditEmail" type="email" />
+
+        <label asp-for="EditRole">Role label (presentation only)</label>
+        <input asp-for="EditRole" type="text" />
+
+        <input asp-for="EditExpectedVersion" type="hidden" />
+
+        <div class="row">
+            <button type="submit">Save</button>
+        </div>
+    </form>
+</fieldset>
+
+<fieldset>
+    <legend>Template assignment</legend>
+    <form method="post" asp-page-handler="Template">
+        <label asp-for="EditTemplateId">Template</label>
+        <select asp-for="EditTemplateId">
+            <option value="">No Template</option>
+            @foreach (var template in Model.TemplateOptions)
+            {
+                <option value="@template.TemplateId">@template.Name</option>
+            }
+        </select>
+        <input asp-for="TemplateExpectedVersion" type="hidden" />
+        <div class="row">
+            <button type="submit">Assign / reassign / remove</button>
+        </div>
+    </form>
+</fieldset>
+
+<fieldset>
+    <legend>Account state</legend>
+    <form method="post" asp-page-handler="Activate" style="display:inline">
+        <input asp-for="ActionExpectedVersion" type="hidden" />
+        <button type="submit" disabled="@(ficha.Active)">Activate</button>
+    </form>
+    <form method="post" asp-page-handler="Deactivate" style="display:inline">
+        <input asp-for="ActionExpectedVersion" type="hidden" />
+        <button type="submit" disabled="@(!ficha.Active)">Deactivate</button>
+    </form>
+</fieldset>
+
+<p class="row">
+    <a asp-page="Delete" asp-route-id="@ficha.UserId">Delete user</a>
+    &nbsp;·&nbsp;
+    <a asp-page="ResetPassword" asp-route-id="@ficha.UserId">Initiate password reset</a>
+    &nbsp;·&nbsp;
+    <a asp-page="ResendInvite" asp-route-id="@ficha.UserId">Resend setup invitation</a>
+    &nbsp;·&nbsp;
+    <a asp-page="List">Back to list</a>
+</p>

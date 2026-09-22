@@ -60,4 +60,35 @@ public interface IUserRepository
 
     /// <summary>Deletes the USER account.</summary>
     Task DeleteAsync(Guid userId, CancellationToken cancellationToken);
+
+    // ---- P1-T05 additive reads/writes (no schema impact) -------------------------------
+
+    /// <summary>Returns every USER account (active and inactive), ordered.</summary>
+    Task<IReadOnlyList<UserAccount>> ListAsync(CancellationToken cancellationToken);
+
+    /// <summary>Returns the USER account with the given carrier email (exact match), or <c>null</c>.</summary>
+    Task<UserAccount?> GetByEmailAsync(string email, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Returns the internal provider linkage (auth_identity_id) of the USER, or <c>null</c>
+    /// when the USER does not exist.
+    /// </summary>
+    /// <remarks>
+    /// P1-T05 addition required by the accepted delete/email/orphan flows: <c>UserAccount</c>
+    /// deliberately carries no provider linkage (it is internal, never presented), so the
+    /// administration service reads the linkage through this narrow primitive only when a
+    /// privileged provider operation needs it.
+    /// </remarks>
+    Task<string?> GetAuthIdentityIdAsync(Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Deletes the USER account against an expected version (stale → conflict, no overwrite).
+    /// </summary>
+    /// <remarks>
+    /// P1-T05 addition used as the final step of the accepted delete sequence, after the
+    /// non-destructive version pre-check and the provider identity delete. A missing row
+    /// (already deleted concurrently) completes as a no-op — the caller decides how to
+    /// interpret that state.
+    /// </remarks>
+    Task DeleteAsync(Guid userId, int expectedVersion, CancellationToken cancellationToken);
 }

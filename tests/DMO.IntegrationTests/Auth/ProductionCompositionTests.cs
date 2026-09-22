@@ -2,6 +2,7 @@ using DMO.Application.Accounts;
 using DMO.Application.Authentication;
 using DMO.Application.Repositories;
 using DMO.Application.Session;
+using DMO.Application.UserAdministration;
 using DMO.Infrastructure.Persistence;
 using DMO.IntegrationTests.Host;
 using DMO.Web.Auth;
@@ -39,6 +40,11 @@ public sealed class ProductionCompositionTests
         Assert.IsType<AdminAccountRepository>(services.GetRequiredService<IAdminAccountRepository>());
         Assert.IsType<TemplateRepository>(services.GetRequiredService<ITemplateRepository>());
         Assert.IsType<TemplateModuleRepository>(services.GetRequiredService<ITemplateModuleRepository>());
+
+        // P1-T05 administration: the real privileged provider boundary (server-only service
+        // role; never the login path) and the real administration service are registered.
+        Assert.IsType<SupabaseAdminUserService>(services.GetRequiredService<IUserIdentityProvisioner>());
+        Assert.IsType<UserAdministrationService>(services.GetRequiredService<IUserAdministrationService>());
 
         // Required non-effect: no fake adapter, no sample user, no hidden bootstrap and no
         // hard-coded mapping exist in production registration (enforced by the concrete

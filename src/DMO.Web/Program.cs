@@ -2,6 +2,7 @@ using DMO.Application.Accounts;
 using DMO.Application.Authentication;
 using DMO.Application.Migrations;
 using DMO.Application.Session;
+using DMO.Application.UserAdministration;
 using DMO.Infrastructure;
 using DMO.Infrastructure.Database;
 using DMO.Web.Auth;
@@ -83,6 +84,33 @@ try
     builder.Services.Configure<AdminBootstrapOptions>(
         builder.Configuration.GetSection(AdminBootstrapOptions.SectionName));
     builder.Services.AddScoped<AdminBootstrapCommand>();
+
+    // ---- P1-T05 ADMIN-only USER administration --------------------------------------
+    // The privileged provider boundary uses the service-role secret (server-only), validated
+    // eagerly like every other required configuration: the host must never start against a
+    // missing service-role secret when the administration surface is registered.
+    builder.Services.Configure<SupabaseAdminOptions>(
+        builder.Configuration.GetSection(SupabaseAdminOptions.SectionName));
+    var supabaseAdminOptions = new SupabaseAdminOptions();
+    builder.Configuration.GetSection(SupabaseAdminOptions.SectionName).Bind(supabaseAdminOptions);
+    supabaseAdminOptions.Validate();
+
+    builder.Services.AddHttpClient<SupabaseAdminUserService>((provider, client) =>
+    {
+        var options = provider.GetRequiredService<IOptions<SupabaseOptions>>().Value;
+        client.BaseAddress = new Uri(options.ProjectUrl!.TrimEnd('/') + "/");
+    });
+
+    builder.Services.AddScoped<IUserIdentityProvisioner>(static provider =>
+        provider.GetRequiredService<SupabaseAdminUserService>());
+    builder.Services.AddScoped<IUserAdministrationService, UserAdministrationService>();
+
+    // One ADMIN-only policy (dmo.administration) + scoped handler; deliberately outside the
+    // Module policy namespace. Administration is ADMIN-account functionality, not a Module.
+    builder.Services.AddAdministrationAuthorization();
+
+    // Razor Pages infrastructure is provided by the A2 shared frontend seam above
+    // (AddDmoSharedFrontend); the P1-T05 ADMIN-only pages are mapped through it.
 }
 catch (DatabaseConfigurationException ex)
 {
@@ -123,5 +151,6 @@ app.UseAuthorization();
 app.MapTechnicalEndpoints();
 app.MapAuthEndpoints();
 app.MapDmoSharedFrontend();
+app.MapUserAdministrationEndpoints();
 
 return await StartupCommands.RunHostAsync(app);

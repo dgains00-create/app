@@ -72,6 +72,12 @@ public sealed class DmoWebApplicationFactory : WebApplicationFactory<Program>
     public const string PlaceholderSupabasePublishableKey = "sb_publishable_placeholder_test_key";
 
     /// <summary>
+    /// Placeholder Supabase Admin service-role secret used to satisfy the P1-T05 eager
+    /// privileged-boundary validation. Deliberately not a real secret.
+    /// </summary>
+    public const string PlaceholderSupabaseServiceRoleKey = "placeholder_service_role_for_tests";
+
+    /// <summary>
     /// Environment variable that carries the Supabase project URL, as the double-underscore
     /// form of <c>Supabase:ProjectUrl</c>.
     /// </summary>
@@ -83,12 +89,20 @@ public sealed class DmoWebApplicationFactory : WebApplicationFactory<Program>
     /// </summary>
     public const string SupabasePublishableKeyEnvironmentVariable = "Supabase__PublishableKey";
 
+    /// <summary>
+    /// Environment variable that carries the Supabase Admin service-role secret, as the
+    /// double-underscore form of <c>SupabaseAdmin:ServiceRoleKey</c>.
+    /// </summary>
+    public const string SupabaseAdminServiceRoleKeyEnvironmentVariable = "SupabaseAdmin__ServiceRoleKey";
+
     private readonly string? _previousConnectionString;
     private readonly bool _hadPreviousConnectionString;
     private readonly string? _previousSupabaseProjectUrl;
     private readonly bool _hadPreviousSupabaseProjectUrl;
     private readonly string? _previousSupabasePublishableKey;
     private readonly bool _hadPreviousSupabasePublishableKey;
+    private readonly string? _previousSupabaseServiceRoleKey;
+    private readonly bool _hadPreviousSupabaseServiceRoleKey;
     private bool _disposed;
 
     /// <summary>
@@ -110,6 +124,10 @@ public sealed class DmoWebApplicationFactory : WebApplicationFactory<Program>
             SupabasePublishableKeyEnvironmentVariable, EnvironmentVariableTarget.Process);
         _hadPreviousSupabasePublishableKey = _previousSupabasePublishableKey is not null;
 
+        _previousSupabaseServiceRoleKey = Environment.GetEnvironmentVariable(
+            SupabaseAdminServiceRoleKeyEnvironmentVariable, EnvironmentVariableTarget.Process);
+        _hadPreviousSupabaseServiceRoleKey = _previousSupabaseServiceRoleKey is not null;
+
         // Process scope only: User and Machine scopes are never touched.
         Environment.SetEnvironmentVariable(
             ConnectionStringEnvironmentVariable,
@@ -122,6 +140,10 @@ public sealed class DmoWebApplicationFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable(
             SupabasePublishableKeyEnvironmentVariable,
             PlaceholderSupabasePublishableKey,
+            EnvironmentVariableTarget.Process);
+        Environment.SetEnvironmentVariable(
+            SupabaseAdminServiceRoleKeyEnvironmentVariable,
+            PlaceholderSupabaseServiceRoleKey,
             EnvironmentVariableTarget.Process);
     }
 
@@ -152,6 +174,10 @@ public sealed class DmoWebApplicationFactory : WebApplicationFactory<Program>
             Environment.SetEnvironmentVariable(
                 SupabasePublishableKeyEnvironmentVariable,
                 _hadPreviousSupabasePublishableKey ? _previousSupabasePublishableKey : null,
+                EnvironmentVariableTarget.Process);
+            Environment.SetEnvironmentVariable(
+                SupabaseAdminServiceRoleKeyEnvironmentVariable,
+                _hadPreviousSupabaseServiceRoleKey ? _previousSupabaseServiceRoleKey : null,
                 EnvironmentVariableTarget.Process);
         }
 
