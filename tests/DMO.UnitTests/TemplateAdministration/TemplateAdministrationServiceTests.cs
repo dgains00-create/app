@@ -194,6 +194,74 @@ public sealed class TemplateAdministrationServiceTests
         Assert.IsType<TemplateAdministrationResult.NotFound>(result);
     }
 
+    // --------------------------- POSITIVE VERSION RULE AT SERVICE BOUNDARY (correction B)
+
+    /// <summary>
+    /// Architect correction B at the service boundary: a zero ExpectedVersion is malformed
+    /// input, so the service returns <c>ValidationFailed</c> before any repository write — it
+    /// must never be compared as a "stale version" and must never reach the persistence layer.
+    /// </summary>
+    /// <remarks>
+    /// Test: Update_ExpectedVersionZero_ValidationFailed_NoWrite.<br/>
+    /// Purpose: prove malformed update carriers fail closed without persisting anything.<br/>
+    /// Master behavior being verified: accepted plan §17 — update requires <c>ExpectedVersion &gt; 0</c>.<br/>
+    /// Preconditions: persisted Template with version 1; update command with <c>ExpectedVersion = 0</c>.<br/>
+    /// Action: <c>UpdateAsync</c>.<br/>
+    /// Assertions: <c>ValidationFailed</c> (not <c>Conflict</c>); name/composition/version unchanged.<br/>
+    /// Required non-effects: no <c>UpdatedAsync</c> call — version still 1, composition intact.<br/>
+    /// What this proves: the validator boundary stops the write before any repository call.<br/>
+    /// What this does NOT prove: direct validator behavior (validator tests cover it).
+    /// </remarks>
+    [Fact]
+    public async Task Update_ExpectedVersionZero_ValidationFailed_NoWrite()
+    {
+        var fixture = CreateFixture();
+        var created = await fixture.CreateTemplateAsync("Manutenção", [JobOnView], null);
+
+        var result = await fixture.Service.UpdateAsync(
+            new TemplateAdministrationCommands.UpdateTemplateCommand(
+                created, "Renomeado", [ControloCreate], "controlo", ExpectedVersion: 0),
+            CancellationToken.None);
+
+        Assert.IsType<TemplateAdministrationResult.ValidationFailed>(result);
+
+        var after = (await fixture.Service.GetAsync(created, CancellationToken.None))!;
+        Assert.Equal("Manutenção", after.Name);
+        Assert.Equal([JobOnView], after.Modules.Select(module => module.ModuleId).ToArray());
+        Assert.Null(after.LandingDestinationId);
+        Assert.Equal(1, after.Version);
+    }
+
+    /// <remarks>
+    /// Test: Update_ExpectedVersionNegative_ValidationFailed_NoWrite.<br/>
+    /// Purpose: negative carriers fail closed as input errors, never as stale conflicts.<br/>
+    /// Master behavior being verified: accepted plan §17.<br/>
+    /// Preconditions: persisted Template with version 1; <c>ExpectedVersion = -1</c>.<br/>
+    /// Action: <c>UpdateAsync</c>.<br/>
+    /// Assertions: <c>ValidationFailed</c>; nothing changed (version 1, same facts).<br/>
+    /// Required non-effects: no <c>UpdatedAsync</c> call.<br/>
+    /// What this proves: negative values cannot overwrite or bump anything.<br/>
+    /// What this does NOT prove: validator-level rule (covered separately).
+    /// </remarks>
+    [Fact]
+    public async Task Update_ExpectedVersionNegative_ValidationFailed_NoWrite()
+    {
+        var fixture = CreateFixture();
+        var created = await fixture.CreateTemplateAsync("Manutenção", [JobOnView], null);
+
+        var result = await fixture.Service.UpdateAsync(
+            new TemplateAdministrationCommands.UpdateTemplateCommand(
+                created, "Renomeado", [ControloCreate], "controlo", ExpectedVersion: -1),
+            CancellationToken.None);
+
+        Assert.IsType<TemplateAdministrationResult.ValidationFailed>(result);
+
+        var after = (await fixture.Service.GetAsync(created, CancellationToken.None))!;
+        Assert.Equal("Manutenção", after.Name);
+        Assert.Equal([JobOnView], after.Modules.Select(module => module.ModuleId).ToArray());
+        Assert.Equal(1, after.Version);
+    }
+
     [Fact]
     public async Task Update_PersistedUnavailableModule_SurvivesOrRemovedExplicitly()
     {
@@ -477,6 +545,251 @@ public sealed class TemplateAdministrationServiceTests
         Assert.IsType<TemplateAdministrationResult.NotFound>(result);
     }
 
+    // ------------------------------------- REMOVE MEMBERSHIP INVARIANT (Architect correction A)
+
+    /// <summary>
+    /// Architect correction A (implementation review, CORRECTION REQUIRED §2): the remove
+    /// invariant is Application authority, not Razor. This test calls the service directly —
+    /// the exact path the minimal API <c>DELETE /administration/templates/{id}/users/{userId}</c>
+    /// route uses — with a USER that actually belongs to Template <b>B</b> and a context of
+    /// Template <b>A</b>.
+    /// </summary>
+    /// <remarks>
+    /// Test: SetTemplateUser_Remove_UserBelongsToAnotherTemplate_ValidationFailed_NoWrite.<br/>
+    /// Purpose: prove the direct service/API remove path cannot clear a membership owned by a
+    /// different Template.<br/>
+    /// Master behavior being verified: a USER belongs to zero or one Template through the single
+    /// <c>users.template_id</c> relation; removal through Template A is an operation on A's
+    /// membership, never a general "clear any membership" primitive (ACCESS_MODEL §3/§14,
+    /// ADMIN.md §4).<br/>
+    /// Preconditions: Template A exists; Template B exists; USER U has <c>template_id = B</c>,
+    /// active, version known.<br/>
+    /// Action: <c>SetTemplateUserAsync(SetTemplateUserCommand(TemplateId: A, UserId: U,
+    /// TargetTemplateId: null, UserExpectedVersion: U.Version))</c> — no Razor page involved.<br/>
+    /// Assertions: closed <c>ValidationFailed</c> (never <c>Success</c>, never <c>Conflict</c>);
+    /// <c>U.template_id</c> still equals B; U's version unchanged; B's ficha still lists U; A's
+    /// ficha does not.<br/>
+    /// Required non-effects: no write through <c>SetTemplateAsync</c>; version unchanged;
+    /// membership of B unchanged; no USER row mutated.<br/>
+    /// What this proves: the rule that the implementation review found living only in the Razor
+    /// page now holds in the Application service, therefore Razor and the minimal API have
+    /// identical semantics.<br/>
+    /// What this does NOT prove: the HTTP status mapping of the delete route (covered by the
+    /// endpoint/PG evidence) nor interactive page behavior.
+    /// </remarks>
+    [Fact]
+    public async Task SetTemplateUser_Remove_UserBelongsToAnotherTemplate_ValidationFailed_NoWrite()
+    {
+        var fixture = CreateFixture();
+        var templateA = await fixture.CreateTemplateAsync("A", [JobOnView], null);
+        var templateB = await fixture.CreateTemplateAsync("B", [ControloCreate], null);
+        var user = await fixture.SeedUserAsync("2661", active: true, templateId: templateB);
+
+        var result = await fixture.Service.SetTemplateUserAsync(
+            new TemplateAdministrationCommands.SetTemplateUserCommand(
+                templateA, user.AccountId, TargetTemplateId: null, user.Version),
+            CancellationToken.None);
+
+        Assert.IsType<TemplateAdministrationResult.ValidationFailed>(result);
+
+        // The membership still belongs to B, untouched — and the version proves no write ran.
+        var stored = fixture.Users.Accounts.Single(account => account.AccountId == user.AccountId);
+        Assert.Equal(templateB, stored.TemplateId);
+        Assert.Equal(user.Version, stored.Version);
+        Assert.True(stored.IsActive);
+
+        var fichaB = (await fixture.Service.GetAsync(templateB, CancellationToken.None))!;
+        Assert.Contains(fichaB.Users, member => member.UserId == user.AccountId);
+
+        var fichaA = (await fixture.Service.GetAsync(templateA, CancellationToken.None))!;
+        Assert.DoesNotContain(fichaA.Users, member => member.UserId == user.AccountId);
+    }
+
+    /// <summary>
+    /// Architect correction A: the same invariant must also hold when the USER has no Template
+    /// at all — a stale/incorrect form must not be able to clear an already-empty membership
+    /// through an arbitrary Template context.
+    /// </summary>
+    /// <remarks>
+    /// Test: SetTemplateUser_Remove_UserHasNoTemplate_ValidationFailed_NoWrite.<br/>
+    /// Purpose: prove removal through Template A requires a current membership in A, so a USER
+    /// with <c>template_id = null</c> is rejected rather than silently "succeeding".<br/>
+    /// Master behavior being verified: same single-relation rule as above; no-op removal is not
+    /// a success.<br/>
+    /// Preconditions: Template A exists; USER U has <c>template_id = null</c>.<br/>
+    /// Action: remove requested through context Template A.<br/>
+    /// Assertions: <c>ValidationFailed</c>; <c>U.template_id</c> remains null; version
+    /// unchanged.<br/>
+    /// Required non-effects: no write, no version bump.<br/>
+    /// What this proves: the invariant is <c>current membership == context Template</c>, not
+    /// merely "not some other Template".<br/>
+    /// What this does NOT prove: nothing about assign/reassign (unchanged accepted behavior).
+    /// </remarks>
+    [Fact]
+    public async Task SetTemplateUser_Remove_UserHasNoTemplate_ValidationFailed_NoWrite()
+    {
+        var fixture = CreateFixture();
+        var templateA = await fixture.CreateTemplateAsync("A", [JobOnView], null);
+        var user = await fixture.SeedUserAsync("2661", active: true, templateId: null);
+
+        var result = await fixture.Service.SetTemplateUserAsync(
+            new TemplateAdministrationCommands.SetTemplateUserCommand(
+                templateA, user.AccountId, TargetTemplateId: null, user.Version),
+            CancellationToken.None);
+
+        Assert.IsType<TemplateAdministrationResult.ValidationFailed>(result);
+
+        var stored = fixture.Users.Accounts.Single(account => account.AccountId == user.AccountId);
+        Assert.Null(stored.TemplateId);
+        Assert.Equal(user.Version, stored.Version);
+    }
+
+    /// <summary>
+    /// Architect correction A, positive side: removal through the Template the USER actually
+    /// belongs to still succeeds and nulls the single relation (the accepted behavior is
+    /// preserved, not narrowed).
+    /// </summary>
+    /// <remarks>
+    /// Test: SetTemplateUser_Remove_UserBelongsToContextTemplate_Success_NullsRelation.<br/>
+    /// Purpose: prove the new guard rejects only foreign/absent memberships and does not break
+    /// the accepted remove flow.<br/>
+    /// Master behavior being verified: ADMIN.md §4 — a USER associated with a Template can be
+    /// removed from that Template; the USER remains active and is left without an effective
+    /// Template (fail closed).<br/>
+    /// Preconditions: Template A exists; USER U has <c>template_id = A</c>, active.<br/>
+    /// Action: remove requested through context Template A.<br/>
+    /// Assertions: <c>Success</c>; <c>U.template_id == null</c>; U still active; A's ficha no
+    /// longer lists U.<br/>
+    /// Required non-effects: USER row not deleted; active state preserved.<br/>
+    /// What this proves: the guard is exactly the corrected invariant and nothing broader.<br/>
+    /// What this does NOT prove: reassign semantics (accepted, separately covered).
+    /// </remarks>
+    [Fact]
+    public async Task SetTemplateUser_Remove_UserBelongsToContextTemplate_Success_NullsRelation()
+    {
+        var fixture = CreateFixture();
+        var templateA = await fixture.CreateTemplateAsync("A", [JobOnView], null);
+        var user = await fixture.SeedUserAsync("2661", active: true, templateId: templateA);
+
+        var result = await fixture.Service.SetTemplateUserAsync(
+            new TemplateAdministrationCommands.SetTemplateUserCommand(
+                templateA, user.AccountId, TargetTemplateId: null, user.Version),
+            CancellationToken.None);
+
+        Assert.IsType<TemplateAdministrationResult.Success>(result);
+
+        var stored = fixture.Users.Accounts.Single(account => account.AccountId == user.AccountId);
+        Assert.Null(stored.TemplateId);
+        Assert.True(stored.IsActive);
+
+        var fichaA = (await fixture.Service.GetAsync(templateA, CancellationToken.None))!;
+        Assert.DoesNotContain(fichaA.Users, member => member.UserId == user.AccountId);
+    }
+
+    /// <summary>
+    /// Architect correction A: the reject must not disturb the other two membership operations.
+    /// </summary>
+    /// <remarks>
+    /// Test: SetTemplateUser_Reassign_Unaffected_ByRemoveInvariant.<br/>
+    /// Purpose: prove the new remove guard is scoped to <c>TargetTemplateId == null</c> only.<br/>
+    /// Master behavior being verified: reassign A → B remains a single atomic column write.<br/>
+    /// Preconditions: Template A and B exist; USER U has <c>template_id = B</c>.<br/>
+    /// Action: reassign U from B into A (not a remove).<br/>
+    /// Assertions: <c>Success</c>; <c>U.template_id == A</c>.<br/>
+    /// Required non-effects: no second relation; B no longer lists U.<br/>
+    /// What this proves: the correction is narrow and does not reopen accepted assign/reassign
+    /// behavior.<br/>
+    /// What this does NOT prove: concurrency (separately covered).
+    /// </remarks>
+    [Fact]
+    public async Task SetTemplateUser_Reassign_Unaffected_ByRemoveInvariant()
+    {
+        var fixture = CreateFixture();
+        var templateA = await fixture.CreateTemplateAsync("A", [JobOnView], null);
+        var templateB = await fixture.CreateTemplateAsync("B", [ControloCreate], null);
+        var user = await fixture.SeedUserAsync("2661", active: true, templateId: templateB);
+
+        var result = await fixture.Service.SetTemplateUserAsync(
+            new TemplateAdministrationCommands.SetTemplateUserCommand(
+                templateA, user.AccountId, TargetTemplateId: templateA, user.Version),
+            CancellationToken.None);
+
+        Assert.IsType<TemplateAdministrationResult.Success>(result);
+        Assert.Equal(
+            templateA,
+            fixture.Users.Accounts.Single(account => account.AccountId == user.AccountId).TemplateId);
+    }
+
+    /// <summary>
+    /// Architect correction B at the service boundary, membership: a zero
+    /// <c>UserExpectedVersion</c> is malformed input — <c>ValidationFailed</c> before any
+    /// membership write, never a stale-version conflict, never a null-out.
+    /// </summary>
+    /// <remarks>
+    /// Test: SetTemplateUser_UserExpectedVersionZero_ValidationFailed_NoWrite.<br/>
+    /// Purpose: prove malformed membership carriers cannot mutate <c>users.template_id</c>.<br/>
+    /// Master behavior being verified: accepted plan §17 — association operations require a
+    /// valid user version <c>&gt; 0</c>.<br/>
+    /// Preconditions: Template A exists; USER U associated with A; command with
+    /// <c>UserExpectedVersion = 0</c> and <c>TargetTemplateId = null</c> (the remove shape that
+    /// would otherwise null the relation).<br/>
+    /// Action: <c>SetTemplateUserAsync</c>.<br/>
+    /// Assertions: <c>ValidationFailed</c>; <c>U.template_id</c> remains A; version unchanged.<br/>
+    /// Required non-effects: no <c>SetTemplateAsync</c> call, no version bump.<br/>
+    /// What this proves: the remove invariant and the positive-version rule both close at the
+    /// same boundary — no write happens for malformed input.<br/>
+    /// What this does NOT prove: HTTP mapping (endpoint tests cover the route).
+    /// </remarks>
+    [Fact]
+    public async Task SetTemplateUser_UserExpectedVersionZero_ValidationFailed_NoWrite()
+    {
+        var fixture = CreateFixture();
+        var templateA = await fixture.CreateTemplateAsync("A", [JobOnView], null);
+        var user = await fixture.SeedUserAsync("2661", active: true, templateId: templateA);
+
+        var result = await fixture.Service.SetTemplateUserAsync(
+            new TemplateAdministrationCommands.SetTemplateUserCommand(
+                templateA, user.AccountId, TargetTemplateId: null, UserExpectedVersion: 0),
+            CancellationToken.None);
+
+        Assert.IsType<TemplateAdministrationResult.ValidationFailed>(result);
+
+        var stored = fixture.Users.Accounts.Single(account => account.AccountId == user.AccountId);
+        Assert.Equal(templateA, stored.TemplateId);
+        Assert.Equal(user.Version, stored.Version);
+    }
+
+    /// <remarks>
+    /// Test: SetTemplateUser_UserExpectedVersionNegative_ValidationFailed_NoWrite.<br/>
+    /// Purpose: negative membership carriers fail closed as input errors, never as stale
+    /// conflicts, and never write.<br/>
+    /// Master behavior being verified: accepted plan §17.<br/>
+    /// Preconditions: Template A exists; USER U associated with A; <c>UserExpectedVersion = -1</c>.<br/>
+    /// Action: <c>SetTemplateUserAsync</c>.<br/>
+    /// Assertions: <c>ValidationFailed</c>; <c>U.template_id</c> remains A; version unchanged.<br/>
+    /// Required non-effects: no <c>SetTemplateAsync</c> call.<br/>
+    /// What this proves: malformed membership carriers cannot become conflicts or writes.<br/>
+    /// What this does NOT prove: validator-level rule (covered separately).
+    /// </remarks>
+    [Fact]
+    public async Task SetTemplateUser_UserExpectedVersionNegative_ValidationFailed_NoWrite()
+    {
+        var fixture = CreateFixture();
+        var templateA = await fixture.CreateTemplateAsync("A", [JobOnView], null);
+        var user = await fixture.SeedUserAsync("2661", active: true, templateId: templateA);
+
+        var result = await fixture.Service.SetTemplateUserAsync(
+            new TemplateAdministrationCommands.SetTemplateUserCommand(
+                templateA, user.AccountId, TargetTemplateId: null, UserExpectedVersion: -1),
+            CancellationToken.None);
+
+        Assert.IsType<TemplateAdministrationResult.ValidationFailed>(result);
+
+        var stored = fixture.Users.Accounts.Single(account => account.AccountId == user.AccountId);
+        Assert.Equal(templateA, stored.TemplateId);
+        Assert.Equal(user.Version, stored.Version);
+    }
+
     // -------------------------------------------------------------- TRANSVERSAL (USER ficha)
 
     [Fact]
@@ -605,6 +918,68 @@ public sealed class TemplateAdministrationServiceTests
             new TemplateAdministrationCommands.DeleteTemplateCommand(Guid.NewGuid(), ExpectedVersion: 1),
             CancellationToken.None);
         Assert.IsType<TemplateAdministrationResult.NotFound>(result);
+    }
+
+    /// <remarks>
+    /// Test: Delete_ExpectedVersionZero_ValidationFailed_NoDeleteOrNullOut.<br/>
+    /// Purpose: prove a zero delete carrier never reaches the destructive path.<br/>
+    /// Master behavior being verified: accepted plan §17 — delete requires
+    /// <c>ExpectedVersion &gt; 0</c>; malformed input must fail before any destructive effect.<br/>
+    /// Preconditions: Template A with a member USER; delete command with <c>ExpectedVersion = 0</c>.<br/>
+    /// Action: <c>DeleteAsync</c>.<br/>
+    /// Assertions: <c>ValidationFailed</c>; Template row survives; USER still references it;
+    /// <c>users.template_id</c> untouched.<br/>
+    /// Required non-effects: no <c>DeleteWithMembersAsync</c>, no null-out, no delete.<br/>
+    /// What this proves: the correction closes malformed destructive input at the boundary.<br/>
+    /// What this does NOT prove: atomic transaction behavior (PG tests cover it).
+    /// </remarks>
+    [Fact]
+    public async Task Delete_ExpectedVersionZero_ValidationFailed_NoDeleteOrNullOut()
+    {
+        var fixture = CreateFixture();
+        var template = await fixture.CreateTemplateAsync("A", [JobOnView], null);
+        var user = await fixture.SeedUserAsync("2661", active: true, templateId: template);
+
+        var result = await fixture.Service.DeleteAsync(
+            new TemplateAdministrationCommands.DeleteTemplateCommand(template, ExpectedVersion: 0),
+            CancellationToken.None);
+
+        Assert.IsType<TemplateAdministrationResult.ValidationFailed>(result);
+
+        Assert.Single(fixture.Templates.Templates);
+        Assert.Equal(template, fixture.Templates.Templates.Single().TemplateId);
+        Assert.Equal(template, fixture.Users.Accounts.Single(account => account.AccountId == user.AccountId).TemplateId);
+    }
+
+    /// <remarks>
+    /// Test: Delete_ExpectedVersionNegative_ValidationFailed_NoDeleteOrNullOut.<br/>
+    /// Purpose: negative delete carriers fail closed as input errors, never as stale conflicts,
+    /// and never delete or null anything.<br/>
+    /// Master behavior being verified: accepted plan §17.<br/>
+    /// Preconditions: Template A with a member USER; <c>ExpectedVersion = -1</c>.<br/>
+    /// Action: <c>DeleteAsync</c>.<br/>
+    /// Assertions: <c>ValidationFailed</c>; Template survives; USER still references it.<br/>
+    /// Required non-effects: no <c>DeleteWithMembersAsync</c>, no null-out.<br/>
+    /// What this proves: malformed destructive carriers cannot produce "stale conflict" or any
+    /// destructive outcome.<br/>
+    /// What this does NOT prove: validator-level rule (covered separately).
+    /// </remarks>
+    [Fact]
+    public async Task Delete_ExpectedVersionNegative_ValidationFailed_NoDeleteOrNullOut()
+    {
+        var fixture = CreateFixture();
+        var template = await fixture.CreateTemplateAsync("A", [JobOnView], null);
+        var user = await fixture.SeedUserAsync("2661", active: true, templateId: template);
+
+        var result = await fixture.Service.DeleteAsync(
+            new TemplateAdministrationCommands.DeleteTemplateCommand(template, ExpectedVersion: -1),
+            CancellationToken.None);
+
+        Assert.IsType<TemplateAdministrationResult.ValidationFailed>(result);
+
+        Assert.Single(fixture.Templates.Templates);
+        Assert.Equal(template, fixture.Templates.Templates.Single().TemplateId);
+        Assert.Equal(template, fixture.Users.Accounts.Single(account => account.AccountId == user.AccountId).TemplateId);
     }
 
     [Fact]

@@ -1,5 +1,7 @@
 using DMO.Application.Accounts;
+using DMO.Application.Access;
 using DMO.Application.Persistence;
+using DMO.Application.TemplateAdministration;
 using DMO.Application.Templates;
 using DMO.Infrastructure.Persistence;
 using DMO.IntegrationTests.Persistence;
@@ -382,6 +384,241 @@ public sealed class TemplateAdministrationPersistenceIntegrationTests
             await Assert.ThrowsAsync<PostgresException>(() => context.Database.ExecuteSqlRawAsync(
                 "INSERT INTO template_modules (template_id, module_id, presentation_order) VALUES (@t, 'controlo-create', 1)",
                 new NpgsqlParameter("t", templateId)));
+        }
+        finally
+        {
+            await CleanupAsync(context, token);
+        }
+    }
+
+    // ------------------------------------------------- CORRECTIONS A + B (real service path)
+
+    /// <summary>
+    /// Architect correction A against the real persistence layer: the direct application
+    /// service path — the exact path the minimal API
+    /// <c>DELETE /administration/templates/{id}/users/{userId}</c> route builds
+    /// (<c>TargetTemplateId: null</c>) — cannot remove a membership that belongs to another
+    /// Template. The rule is enforced in the service, not in a Razor page.
+    /// </summary>
+    /// <remarks>
+    /// Test: ServiceRemove_UserBelongsToAnotherTemplate_ValidationFailed_NoWrite.<br/>
+    /// Purpose: prove the direct service/API remove path cannot clear a membership owned by a
+    /// different Template, against the real schema.<br/>
+    /// Master behavior being verified: removal through Template A is an operation on A's
+    /// membership; a USER associated with Template B stays in B (ACCESS_MODEL §3/§14).<br/>
+    /// Preconditions: Templates A and B persisted; USER U has <c>template_id = B</c>, version 1.<br/>
+    /// Action: <c>TemplateAdministrationService.SetTemplateUserAsync(SetTemplateUserCommand(A, U,
+    /// TargetTemplateId: null, 1))</c> — no Razor page involved.<br/>
+    /// Assertions: <c>ValidationFailed</c>; reloading U from the DB: <c>template_id</c> still B,
+    /// version still 1; B's member list contains U; A's does not.<br/>
+    /// Required non-effects: no row/column write — version unchanged proves no
+    /// <c>SetTemplateAsync</c> reached the DB.<br/>
+    /// What this proves: the remove invariant is Application authority over the real schema.<br/>
+    /// What this does NOT prove: HTTP status mapping of the route (host smoke tests).
+    /// </remarks>
+    [SkippableFact]
+    public async Task ServiceRemove_UserBelongsToAnotherTemplate_ValidationFailed_NoWrite()
+    {
+        PersistenceTestDatabase.SkipIfNotConfigured();
+
+        await using var context = PersistenceTestDatabase.CreateContext();
+        await PersistenceTestDatabase.ApplyMigrationsAsync(context);
+
+        var token = UniqueToken();
+        try
+        {
+            var users = new UserRepository(context);
+            var templates = new TemplateRepository(context);
+            var service = new TemplateAdministrationService(
+                templates,
+                new TemplateModuleRepository(context),
+                users,
+                ModuleRegistry.Empty());
+
+            var templateA = await CreateTemplateAsync(templates, $"A-{token}", null, ["job-on-view"]);
+            var templateB = await CreateTemplateAsync(templates, $"B-{token}", null, ["controlo-create"]);
+            var user = await CreateAccountAsync(users, $"cn-{token}", templateId: templateB);
+
+            var result = await service.SetTemplateUserAsync(
+                new TemplateAdministrationCommands.SetTemplateUserCommand(
+                    templateA, user.AccountId, TargetTemplateId: null, UserExpectedVersion: user.Version),
+                CancellationToken.None);
+
+            Assert.IsType<TemplateAdministrationResult.ValidationFailed>(result);
+
+            var stored = (await users.GetByIdAsync(user.AccountId, CancellationToken.None))!;
+            Assert.Equal(templateB, stored.TemplateId);
+            Assert.Equal(user.Version, stored.Version);
+
+            var membersB = await users.ListByTemplateAsync(templateB, CancellationToken.None);
+            var membersA = await users.ListByTemplateAsync(templateA, CancellationToken.None);
+            Assert.Contains(membersB, member => member.AccountId == user.AccountId);
+            Assert.DoesNotContain(membersA, member => member.AccountId == user.AccountId);
+        }
+        finally
+        {
+            await CleanupAsync(context, token);
+        }
+    }
+
+    /// <remarks>
+    /// Test: ServiceUpdate_NonPositiveExpectedVersion_ValidationFailed_NoWrite.<br/>
+    /// Purpose: prove update with <c>ExpectedVersion &lt;= 0</c> fails validation before any
+    /// repository write, against the real schema.<br/>
+    /// Master behavior being verified: accepted plan §17 — <c>ExpectedVersion &gt; 0</c>.<br/>
+    /// Preconditions: Template persisted with version 1.<br/>
+    /// Action: <c>UpdateAsync</c> with version 0 (−1 in a second invocation against a fresh
+    /// Template).<br/>
+    /// Assertions: <c>ValidationFailed</c>; reload: name/composition/version unchanged.<br/>
+    /// Required non-effects: no <c>UpdatedAsync</c> — version stays 1, composition intact.<br/>
+    /// What this proves: malformed carriers never reach the versioned write path.<br/>
+    /// What this does NOT prove: validator unit rule (covered in unit tests).
+    /// </remarks>
+    [SkippableFact]
+    public async Task ServiceUpdate_NonPositiveExpectedVersion_ValidationFailed_NoWrite()
+    {
+        PersistenceTestDatabase.SkipIfNotConfigured();
+
+        await using var context = PersistenceTestDatabase.CreateContext();
+        await PersistenceTestDatabase.ApplyMigrationsAsync(context);
+
+        var token = UniqueToken();
+        try
+        {
+            var templates = new TemplateRepository(context);
+            var service = new TemplateAdministrationService(
+                templates,
+                new TemplateModuleRepository(context),
+                new UserRepository(context),
+                ModuleRegistry.Empty());
+
+            foreach (var malformedVersion in new[] { 0, -1 })
+            {
+                var templateId = await CreateTemplateAsync(templates, $"T-{token}-{malformedVersion}", null, ["job-on-view"]);
+
+                var result = await service.UpdateAsync(
+                    new TemplateAdministrationCommands.UpdateTemplateCommand(
+                        templateId, "Renomeado", ["controlo-create"], "controlo", malformedVersion),
+                    CancellationToken.None);
+
+                Assert.IsType<TemplateAdministrationResult.ValidationFailed>(result);
+
+                var stored = (await templates.GetByIdAsync(templateId, CancellationToken.None))!;
+                Assert.Equal($"T-{token}-{malformedVersion}", stored.Name);
+                Assert.Equal(1, stored.Version);
+                Assert.Equal(["job-on-view"], (await new TemplateModuleRepository(context)
+                    .GetByTemplateAsync(templateId, CancellationToken.None))
+                    .Select(module => module.ModuleId)
+                    .ToArray());
+            }
+        }
+        finally
+        {
+            await CleanupAsync(context, token);
+        }
+    }
+
+    /// <remarks>
+    /// Test: ServiceDelete_NonPositiveExpectedVersion_ValidationFailed_NoDeleteOrNullOut.<br/>
+    /// Purpose: prove delete with <c>ExpectedVersion &lt;= 0</c> fails validation before any
+    /// destructive effect, against the real schema.<br/>
+    /// Master behavior being verified: accepted plan §17 — delete requires <c>&gt; 0</c>.<br/>
+    /// Preconditions: Template with a member USER; delete command with version 0 (−1 in a second
+    /// iteration).<br/>
+    /// Action: <c>DeleteAsync</c>.<br/>
+    /// Assertions: <c>ValidationFailed</c>; Template row survives; USER reference survives.<br/>
+    /// Required non-effects: no <c>DeleteWithMembersAsync</c>, no null-out.<br/>
+    /// What this proves: malformed destructive carriers cannot delete or null anything.<br/>
+    /// What this does NOT prove: atomic transaction semantics (covered by the delete tests).
+    /// </remarks>
+    [SkippableFact]
+    public async Task ServiceDelete_NonPositiveExpectedVersion_ValidationFailed_NoDeleteOrNullOut()
+    {
+        PersistenceTestDatabase.SkipIfNotConfigured();
+
+        await using var context = PersistenceTestDatabase.CreateContext();
+        await PersistenceTestDatabase.ApplyMigrationsAsync(context);
+
+        var token = UniqueToken();
+        try
+        {
+            var users = new UserRepository(context);
+            var templates = new TemplateRepository(context);
+            var service = new TemplateAdministrationService(
+                templates,
+                new TemplateModuleRepository(context),
+                users,
+                ModuleRegistry.Empty());
+
+            foreach (var malformedVersion in new[] { 0, -1 })
+            {
+                var templateId = await CreateTemplateAsync(templates, $"T-{token}-{malformedVersion}", null, ["job-on-view"]);
+                var account = await CreateAccountAsync(users, $"cn-{token}-{malformedVersion}", templateId: templateId);
+
+                var result = await service.DeleteAsync(
+                    new TemplateAdministrationCommands.DeleteTemplateCommand(templateId, malformedVersion),
+                    CancellationToken.None);
+
+                Assert.IsType<TemplateAdministrationResult.ValidationFailed>(result);
+                Assert.NotNull(await templates.GetByIdAsync(templateId, CancellationToken.None));
+                Assert.Equal(templateId, (await users.GetByIdAsync(account.AccountId, CancellationToken.None))!.TemplateId);
+            }
+        }
+        finally
+        {
+            await CleanupAsync(context, token);
+        }
+    }
+
+    /// <remarks>
+    /// Test: ServiceMembership_NonPositiveUserExpectedVersion_ValidationFailed_NoWrite.<br/>
+    /// Purpose: prove membership with <c>UserExpectedVersion &lt;= 0</c> fails validation before
+    /// any membership write, against the real schema.<br/>
+    /// Master behavior being verified: accepted plan §17 — association operations require a valid
+    /// user version <c>&gt; 0</c>.<br/>
+    /// Preconditions: USER U associated with Template A, version 1; remove command (the shape that
+    /// would null the relation) with version 0 (−1 in a second iteration).<br/>
+    /// Action: <c>SetTemplateUserAsync</c>.<br/>
+    /// Assertions: <c>ValidationFailed</c>; U's <c>template_id</c> remains A; version unchanged.<br/>
+    /// Required non-effects: no <c>SetTemplateAsync</c>, no version bump.<br/>
+    /// What this proves: malformed membership carriers cannot null or reassign anything.<br/>
+    /// What this does NOT prove: validator unit rule (covered in unit tests).
+    /// </remarks>
+    [SkippableFact]
+    public async Task ServiceMembership_NonPositiveUserExpectedVersion_ValidationFailed_NoWrite()
+    {
+        PersistenceTestDatabase.SkipIfNotConfigured();
+
+        await using var context = PersistenceTestDatabase.CreateContext();
+        await PersistenceTestDatabase.ApplyMigrationsAsync(context);
+
+        var token = UniqueToken();
+        try
+        {
+            var users = new UserRepository(context);
+            var templates = new TemplateRepository(context);
+            var service = new TemplateAdministrationService(
+                templates,
+                new TemplateModuleRepository(context),
+                users,
+                ModuleRegistry.Empty());
+
+            foreach (var malformedVersion in new[] { 0, -1 })
+            {
+                var templateId = await CreateTemplateAsync(templates, $"T-{token}-{malformedVersion}", null, ["job-on-view"]);
+                var account = await CreateAccountAsync(users, $"cn-{token}-{malformedVersion}", templateId: templateId);
+
+                var result = await service.SetTemplateUserAsync(
+                    new TemplateAdministrationCommands.SetTemplateUserCommand(
+                        templateId, account.AccountId, TargetTemplateId: null, malformedVersion),
+                    CancellationToken.None);
+
+                Assert.IsType<TemplateAdministrationResult.ValidationFailed>(result);
+
+                var stored = (await users.GetByIdAsync(account.AccountId, CancellationToken.None))!;
+                Assert.Equal(templateId, stored.TemplateId);
+                Assert.Equal(account.Version, stored.Version);
+            }
         }
         finally
         {

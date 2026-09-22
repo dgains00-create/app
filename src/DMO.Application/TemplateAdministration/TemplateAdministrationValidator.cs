@@ -25,6 +25,14 @@ namespace DMO.Application.TemplateAdministration;
 /// landing is rejected unless the Admin explicitly changes/removes the landing — no silent
 /// clearing, no auto-fix of invalid persisted landing.
 /// </para>
+/// <para>
+/// Optimistic-concurrency carriers (accepted plan §17, <c>ExpectedVersion</c> válido
+/// <c>&gt;0</c>): <c>UpdateTemplateCommand.ExpectedVersion</c>,
+/// <c>DeleteTemplateCommand.ExpectedVersion</c> and
+/// <c>SetTemplateUserCommand.UserExpectedVersion</c> must all be positive. A malformed
+/// (<c>&lt;= 0</c>) carrier is rejected as <c>ValidationFailed</c> before any write — it is
+/// never reinterpreted as a stale version and never reaches the repository.
+/// </para>
 /// </remarks>
 public static class TemplateAdministrationValidator
 {
@@ -61,24 +69,38 @@ public static class TemplateAdministrationValidator
         ArgumentNullException.ThrowIfNull(registry);
 
         var errors = new List<string>();
+        ValidateVersion(errors, command.ExpectedVersion, "ExpectedVersion");
         ValidateName(errors, command.Name);
         ValidateComposition(errors, command.ModuleIds, persistedModuleIds, registry);
         ValidateLanding(errors, command.LandingDestinationId, command.ModuleIds, registry);
         return errors;
     }
 
-    /// <summary>Validates a delete command (confirmation shape; version checked by the repository).</summary>
+    /// <summary>
+    /// Validates a delete command: the optimistic-concurrency carrier must be a positive
+    /// version (accepted plan §17: <c>ExpectedVersion</c> válido <c>&gt;0</c>). Existence and
+    /// the authoritative version comparison remain repository/transaction responsibilities.
+    /// </summary>
     public static IReadOnlyList<string> Validate(TemplateAdministrationCommands.DeleteTemplateCommand command)
     {
         ArgumentNullException.ThrowIfNull(command);
-        return [];
+
+        var errors = new List<string>();
+        ValidateVersion(errors, command.ExpectedVersion, "ExpectedVersion");
+        return errors;
     }
 
-    /// <summary>Validates a USER association command (existence/version checked against the repository).</summary>
+    /// <summary>
+    /// Validates a USER association command: the optimistic-concurrency carrier must be a
+    /// positive version. Existence and version comparison remain repository responsibilities.
+    /// </summary>
     public static IReadOnlyList<string> Validate(TemplateAdministrationCommands.SetTemplateUserCommand command)
     {
         ArgumentNullException.ThrowIfNull(command);
-        return [];
+
+        var errors = new List<string>();
+        ValidateVersion(errors, command.UserExpectedVersion, "UserExpectedVersion");
+        return errors;
     }
 
     /// <summary>
@@ -121,6 +143,20 @@ public static class TemplateAdministrationValidator
         if (string.IsNullOrWhiteSpace(name) || name.Length > MaxNameLength)
         {
             errors.Add($"Name must be non-blank and at most {MaxNameLength} characters.");
+        }
+    }
+
+    /// <summary>
+    /// The optimistic-concurrency carrier must be a real version: persisted versions start at
+    /// 1 and only increase. A non-positive value is malformed input, not a stale version, so it
+    /// fails closed as validation (never surfaces as a conflict and never reaches a write).
+    /// </summary>
+    private static void ValidateVersion(List<string> errors, int version, string fieldName)
+    {
+        if (version <= 0)
+        {
+            errors.Add(
+                $"{fieldName} must be a positive version (received {version}); reload the form and retry.");
         }
     }
 

@@ -32,12 +32,27 @@ namespace DMO.Application.TemplateAdministration;
 /// relationship; no membership table, no secondary model.
 /// </para>
 /// <para>
+/// <b>Remove invariant (Application authority).</b> A remove command
+/// (<c>TargetTemplateId == null</c>) is only valid for a USER currently associated with the
+/// context Template. The check is enforced <b>here</b>, so the Razor page and the minimal API
+/// have identical semantics and no membership business rule lives in a page; a USER belonging
+/// to another Template (or to none) is rejected as <c>ValidationFailed</c> with no write.
+/// </para>
+/// <para>
 /// No audit of any kind is implemented in P1-T06; results are typed so P1-T09 can instrument
 /// later.
 /// </para>
 /// </remarks>
 public sealed class TemplateAdministrationService : ITemplateAdministrationService
 {
+    /// <summary>
+    /// Closed failure used when a remove request targets a USER whose current membership does
+    /// not belong to the context Template (belongs to another Template, or to none).
+    /// </summary>
+    private const string MembershipNotInContextTemplateMessage =
+        "The USER is not associated with this Template; its Template association was not changed. " +
+        "Reload the form and retry.";
+
     private readonly ITemplateRepository _templates;
     private readonly ITemplateModuleRepository _templateModules;
     private readonly IUserRepository _users;
@@ -287,6 +302,16 @@ public sealed class TemplateAdministrationService : ITemplateAdministrationServi
                 return new TemplateAdministrationResult.ValidationFailed(
                     ["The selected Template no longer exists; reload the form."]);
             }
+        }
+        else if (user.TemplateId != command.TemplateId)
+        {
+            // Remove (TargetTemplateId == null) is an operation on a membership that belongs to
+            // the context Template: the invariant lives here, in the Application boundary, so
+            // the minimal API and Razor have identical semantics. A USER associated with another
+            // Template (or with none) must never be nulled through this Template — the delete
+            // route is not a general "clear any membership" primitive. No write is attempted.
+            return new TemplateAdministrationResult.ValidationFailed(
+                [MembershipNotInContextTemplateMessage]);
         }
 
         try

@@ -259,6 +259,207 @@ public sealed class TemplateAdministrationValidatorTests
         Assert.Empty(errors);
     }
 
+    // --------------------------------------------- POSITIVE VERSION RULE (Architect correction B)
+
+    /// <summary>
+    /// Architect correction B (implementation review, CORRECTION REQUIRED §3): the accepted plan
+    /// §17 requires <c>ExpectedVersion &gt; 0</c>; malformed carriers must fail closed as input
+    /// validation, never fall through into repository comparison and surface as stale conflicts.
+    /// </summary>
+    /// <remarks>
+    /// Test: Update_ExpectedVersionZero_Error.<br/>
+    /// Purpose: prove a zero carrier is rejected by validation alone — before any repository
+    /// read/write.<br/>
+    /// Master behavior being verified: accepted plan §17 — <c>ExpectedVersion válido (&gt;0)</c>.<br/>
+    /// Preconditions: command with <c>ExpectedVersion = 0</c> and otherwise valid facts.<br/>
+    /// Action: <c>TemplateAdministrationValidator.Validate(update, persistedIds, registry)</c>.<br/>
+    /// Assertions: at least one error naming the version; no exception.<br/>
+    /// Required non-effects: pure validation — none possible (no repository involved).<br/>
+    /// What this proves: the validators hold the rule, so the service rejects before any write.<br/>
+    /// What this does NOT prove: that the service performs no write (service-level tests cover it).
+    /// </remarks>
+    [Fact]
+    public void Update_ExpectedVersionZero_Error()
+    {
+        var errors = TemplateAdministrationValidator.Validate(
+            new TemplateAdministrationCommands.UpdateTemplateCommand(
+                Guid.NewGuid(), "Manutenção", [JobOnView], LandingDestinationId: null, ExpectedVersion: 0),
+            persistedModuleIds: new HashSet<string>([JobOnView], StringComparer.Ordinal),
+            registry: CreateRegistry());
+
+        Assert.Contains(errors, error => error.Contains("ExpectedVersion", StringComparison.Ordinal));
+    }
+
+    /// <remarks>
+    /// Test: Update_ExpectedVersionNegative_Error.<br/>
+    /// Purpose: prove a negative carrier is rejected by validation alone.<br/>
+    /// Master behavior being verified: accepted plan §17 — <c>ExpectedVersion válido (&gt;0)</c>.<br/>
+    /// Preconditions: command with <c>ExpectedVersion = -1</c> and otherwise valid facts.<br/>
+    /// Action: <c>Validate(update, persistedIds, registry)</c>.<br/>
+    /// Assertions: at least one error naming the version.<br/>
+    /// Required non-effects: pure validation — none possible.<br/>
+    /// What this proves: negative carriers never become "stale version" outcomes.<br/>
+    /// What this does NOT prove: service no-write behavior (service-level tests cover it).
+    /// </remarks>
+    [Fact]
+    public void Update_ExpectedVersionNegative_Error()
+    {
+        var errors = TemplateAdministrationValidator.Validate(
+            new TemplateAdministrationCommands.UpdateTemplateCommand(
+                Guid.NewGuid(), "Manutenção", [JobOnView], LandingDestinationId: null, ExpectedVersion: -1),
+            persistedModuleIds: new HashSet<string>([JobOnView], StringComparer.Ordinal),
+            registry: CreateRegistry());
+
+        Assert.Contains(errors, error => error.Contains("ExpectedVersion", StringComparison.Ordinal));
+    }
+
+    /// <remarks>
+    /// Test: Update_ExpectedVersionPositive_StillValid.<br/>
+    /// Purpose: prove the new rule does not reject the accepted positive carrier.<br/>
+    /// Master behavior being verified: assumed positive versions are valid when facts are valid.<br/>
+    /// Preconditions: update command with <c>ExpectedVersion = 1</c>.<br/>
+    /// Action: <c>Validate(...)</c>.<br/>
+    /// Assertions: empty errors.<br/>
+    /// Required non-effects: none.<br/>
+    /// What this proves: the rule is exactly <c>&gt; 0</c>, nothing broader.<br/>
+    /// What this does NOT prove: repository behavior.
+    /// </remarks>
+    [Fact]
+    public void Update_ExpectedVersionPositive_NoErrors()
+    {
+        var errors = TemplateAdministrationValidator.Validate(
+            new TemplateAdministrationCommands.UpdateTemplateCommand(
+                Guid.NewGuid(), "Manutenção", [JobOnView], LandingDestinationId: null, ExpectedVersion: 1),
+            persistedModuleIds: new HashSet<string>([JobOnView], StringComparer.Ordinal),
+            registry: CreateRegistry());
+
+        Assert.Empty(errors);
+    }
+
+    /// <remarks>
+    /// Test: Delete_ExpectedVersionZero_Error.<br/>
+    /// Purpose: prove a zero delete carrier is rejected before any delete/null-out.<br/>
+    /// Master behavior being verified: accepted plan §17 — delete carries <c>ExpectedVersion &gt; 0</c>.<br/>
+    /// Preconditions: delete command with <c>ExpectedVersion = 0</c>.<br/>
+    /// Action: <c>Validate(delete)</c>.<br/>
+    /// Assertions: at least one error naming the version.<br/>
+    /// Required non-effects: pure validation.<br/>
+    /// What this proves: the validator closes the malformed delete at the boundary.<br/>
+    /// What this does NOT prove: no-destructive-side-effect at service level (covered elsewhere).
+    /// </remarks>
+    [Fact]
+    public void Delete_ExpectedVersionZero_Error()
+    {
+        var errors = TemplateAdministrationValidator.Validate(
+            new TemplateAdministrationCommands.DeleteTemplateCommand(Guid.NewGuid(), ExpectedVersion: 0));
+
+        Assert.Contains(errors, error => error.Contains("ExpectedVersion", StringComparison.Ordinal));
+    }
+
+    /// <remarks>
+    /// Test: Delete_ExpectedVersionNegative_Error.<br/>
+    /// Purpose: prove a negative delete carrier is rejected before any delete/null-out.<br/>
+    /// Master behavior being verified: accepted plan §17.<br/>
+    /// Preconditions: delete command with <c>ExpectedVersion = -1</c>.<br/>
+    /// Action: <c>Validate(delete)</c>.<br/>
+    /// Assertions: at least one error naming the version.<br/>
+    /// Required non-effects: pure validation.<br/>
+    /// What this proves: negative delete carriers are input failures, not conflicts.<br/>
+    /// What this does NOT prove: service-level non-effects (covered elsewhere).
+    /// </remarks>
+    [Fact]
+    public void Delete_ExpectedVersionNegative_Error()
+    {
+        var errors = TemplateAdministrationValidator.Validate(
+            new TemplateAdministrationCommands.DeleteTemplateCommand(Guid.NewGuid(), ExpectedVersion: -1));
+
+        Assert.Contains(errors, error => error.Contains("ExpectedVersion", StringComparison.Ordinal));
+    }
+
+    /// <remarks>
+    /// Test: Delete_ExpectedVersionPositive_NoErrors.<br/>
+    /// Purpose: prove accepted positive delete carriers remain valid.<br/>
+    /// Master behavior being verified: accepted plan §17.<br/>
+    /// Preconditions: delete command with <c>ExpectedVersion = 1</c>.<br/>
+    /// Action: <c>Validate(delete)</c>.<br/>
+    /// Assertions: empty errors.<br/>
+    /// Required non-effects: none.<br/>
+    /// What this proves: the delete rule is exactly <c>&gt; 0</c>.<br/>
+    /// What this does NOT prove: repository behavior.
+    /// </remarks>
+    [Fact]
+    public void Delete_ExpectedVersionPositive_NoErrors()
+    {
+        var errors = TemplateAdministrationValidator.Validate(
+            new TemplateAdministrationCommands.DeleteTemplateCommand(Guid.NewGuid(), ExpectedVersion: 1));
+
+        Assert.Empty(errors);
+    }
+
+    /// <remarks>
+    /// Test: Membership_UserExpectedVersionZero_Error.<br/>
+    /// Purpose: prove a zero membership carrier is rejected before any membership write.<br/>
+    /// Master behavior being verified: accepted plan §17 — association operations carry a valid
+    /// user optimistic-concurrency version.<br/>
+    /// Preconditions: membership command with <c>UserExpectedVersion = 0</c>.<br/>
+    /// Action: <c>Validate(membership)</c>.<br/>
+    /// Assertions: at least one error naming the version.<br/>
+    /// Required non-effects: pure validation.<br/>
+    /// What this proves: malformed membership versions are input failures, not conflicts.<br/>
+    /// What this does NOT prove: service-level no-write behavior (covered elsewhere).
+    /// </remarks>
+    [Fact]
+    public void Membership_UserExpectedVersionZero_Error()
+    {
+        var errors = TemplateAdministrationValidator.Validate(
+            new TemplateAdministrationCommands.SetTemplateUserCommand(
+                Guid.NewGuid(), Guid.NewGuid(), TargetTemplateId: null, UserExpectedVersion: 0));
+
+        Assert.Contains(errors, error => error.Contains("UserExpectedVersion", StringComparison.Ordinal));
+    }
+
+    /// <remarks>
+    /// Test: Membership_UserExpectedVersionNegative_Error.<br/>
+    /// Purpose: prove a negative membership carrier is rejected before any membership write.<br/>
+    /// Master behavior being verified: accepted plan §17.<br/>
+    /// Preconditions: membership command with <c>UserExpectedVersion = -1</c>.<br/>
+    /// Action: <c>Validate(membership)</c>.<br/>
+    /// Assertions: at least one error naming the version.<br/>
+    /// Required non-effects: pure validation.<br/>
+    /// What this proves: negative membership carriers never become stale-version conflicts.<br/>
+    /// What this does NOT prove: service-level behavior (covered elsewhere).
+    /// </remarks>
+    [Fact]
+    public void Membership_UserExpectedVersionNegative_Error()
+    {
+        var errors = TemplateAdministrationValidator.Validate(
+            new TemplateAdministrationCommands.SetTemplateUserCommand(
+                Guid.NewGuid(), Guid.NewGuid(), TargetTemplateId: null, UserExpectedVersion: -1));
+
+        Assert.Contains(errors, error => error.Contains("UserExpectedVersion", StringComparison.Ordinal));
+    }
+
+    /// <remarks>
+    /// Test: Membership_UserExpectedVersionPositive_NoErrors.<br/>
+    /// Purpose: prove accepted positive membership carriers remain valid.<br/>
+    /// Master behavior being verified: accepted plan §17.<br/>
+    /// Preconditions: membership command with <c>UserExpectedVersion = 1</c>.<br/>
+    /// Action: <c>Validate(membership)</c>.<br/>
+    /// Assertions: empty errors.<br/>
+    /// Required non-effects: none.<br/>
+    /// What this proves: the membership version rule is exactly <c>&gt; 0</c>.<br/>
+    /// What this does NOT prove: repository behavior.
+    /// </remarks>
+    [Fact]
+    public void Membership_UserExpectedVersionPositive_NoErrors()
+    {
+        var errors = TemplateAdministrationValidator.Validate(
+            new TemplateAdministrationCommands.SetTemplateUserCommand(
+                Guid.NewGuid(), Guid.NewGuid(), TargetTemplateId: null, UserExpectedVersion: 1));
+
+        Assert.Empty(errors);
+    }
+
     // -------------------------------------------------------------- HELPERS
 
     private static IModuleRegistry CreateRegistry() => TestModuleDefinitions.TestRegistry();

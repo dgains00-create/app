@@ -193,8 +193,10 @@ public sealed class EditModel : PageModel
 
         if (targetTemplateId is null && Ficha!.Users.All(member => member.UserId != userId))
         {
-            // The user is not a member of this Template; removal would be a silent no-op.
-            // Fail explicitly instead: the ficha is stale or the form is inconsistent.
+            // UX convenience only: a stone-stale ficha is rejected before round-tripping to the
+            // service. The authoritative remove invariant (the USER must currently belong to
+            // this Template) lives in TemplateAdministrationService.SetTemplateUserAsync, so the
+            // minimal API DELETE route has exactly the same semantics.
             return await WithErrorAsync(
                 "The selected USER is not associated with this Template; reload and retry.",
                 cancellationToken);
