@@ -368,7 +368,6 @@ no correction workflow, no authorization.
 | `Detail` | `string?` | optional supplied concise detail/description. |
 | `BeforeDetail` | `string?` | optional supplied before-state display detail. |
 | `AfterDetail` | `string?` | optional supplied after-state display detail. |
-| `Status` | `RecordStatusPresentation?` | optional supplied entry status rendered through the accepted P2-T01 `RecordStatus` (§6.4). |
 | `DetailAction` | `SharedActionPresentation?` | optional single generic consumer action (freeze §12: "generic detail action"). |
 
 **Not included** (authority does not support them): generic metadata dictionaries, arbitrary
@@ -409,8 +408,6 @@ P2-T07, P2-T08) supplied to this component as input order.
   A-owned labels ("Detalhe", "Antes", "Depois", "Ator", "Data/hora").
 - `TimestampText` is always the visible timestamp text; `TimestampValue`, when supplied, is the
   machine value only. Visible text is never derived from `TimestampValue`.
-- Entry `Status`, when supplied, renders via the accepted P2-T01 `_RecordStatus.cshtml` partial.
-  P2-T02 defines no AuditTrail-specific status vocabulary.
 - No cards, no oversized headers, no decorative vertical whitespace, no stacked variant (§4).
 - Optional supplied parent-controlled filter/page context is represented by
   `AuditTrailPresentation.ContextText` (supplied display text rendered verbatim; the component
@@ -600,7 +597,7 @@ method or its assertions**.
 | U8 | with `SelectionEnabled = false`, no input selects; with `SelectionEnabled = true`, at most one row is selected and `SelectedKey` equals the controlled value | controlled single selection (§5.6, AC-4) |
 | U9 | `Create` rejects a non-null `SelectedKey` absent from the supplied rows, and rejects a `SelectedKey` when selection is disabled | no phantom selection (§5.6) |
 | U10 | `Create` rejects a blank `Caption`, blank cell text, blank column `Key`/`Heading`, blank row `Key`/`AccessibleContext`, and a missing `Message` when `State != Ready` | fail-closed carriers; no invented text (§5.2, §5.3, §5.8) |
-| U11 | no `DenseDataTable` type exposes a member returning a `Uri`, URL, route or navigation target, and no contract member/emitted event contains a URL string | no URL construction (AC-14) |
+| U11 | no `DenseDataTable` type exposes a member returning a `Uri`, URL, route or navigation target, and no contract member/emitted event contains a URL string | no URL construction (AC-15) |
 | U12 | `DenseTableRowPresentation.Actions` reuses `SharedActionPresentation`, and a disabled supplied action without a reason is rejected | disabled-action reason rule (§5.3, AC-12) |
 | U13 | no `DenseDataTable` contract type references a feature/domain namespace, service, `DbContext`, `HttpClient`, Supabase, or a session/clock | domain-neutral boundary (AC-26, AC-25) |
 
@@ -608,11 +605,11 @@ method or its assertions**.
 
 | # | Test | Proves |
 |---|---|---|
-| U14 | entries render in exactly the supplied order for any supplied sequence; no ordering metadata changes it | no sorting/chronology inference (§6.3, AC-17) |
-| U15 | `ActionText` is mandatory; `Actor`/`TimestampText` absent ⇒ no attribution text is produced; `ActorUnavailableText` renders only when `Actor` is absent | no synthesized attribution (§6.2, AC-19) |
+| U14 | entries render in exactly the supplied order for any supplied sequence; no ordering metadata changes it | no sorting/chronology inference (§6.3, AC-18) |
+| U15 | `ActionText` is mandatory; `Actor`/`TimestampText` absent ⇒ no attribution text is produced; `ActorUnavailableText` renders only when `Actor` is absent | no synthesized attribution (§6.2, AC-20) |
 | U16 | no `AuditTrail` type/member references `ICurrentAccountContext`, session, clock, `DateTime.Now`/`DateTime.UtcNow`, or any service; the type has no formatting/parsing member for timestamps | structural no-synthesis guarantee (§6.2, AC-25) |
 | U17 | supplied `TimestampText` is preserved verbatim; `TimestampValue`, when supplied, is exposed as a machine value only and never used to populate the display text | no locale/format derivation (§6.2, §6.4) |
-| U18 | `BeforeDetail`/`AfterDetail`/`Detail` render only when supplied; no diff is computed | no invented detail (§6.2, AC-20) |
+| U18 | `BeforeDetail`/`AfterDetail`/`Detail` render only when supplied; no diff is computed | no invented detail (§6.2, AC-21) |
 | U19 | the only interactive element carried by an entry is the optional supplied `DetailAction`; no edit/delete/restore member exists | read-only rule (§6.5, AC-24) |
 | U20 | no `AuditTrail` contract type references a feature/domain namespace, service or canonical identity | domain-neutral boundary (AC-26) |
 
@@ -623,13 +620,13 @@ method or its assertions**.
 | R1 | `empty` rendered surfaces for both components carry the P2-T01 `empty` token/heading and the supplied message, and never the `lookup-failed` token/message; `lookup-failed` carries its own token, assertive announcement and supplied retry and never the `empty` token/message | §7 distinction (AC-8, AC-9, AC-22) |
 | R2 | `DenseDataTable` `empty` retains the caption/header context; `lookup-failed`/`unavailable`/`permission-denied`/`conflict` render no data body | §7.1 (AC-8, AC-9, AC-11) |
 | R3 | `DenseDataTable` `loading` marks the region busy and each supplied retained row carries visible stale text and a stale hook | §7.1 (AC-10) |
-| R4 | selected row exposes `aria-selected="true"` plus the visible marker element; exactly one row is selected for a supplied `SelectedKey` | programmatic, non-colour selection (AC-16) |
+| R4 | selected row exposes `aria-selected="true"` plus the visible marker element; exactly one row is selected for a supplied `SelectedKey` | programmatic, non-colour selection (AC-17) |
 | R5 | row actions render with `data-dmo-action`/`data-dmo-row-key`; a disabled action renders `aria-disabled="true"`, `disabled`, an `aria-describedby` that resolves to the rendered reason `id`, and an accessible name containing the supplied row context | disabled reasons + row context (§8.1, AC-12) |
 | R6 | the explicit open control renders **iff** `OpenEnabled`; the actions cell renders last and only when actions are supplied | AC-6, AC-7, §5.3 |
-| R7 | row status renders through the accepted P2-T01 status partial (tone token + visible text); a row with no supplied status renders no status | §5.4 (AC-21) |
-| R8 | supplied `ResultSummary` renders verbatim inside a polite live region | AC-13 |
-| R9 | supplied filter/paging/sort affordances render with their controlled values and **no** `action`/`method`/`href` attribute is produced by the component | §5.5, AC-14 |
-| R10 | `AuditTrail` entries render actor/timestamp/action/before/after/detail with their visible labels and hooks; a missing actor/timestamp produces no attribution text | §6.4 (AC-18, AC-19) |
+| R7 | row status renders through the accepted P2-T01 status partial (tone token + visible text); a row with no supplied status renders no status | §5.4 (AC-13) |
+| R8 | supplied `ResultSummary` renders verbatim inside a polite live region | AC-14 |
+| R9 | supplied filter/paging/sort affordances render with their controlled values and **no** `action`/`method`/`href` attribute is produced by the component | §5.5, AC-15 |
+| R10 | `AuditTrail` entries render actor/timestamp/action/before/after/detail with their visible labels and hooks; a missing actor/timestamp produces no attribution text | §6.4 (AC-19, AC-20) |
 | R11 | `AuditTrail` `unavailable`/`permission-denied` render only the P2-T01 state surface with the supplied reason and no entry markup | §7.2 (AC-23) |
 | R12 | `AuditTrail` renders no edit/delete/restore control for any state | §6.5 (AC-24) |
 | R13 | the table scroll container is focusable (`tabindex="0"`), labelled, and no component markup renders a `role="grid"` or a focus-trapping handler | §8.1 (AC-30) |
@@ -642,7 +639,7 @@ method or its assertions**.
 | S1 | `/css/dmo-components.css` resolves and contains the new `dmo-table*`/`dmo-audit*` selectors plus the P2-T01 selectors unchanged | additive CSS (§9) |
 | S2 | the new P2-T02 CSS blocks contain **no** `@media`, no `@container` and no width-conditional rule | no breakpoint reflow (§4.1.3, AC-30) |
 | S3 | every `var(--dmo-…)` referenced by the new rules is defined in `dmo-tokens.css` | token reuse, no new design system (§9, AC-29) |
-| S4 | `/js/dmo-focus.js` and `/js/dmo-dense-table.js` resolve and contain no `fetch(`, `XMLHttpRequest`, `location.`/`href`/`window.open`, no `submit(`, and no domain vocabulary | generic, non-fetching, non-navigating assets (AC-14, AC-26) |
+| S4 | `/js/dmo-focus.js` and `/js/dmo-dense-table.js` resolve and contain no `fetch(`, `XMLHttpRequest`, `location.`/`href`/`window.open`, no `submit(`, and no domain vocabulary | generic, non-fetching, non-navigating assets (AC-15, AC-26) |
 | S5 | the asset include helper emits each asset tag at most once per render | no duplicated includes (§14.5) |
 
 ### 10.5 Regression / protected foundation
@@ -697,30 +694,30 @@ Objective and checkable. "Failing-if-removed test" means the referenced test in 
     the row's opaque key, positioned in the fixed trailing actions cell; a disabled action
     exposes `aria-disabled="true"` with its supplied reason programmatically associated; the
     action's accessible name includes the supplied row context (U12, R5, R6).
-13. **AC-13** Supplied `ResultSummary` text is rendered verbatim and exposed as a polite live
+13. **AC-13** A supplied row status renders through the accepted P2-T01 `RecordStatus`
+    presentation; a row without a supplied status renders no status (R7).
+14. **AC-14** Supplied `ResultSummary` text is rendered verbatim and exposed as a polite live
     region (R8).
-14. **AC-14** The component constructs no consumer URL: no member, attribute, markup or emitted
+15. **AC-15** The component constructs no consumer URL: no member, attribute, markup or emitted
     event produced by P2-T02 contains a URL, `href`, `action`, `method` or route target (U11, R9,
     S4).
-15. **AC-15** The component contains no filter operator model, no query expression, no sorting
+16. **AC-16** The component contains no filter operator model, no query expression, no sorting
     algorithm, no paging arithmetic and no result counting; supplied rows are never transformed
     (U2, §5.5).
-16. **AC-16** The selected row exposes a programmatic selected fact (`aria-selected="true"`) and a
+17. **AC-17** The selected row exposes a programmatic selected fact (`aria-selected="true"`) and a
     visible non-colour indicator (R4).
 
 **AuditTrail**
 
-17. **AC-17** Supplied entries render in exactly the supplied order; the component performs no
+18. **AC-18** Supplied entries render in exactly the supplied order; the component performs no
     sorting, reordering or chronology inference (U14).
-18. **AC-18** Each entry renders its supplied action text; supplied timestamp display text renders
+19. **AC-19** Each entry renders its supplied action text; supplied timestamp display text renders
     verbatim and the supplied semantic value appears only as the machine value (U17, R10).
-19. **AC-19** A supplied actor renders verbatim; when actor or timestamp is absent the component
+20. **AC-20** A supplied actor renders verbatim; when actor or timestamp is absent the component
     renders no substitute attribution text and never any current-session/current-user/current-time
     value (U15, U16, R10).
-20. **AC-20** `Detail`/`BeforeDetail`/`AfterDetail` render only when supplied, with their visible
+21. **AC-21** `Detail`/`BeforeDetail`/`AfterDetail` render only when supplied, with their visible
     labels; no diff is computed (U18).
-21. **AC-21** A supplied entry status renders through the accepted P2-T01 `RecordStatus`
-    presentation; no AuditTrail-specific status vocabulary exists (R7).
 22. **AC-22** `AuditTrail` `empty` (explicit no-history) and `lookup-failed` (failure with
     supplied retry) render as distinct accepted P2-T01 presentations and are never the same
     rendering (R1).
@@ -753,10 +750,9 @@ Objective and checkable. "Failing-if-removed test" means the referenced test in 
 
 ## 12. Contract Questions
 
-Three questions remain. Each records the exact unresolved decision, the authority inspected, why
-that authority is insufficient to settle it, and an explicit **non-blocking default** so
-implementation can proceed either way. None blocks `PLAN ACCEPT` unless the Architect decides
-otherwise.
+Three questions were recorded. Architect review accepted the Q1 and Q3 defaults and resolved Q2
+to **ABSENT**. The corrected contract remains subject to Architect re-review and does not
+self-authorize implementation.
 
 ### Q1 — DOM/browser-level verification authority for the two JS adapters
 
@@ -775,23 +771,18 @@ otherwise.
 - **Non-blocking default:** implement the arbitration as the C# `DenseTableInteraction` model
   (unit-tested, U4–U8) plus rendered markup/hook assertions (R4–R6, R13) and static-asset content
   assertions (S4); defer DOM-level browser verification to a separately authorized browser package
-  or to consumer integration (A8)/P2-T10. **Implementation can proceed without resolving Q1.**
+  or to consumer integration (A8)/P2-T10. **Architect disposition: ACCEPTED DEFAULT PRESERVED.**
 
-### Q2 — optional per-entry `RecordStatus` on `AuditTrail` entries
+### Q2 — per-entry `RecordStatus` on `AuditTrail` entries — RESOLVED
 
-- **Decision:** whether `AuditEntryPresentation` may carry the optional `Status`
-  (`RecordStatusPresentation`).
-- **Authority inspected:** A1 freeze §12 carrier list (entry key, actor, timestamp, action,
-  optional before/after detail, generic detail action, parent-controlled filter/page context —
-  **no** entry-level status); A1 freeze §12 accessibility ("change meaning is not color-only");
-  A1 freeze §15 (`RecordStatus` owned by A, available to consumers B–E); A1 freeze §16 (consumers
-  must not create private look-alike components).
-- **Why insufficient:** authority requires change meaning to be visible and non-colour-only but
-  does not say whether a history entry may carry a status badge, and §12's carrier list omits one.
-- **Non-blocking default:** include the **optional** `Status`, default absent, rendered through the
-  accepted P2-T01 `RecordStatus` (never a P2-T02-specific status vocabulary). If the Architect
-  rejects it, removal is a single optional field plus test R7. **Implementation can proceed
-  without resolving Q2.**
+- **Resolution:** **ABSENT**. `AuditEntryPresentation` carries no `Status` or equivalent generic
+  status field, and `AuditTrail` renders no entry-level `RecordStatus`.
+- **Authority basis:** A1 freeze §12 defines the AuditTrail carrier as entry key, actor,
+  timestamp, action, optional before/after detail, generic detail action and optional
+  parent-controlled filter/page context. It does not authorize an entry-level status slot.
+- **Architect disposition:** generic P2-T01 `RecordStatus` availability does not expand the
+  AuditTrail carrier. Change meaning remains visible through the authority-backed supplied action
+  and detail facts. No replacement field is introduced.
 
 ### Q3 — plain supplied text vs. consumer-rendered cell markup
 
@@ -808,7 +799,7 @@ otherwise.
 - **Non-blocking default:** **plain supplied text**, Razor-encoded. Rationale: keeps the shared
   primitive free of consumer markup injection, keeps display text from being treated as identity,
   and matches the accepted P2-T01 carrier style. Richer cell rendering would be an A1 §16
-  contract change. **Implementation can proceed without resolving Q3.**
+  contract change. **Architect disposition: ACCEPTED DEFAULT PRESERVED.**
 
 ### Recorded authority silences (not questions, not inventions)
 

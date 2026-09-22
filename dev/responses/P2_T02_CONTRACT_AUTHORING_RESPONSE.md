@@ -103,9 +103,10 @@ directory did not exist; it was created because the requested preferred artifact
 | D24 | P2-T02 must not modify any accepted P2-T01 contract/partial/CSS selector or any existing test method. | task instruction ("P2-T01 is protected input"); master plan §12 #23 |
 | D25 | Row cells are supplied plain text (Razor-encoded); the component never parses or interprets cell text. | freeze §2 (PROVISIONAL slot may be refined), §3 rules 2–4; P2-T01 plain-text precedent (recorded as Q3 for Architect confirmation) |
 
-## 5. Contract Questions Remaining
+## 5. Contract Question Dispositions
 
-**Count: 3** — all non-blocking, each with an explicit default so implementation can proceed.
+**Count: 3.** Architect review accepted the Q1 and Q3 defaults and resolved Q2 to **ABSENT**.
+The corrected contract remains awaiting Architect re-review.
 
 1. **Q1 — DOM/browser-level verification authority for `dmo-dense-table.js`/`dmo-focus.js`.**
    Authority requires the interaction behaviours as U-level evidence but the repository has no JS
@@ -113,10 +114,10 @@ directory did not exist; it was created because the requested preferred artifact
    add one); A plan §14 A7's tablet clauses are superseded. *Default:* C# interaction-model unit
    tests + rendered markup/hook assertions + static-asset content assertions; defer DOM-level
    verification to a separately authorized browser package or to consumer integration / P2-T10.
-2. **Q2 — optional per-entry `RecordStatus` on `AuditTrail` entries.** Freeze §12's carrier list
-   has no entry-level status, while §12 accessibility requires change meaning to be non-colour-only
-   and §15 makes `RecordStatus` available to B–E consumers. *Default:* include the optional status,
-   default absent, rendered through the accepted P2-T01 `RecordStatus`.
+2. **Q2 — per-entry `RecordStatus` on `AuditTrail` entries — RESOLVED.** AuditTrail entry status
+   is **absent**. A1 freeze §12 defines the AuditTrail carrier and does not authorize an
+   entry-level status slot; generic P2-T01 `RecordStatus` availability does not expand that
+   carrier. No replacement field is introduced.
 3. **Q3 — plain supplied text vs. consumer-rendered cell markup.** Freeze §9 names
    "consumer-rendered cell content" but classifies the slot PROVISIONAL (§2). *Default:* plain
    supplied text, Razor-encoded; richer rendering would be an A1 §16 change.
@@ -161,7 +162,7 @@ P2-T02 introduces **no** replacement state, status or action vocabulary:
 | `CommonState` | the sole state vocabulary for both components' region state |
 | `CommonStateRegionPresentation` + `_CommonStateRegion.cshtml` | the sole rendering for every non-`ready` surface of both components (empty/lookup-failed/unavailable/permission-denied/loading/stale/conflict), preserving the four mandated distinct surfaces |
 | `CommonStateTraits` | busy/assertive/reason semantics arrive through the accepted traits; P2-T02 restates none |
-| `RecordStatusPresentation` + `_RecordStatus.cshtml` | the sole row/entry status rendering (tone supplementary, text always visible, no lifecycle/action inference) |
+| `RecordStatusPresentation` + `_RecordStatus.cshtml` | the sole DenseDataTable row-status rendering (tone supplementary, text always visible, no lifecycle/action inference); AuditTrail has no entry-status slot |
 | `SharedActionPresentation` | the sole generic action carrier for row actions, state/retry/refresh/recovery actions and the audit detail action — including the accepted mandatory disabled-reason rule |
 | `StatusTone` | the sole tone vocabulary for status |
 | `dmo-components.css` token-usage pattern | extended additively with the same `var(--dmo-*)`-only discipline; no new token |
@@ -182,7 +183,7 @@ selector or existing test method may change. AC-28 and test G4 verify it.
   is defined.
 - Table-scoped/global actions are explicitly assigned to the consumer's `DecisionBar` region
   (P2-T03) rather than absorbed into `DenseDataTable` (D11).
-- The contract forbids turning P2-T02 into a filter/pagination/query framework (§2, §5.5, AC-15):
+- The contract forbids turning P2-T02 into a filter/pagination/query framework (§2, §5.5, AC-16):
   no operators, expressions, algorithms, arithmetic or counting.
 
 ## 9. Files Changed

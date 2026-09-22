@@ -640,8 +640,9 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   local horizontal scroll), reuses the accepted P2-T01 state/status/action primitives without
   modification, protects the P2-T03 boundary (no ToolPicker/ToolSummaryRow/MeasurementRows/
   DecisionBar/ProductionContextStrip), defines no backend/persistence/route/authorization seam,
-  and leaves 3 non-blocking CONTRACT QUESTIONS (Q1 browser-level JS verification, Q2 optional
-  per-entry audit status, Q3 plain-text vs rendered cell content). No implementation, no
+  and records 3 CONTRACT QUESTIONS (Q1 browser-level JS verification and Q3 plain-text vs
+  rendered cell content defaults accepted; Q2 resolved by Architect review with AuditTrail
+  entry status absent). No implementation, no
   application change, no self-acceptance: P2-T02 remains unauthorized until an Architect
   `PLAN ACCEPT` on the contract per `dmo-beta-master/WORKFLOW.md` steps 4–7.
 - **Downstream dependents:** P2-T04 (Job On history), P2-T05/P2-T06 (Controlo lists),
