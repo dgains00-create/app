@@ -82,13 +82,20 @@ public sealed class UserRepository : IUserRepository
     {
         ArgumentNullException.ThrowIfNull(account);
 
-        // Read-modify-write inside this scope: the row version read here is the version the
-        // concurrency check compares against, so a concurrent change between read and write
-        // surfaces as a typed conflict.
+        // Load the current row: the persisted version read here is the version the caller's
+        // observation is compared against. A stale observation fails the compare and is
+        // rejected before any field is changed.
         var entity = await _context.Users
             .SingleOrDefaultAsync(user => user.UserId == account.AccountId, cancellationToken)
             ?? throw new InvalidOperationException(
                 $"USER account '{account.AccountId}' was not found (delete or invalid identifier).");
+
+        if (entity.Version != account.Version)
+        {
+            throw new ConcurrencyConflictException(
+                $"USER account '{account.AccountId}' was modified concurrently (expected version {account.Version}, " +
+                $"current version {entity.Version}); reload and retry.");
+        }
 
         // The provider mapping (auth_identity_id) is durable linkage and is not changed here.
         entity.CompanyNumber = account.CompanyNumber;
@@ -98,8 +105,10 @@ public sealed class UserRepository : IUserRepository
         entity.Active = account.IsActive;
         entity.TemplateId = account.TemplateId;
 
-        // Every committed write bumps version; the version read in this scope is the value
-        // the concurrency WHERE-clause compares against at save time.
+        // Every committed write bumps version exactly once. The EF concurrency token stays
+        // active: any race between the read/compare above and this save still surfaces as a
+        // typed conflict (zero rows matched -> DbUpdateConcurrencyException -> domain conflict)
+        // instead of silently overwriting the concurrent change.
         entity.Version += 1;
         entity.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -181,7 +190,8 @@ public sealed class UserRepository : IUserRepository
             user.Email,
             user.Role ?? string.Empty,
             user.Active,
-            user.TemplateId));
+            user.TemplateId,
+            user.Version));
 
     private async Task SaveAsync(CancellationToken cancellationToken)
     {

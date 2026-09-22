@@ -34,7 +34,9 @@ public sealed class AuthEndpointsTests
         DisplayName: "João Silva",
         Email: "joao@dmo.test",
         RoleLabel: "Reparador",
-        IsActive: true);
+        IsActive: true,
+        TemplateId: null,
+        Version: 1);
 
     private static WebApplicationFactory<Program> FactoryWith(params AccountMatch[] matches) =>
         new DmoWebApplicationFactory().WithWebHostBuilder(builder =>

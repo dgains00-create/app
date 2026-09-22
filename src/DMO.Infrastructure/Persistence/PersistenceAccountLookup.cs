@@ -65,7 +65,8 @@ public sealed class PersistenceAccountLookup : IAccountLookup
                 account.Email,
                 account.Role ?? string.Empty,
                 account.Active,
-                account.TemplateId))
+                account.TemplateId,
+                account.Version))
             .FirstOrDefaultAsync(cancellationToken);
 
         return user is null

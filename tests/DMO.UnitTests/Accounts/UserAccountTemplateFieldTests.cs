@@ -25,13 +25,15 @@ public sealed class UserAccountTemplateFieldTests
         Email: "joao@dmo.test",
         RoleLabel: "Reparador",
         IsActive: true,
-        TemplateId: TemplateId);
+        TemplateId: TemplateId,
+        Version: 1);
 
     [Fact]
     public void TemplateId_IsNullable_AndDefaultsToNull()
     {
         var account = new UserAccount(
-            Guid.NewGuid(), "2661", "João Silva", "joao@dmo.test", "Reparador", IsActive: true);
+            Guid.NewGuid(), "2661", "João Silva", "joao@dmo.test", "Reparador", IsActive: true,
+            TemplateId: null, Version: 1);
 
         Assert.Null(account.TemplateId);
     }

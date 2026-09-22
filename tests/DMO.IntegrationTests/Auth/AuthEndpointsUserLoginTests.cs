@@ -35,7 +35,9 @@ public sealed class AuthEndpointsUserLoginTests
         DisplayName: "João Silva",
         Email: "joao@dmo.test",
         RoleLabel: "Reparador",
-        IsActive: true);
+        IsActive: true,
+        TemplateId: null,
+        Version: 1);
 
     private static readonly UserAccount InactiveUser = ActiveUser with { IsActive = false };
 

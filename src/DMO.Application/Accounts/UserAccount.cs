@@ -17,6 +17,12 @@ namespace DMO.Application.Accounts;
 /// no resolver branch reads it and no Template/access semantics exist yet (P1-T04 owns
 /// Template access resolution).
 /// </para>
+/// <para>
+/// <see cref="Version"/> is the optimistic-concurrency token observed at read time (mirror of
+/// <c>Template.Version</c>). A write carrying a stale version is rejected with a typed
+/// <see cref="DMO.Application.Persistence.ConcurrencyConflictException"/>; the caller must
+/// reload and retry. Every persisted projection of a <c>UserAccount</c> populates it.
+/// </para>
 /// </remarks>
 /// <param name="AccountId">Stable application account identity.</param>
 /// <param name="CompanyNumber">Canonical USER login identifier.</param>
@@ -25,6 +31,7 @@ namespace DMO.Application.Accounts;
 /// <param name="RoleLabel">Presentation-only free-text role label.</param>
 /// <param name="IsActive">Whether the account is active.</param>
 /// <param name="TemplateId">Nullable persisted Template association (P1-T03 persistence fact; grants nothing).</param>
+/// <param name="Version">Optimistic-concurrency version observed at read time.</param>
 public sealed record UserAccount(
     Guid AccountId,
     string CompanyNumber,
@@ -32,4 +39,5 @@ public sealed record UserAccount(
     string Email,
     string RoleLabel,
     bool IsActive,
-    Guid? TemplateId = null);
+    Guid? TemplateId,
+    int Version);

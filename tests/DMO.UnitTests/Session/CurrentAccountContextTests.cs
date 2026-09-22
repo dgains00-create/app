@@ -27,7 +27,9 @@ public sealed class CurrentAccountContextTests
         DisplayName: "João Silva",
         Email: "joao@dmo.test",
         RoleLabel: "Reparador",
-        IsActive: true);
+        IsActive: true,
+        TemplateId: null,
+        Version: 1);
 
     private static ICurrentAccountContext Context(
         ISessionAuthentication session,

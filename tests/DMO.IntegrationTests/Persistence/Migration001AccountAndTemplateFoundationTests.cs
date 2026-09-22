@@ -114,11 +114,72 @@ public sealed class Migration001AccountAndTemplateFoundationTests
     }
 
     [SkippableTheory]
-    [InlineData("NULL")]
-    [InlineData("   ")]
-    [InlineData("")]
-    public async Task UsersMandatoryIdentifiers_RejectNullAndBlank(string emailValue)
+    [MemberData(nameof(UserIdentifierMandatoryCases))]
+    public async Task UsersMandatoryIdentifiers_RejectNullAndBlank(string column, string value)
     {
+        // P1-T03 correction test (review §3 / correction plan §3a): behavioral proof, for
+        // EVERY mandatory USER identifier (email, auth_identity_id, company_number), that a
+        // NULL insert is rejected by NOT NULL (23502) and blank/whitespace inserts are
+        // rejected by the nonblank CHECK (23514). Constraint-definition inspection alone is
+        // not sufficient; these are real inserts against the existing schema (migrations
+        // unchanged).
+        PersistenceTestDatabase.SkipIfNotConfigured();
+
+        await using var context = PersistenceTestDatabase.CreateContext();
+        await PersistenceTestDatabase.ApplyMigrationsAsync(context);
+
+        var token = Guid.NewGuid().ToString("N");
+        var rawValue = RawSqlValue(value);
+
+        // Exactly the target column carries the invalid value; all other identifiers are valid.
+        var email = column == "email" ? rawValue : SqlLiteral($"valid-{token}@dmo.test");
+        var subject = column == "auth_identity_id" ? rawValue : SqlLiteral($"subject-{token}");
+        var companyNumber = column == "company_number" ? rawValue : SqlLiteral($"company-{token}");
+
+        var exception = await Assert.ThrowsAsync<PostgresException>(() =>
+            context.Database.ExecuteSqlRawAsync(
+                "INSERT INTO users (user_id, auth_identity_id, name, company_number, email, active, version) " +
+                $"VALUES (gen_random_uuid(), {subject}, 'Name', {companyNumber}, {email}, true, 1)"));
+
+        Assert.Equal(ExpectedSqlState(value), exception.SqlState);
+    }
+
+    [SkippableTheory]
+    [MemberData(nameof(AdminIdentifierMandatoryCases))]
+    public async Task AdminAccountsMandatoryIdentifiers_RejectNullAndBlank(string column, string value)
+    {
+        // P1-T03 correction test (correction plan §3b): behavioral proof, for EVERY mandatory
+        // ADMIN identifier (email, auth_identity_id), that a NULL insert is rejected by
+        // NOT NULL (23502) and blank/whitespace inserts are rejected by the nonblank CHECK
+        // (23514) — against the existing schema, migrations unchanged.
+        PersistenceTestDatabase.SkipIfNotConfigured();
+
+        await using var context = PersistenceTestDatabase.CreateContext();
+        await PersistenceTestDatabase.ApplyMigrationsAsync(context);
+
+        var token = Guid.NewGuid().ToString("N");
+        var rawValue = RawSqlValue(value);
+
+        // Exactly the target column carries the invalid value; the other identifiers are valid.
+        var email = column == "email" ? rawValue : SqlLiteral($"valid-admin-{token}@dmo.test");
+        var subject = column == "auth_identity_id" ? rawValue : SqlLiteral($"subject-admin-{token}");
+
+        var exception = await Assert.ThrowsAsync<PostgresException>(() =>
+            context.Database.ExecuteSqlRawAsync(
+                "INSERT INTO admin_accounts (admin_id, auth_identity_id, display_name, email, active, version) " +
+                $"VALUES ('{AdminAccountId.Value}', {subject}, 'Name', {email}, true, 1)"));
+
+        Assert.Equal(ExpectedSqlState(value), exception.SqlState);
+    }
+
+    [SkippableFact]
+    public async Task AdminAccountValidIdentifiers_AreAccepted()
+    {
+        // Acceptance half of correction plan §3b: an admin_accounts row whose mandatory
+        // identifiers are all valid (nonnull, nonblank) is accepted under the existing schema
+        // (the fixed AdminAccountId satisfies the singleton CHECK + PK). The USER acceptance
+        // half is already proven by ValidIdentifiers_AreAccepted_TimestampsAndVersionDefault
+        // and UniqueConstraints_RejectDuplicateCompanyNumberAndSubject.
         PersistenceTestDatabase.SkipIfNotConfigured();
 
         await using var context = PersistenceTestDatabase.CreateContext();
@@ -126,16 +187,22 @@ public sealed class Migration001AccountAndTemplateFoundationTests
 
         var token = Guid.NewGuid().ToString("N");
 
-        // NULL email is rejected by NOT NULL; blank/whitespace is rejected by the CHECK.
-        var rawEmail = emailValue == "NULL" ? "NULL" : $"'{emailValue.Replace("'", "''")}'";
-        var exception = await Assert.ThrowsAsync<PostgresException>(() =>
-            context.Database.ExecuteSqlRawAsync(
-                "INSERT INTO users (user_id, auth_identity_id, name, company_number, email, active, version) " +
-                $"VALUES (gen_random_uuid(), 'subject-{token}', 'Name', 'company-{token}', {rawEmail}, true, 1)"));
+        try
+        {
+            await context.Database.ExecuteSqlRawAsync(
+                "INSERT INTO admin_accounts (admin_id, auth_identity_id, display_name, email, active) " +
+                $"VALUES ('{AdminAccountId.Value}', 'subject-admin-{token}', 'Name', 'valid-admin-{token}@dmo.test', true)");
 
-        Assert.True(
-            exception.SqlState is "23502" or "23514",
-            $"Expected NOT NULL (23502) or CHECK (23514) violation, got {exception.SqlState}.");
+            var row = await QueryStringsAsync(
+                context,
+                "SELECT auth_identity_id, email FROM admin_accounts WHERE admin_id = @p",
+                new NpgsqlParameter("p", AdminAccountId.Value));
+            Assert.Equal($"subject-admin-{token}|valid-admin-{token}@dmo.test", Assert.Single(row));
+        }
+        finally
+        {
+            await PersistenceTestDatabase.ClearAdminAccountsAsync(context);
+        }
     }
 
     [SkippableFact]
@@ -246,6 +313,45 @@ public sealed class Migration001AccountAndTemplateFoundationTests
         Assert.Equal("23514", postgres.SqlState); // check_violation (singleton CHECK)
         Assert.Contains("admin_accounts_singleton_id_check", postgres.ConstraintName);
     }
+
+    /// <summary>Mandatory USER identifiers × invalid values (NULL, blank, whitespace).</summary>
+    public static TheoryData<string, string> UserIdentifierMandatoryCases()
+    {
+        var data = new TheoryData<string, string>();
+        foreach (var column in new[] { "email", "auth_identity_id", "company_number" })
+        {
+            data.Add(column, "NULL");
+            data.Add(column, "");
+            data.Add(column, "   ");
+        }
+
+        return data;
+    }
+
+    /// <summary>Mandatory ADMIN identifiers × invalid values (NULL, blank, whitespace).</summary>
+    public static TheoryData<string, string> AdminIdentifierMandatoryCases()
+    {
+        var data = new TheoryData<string, string>();
+        foreach (var column in new[] { "email", "auth_identity_id" })
+        {
+            data.Add(column, "NULL");
+            data.Add(column, "");
+            data.Add(column, "   ");
+        }
+
+        return data;
+    }
+
+    /// <summary>Renders a case value as raw SQL: <c>NULL</c> stays NULL, literals are single-quoted.</summary>
+    private static string RawSqlValue(string value) =>
+        value == "NULL" ? "NULL" : SqlLiteral(value);
+
+    /// <summary>Wraps a string in SQL single quotes (test-owned fixed tokens only).</summary>
+    private static string SqlLiteral(string value) => $"'{value.Replace("'", "''")}'";
+
+    /// <summary>NULL violates NOT NULL (23502); blank/whitespace violates the nonblank CHECK (23514).</summary>
+    private static string ExpectedSqlState(string value) =>
+        value == "NULL" ? "23502" : "23514";
 
     private static Task InsertUserAsync(DmoDbContext context, string companyNumber, string subject)
     {

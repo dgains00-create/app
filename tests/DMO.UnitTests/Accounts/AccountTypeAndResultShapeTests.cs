@@ -74,7 +74,9 @@ public sealed class AccountTypeAndResultShapeTests
     public void UserAccount_CarriesOnlyTheNullableTemplateIdFact()
     {
         // P1-T03: the USER account record carries exactly the nullable TemplateId persistence
-        // fact (grants nothing, no resolver branch reads it); no Module/access state exists.
+        // fact (grants nothing, no resolver branch reads it) plus the pessimistic-concurrency
+        // Version observed at read time (P1-T03 correction: mirror of Template.Version); no
+        // Module/access state exists.
         var properties = typeof(UserAccount)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Select(property => property.Name)
@@ -84,7 +86,7 @@ public sealed class AccountTypeAndResultShapeTests
         Assert.Equal(
             new[]
             {
-                "AccountId", "CompanyNumber", "DisplayName", "Email", "IsActive", "RoleLabel", "TemplateId",
+                "AccountId", "CompanyNumber", "DisplayName", "Email", "IsActive", "RoleLabel", "TemplateId", "Version",
             },
             properties);
 
