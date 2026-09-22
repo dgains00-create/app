@@ -1,0 +1,61 @@
+@using DMO.Web.Frontend.Shared.Contracts
+@model AvailabilityPresentation
+@*
+    A3 shared AvailabilityState (freeze §11). Renders one of the eight distinct availability
+    outcomes with explicit text. Never checks storage, infers record existence, generates
+    output, defines versions, exposes paths or decides authorization.
+
+    available / not-generated / awaiting-approval / workspace-unavailable / file-missing /
+    versions-available / not-applicable / lookup-failed each carry their own token and their own
+    supplied text. not-applicable is not an error; file-missing is not not-generated;
+    lookup-failed is not no-file/no-record.
+*@
+@{
+    var regionId = ViewData["AvailabilityRegionId"] as string ?? "dmo-availability";
+}
+<section class="dmo-availability dmo-availability--@Model.StateToken"
+         data-dmo-availability="@Model.StateToken"
+         role="group"
+         aria-labelledby="@($"{regionId}-label")"
+         aria-describedby="@(Model.HasDetail ? $"{regionId}-detail" : null)">
+    <h3 class="dmo-availability__label" id="@($"{regionId}-label")">@Model.RegionLabel</h3>
+    <p class="dmo-availability__text" data-dmo-availability-text="@Model.StateToken">@Model.Text</p>
+    @if (Model.HasDetail)
+    {
+        <p class="dmo-availability__detail" id="@($"{regionId}-detail")" data-dmo-availability-detail="@Model.StateToken">@Model.Detail</p>
+    }
+    @if (Model.HasVersions)
+    {
+        <ul class="dmo-availability__versions" aria-label="Versões disponíveis">
+            @foreach (var version in Model.Versions)
+            {
+                <li>
+                    <button type="button" class="dmo-availability__version"
+                            data-dmo-version="@version.Key"
+                            aria-pressed="@(version.Selected ? "true" : "false")">@version.Label</button>
+                </li>
+            }
+        </ul>
+    }
+    @if (Model.HasActions)
+    {
+        <ul class="dmo-availability__actions" aria-label="Ações de documento">
+            @foreach (var action in Model.Actions)
+            {
+                var reasonId = $"{regionId}-action-{action.Key}-reason";
+                <li>
+                    @if (action.Enabled)
+                    {
+                        <button type="button" class="dmo-availability__action" data-dmo-action="@action.Key">@action.Label</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="dmo-availability__action" data-dmo-action="@action.Key"
+                                disabled aria-disabled="true" aria-describedby="@reasonId">@action.Label</button>
+                        <span class="dmo-availability__action-reason" id="@reasonId">@action.DisabledReason</span>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</section>

@@ -1,0 +1,20 @@
+@using DMO.Web.Frontend.Shared.Contracts
+@model RecordStatusPresentation
+@*
+    A3 shared RecordStatus (freeze §10). Always renders the supplied status text; tone/marker
+    are supplementary and never colour-only; an unknown supplied status uses the neutral tone
+    and guesses no semantics. Not focusable and grants no actions.
+*@
+<span class="dmo-status dmo-status--@Model.ToneToken"
+      data-dmo-status-tone="@Model.ToneToken"
+      role="status">
+    @if (Model.HasMarker)
+    {
+        <span class="dmo-status__marker" data-dmo-status-marker="@Model.MarkerLabel" aria-hidden="true">@Model.MarkerLabel</span>
+    }
+    <span class="dmo-status__text" data-dmo-status-text="@Model.Text">@Model.Text</span>
+</span>
+@if (Model.HasAssistiveDescription)
+{
+    <span class="dmo-status__assistive visually-hidden" data-dmo-status-description="true">@Model.AssistiveDescription</span>
+}

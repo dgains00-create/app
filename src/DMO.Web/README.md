@@ -1,8 +1,9 @@
 # DMO.Web
 
-Application host only: startup/composition root, HTTP pipeline, configuration binding,
-dependency registration, the technical health/startup surface, and the runtime
-authentication/account boundary.
+Application host: startup/composition root, HTTP pipeline, configuration binding,
+dependency registration, the technical health/startup surface, the runtime
+authentication/account boundary, the ADMIN-only administration surfaces, the account-aware
+root router and the accepted shared frontend shell.
 
 It owns no industrial business rule.
 
@@ -13,12 +14,21 @@ It owns no industrial business rule.
 | Composition root | `Program.cs` |
 | Technical endpoints | `Endpoints/TechnicalEndpoints.cs` |
 | Authentication + current-account endpoints | `Endpoints/AuthEndpoints.cs` |
-| Technical startup commands (migrate / run) | `Startup/StartupCommands.cs` |
-| Supabase Auth configuration (DEV/TEST, ADMIN path) | `Auth/SupabaseOptions.cs` |
+| Technical startup commands (migrate / bootstrap-admin / run) | `Startup/StartupCommands.cs` |
+| Supabase Auth configuration (DEV/TEST) | `Auth/SupabaseOptions.cs`, `Auth/SupabaseAdminOptions.cs` |
 | Production authentication boundary | `Auth/SupabaseAuthenticationService.cs` |
 | Runtime session element (cookie scheme) | `Auth/SessionAuthentication.cs` |
 | Real current-account context | `Auth/CurrentAccountContext.cs` |
-| Production P1-T02 account lookup (fail closed) | `Resolution/UnavailableAccountLookup.cs` |
+| Shared frontend registration seam (A2/A3) | `Frontend/Shared/SharedFrontendExtensions.cs` |
+| Shared presentation contracts (A3 P2-T01) | `Frontend/Shared/Contracts/` |
+| Shared component partials (A3 P2-T01) | `Pages/Shared/Components/` |
+| Shared shell presentation | `Frontend/Shell/ShellPresentationService.cs`, `ShellPresentationModels.cs` |
+| Navigation projection + route seam | `Frontend/Shell/NavigationProjectionService.cs`, `DestinationRoutes.cs` |
+| Account-aware root routing / landing | `Pages/Index.cshtml.cs`, `Navigation/UserLandingService.cs`, `Navigation/LandingSelector.cs` |
+| No-access USER surface | `Pages/AccessDenied.cshtml(.cs)` |
+| ADMIN-only Template administration | `Pages/Administration/Templates/` |
+| ADMIN-only USER administration | `Pages/Administration/Users/` |
+| Module authorization gate | `Authorization/ModuleAuthorization*.cs` |
 
 ## Technical endpoint
 
@@ -28,11 +38,11 @@ GET /health  ->  {"status":"ok","environment":"<host environment>"}
 
 Startup/liveness only. It reads no product data and does not touch the database.
 
-## Authentication + current-account surface (P1-T02)
+## Authentication + current-account surface
 
 ```text
-POST /auth/login    ADMIN: {"email", "password"}      -> 200 (session) | 401 | 502 | 503 | 403 (fail closed)
-                    USER:  {"companyNumber", "password"} -> 503 in P1-T02 (no USER provider flow yet)
+POST /auth/login    ADMIN: {"email", "password"}          -> 200 (session) | 401 | 502 | 503 | 403 (fail closed)
+                    USER:  {"companyNumber", "password"}  -> 200 (session) | 401 | 502 | 503 | 403 (fail closed)
 POST /auth/logout   clears only the runtime session state
 GET  /auth/me       {"accountType": "admin"|"user"|"none", ...} — read-only, never grants access
 ```
@@ -42,12 +52,22 @@ GET  /auth/me       {"accountType": "admin"|"user"|"none", ...} — read-only, n
   no `service_role` and no secret key is used. This project is DEV/TEST only — the future
   production backend is a separate clean Supabase project.
 - A session is established only when authentication succeeds **and** account resolution
-  returns the active ADMIN/USER. In P1-T02 production no account can resolve
-  (`UnavailableAccountLookup` until P1-T03), so `POST /auth/login` always fails closed and
-  no session is ever created.
-- USER login contract stays `company_number + password`. No email mapping is invented; the
-  durable mapping is P1-T03 persistence.
+  returns the active ADMIN/USER.
+- USER login contract is `company_number + password`; the persisted carrier email is resolved
+  through the narrow lookup and the same Supabase password grant is used.
 - Provider identity is internal linkage only. Provider claims/roles never classify access.
+
+## Routing
+
+```text
+GET /           ADMIN  -> 302 /Administration
+                USER   -> 302 valid landing route, or 302 /AccessDenied when resolution fails closed / no routable destination
+                none   -> 302 /Login
+GET /AccessDenied  ADMIN -> 302 /Administration; USER -> 403 generic no-access in the shared shell
+```
+
+Invalid explicit persisted landing fails closed to `/AccessDenied`; it never falls back to the
+first valid destination.
 
 ## Configuration
 
@@ -55,7 +75,8 @@ GET  /auth/me       {"accountType": "admin"|"user"|"none", ...} — read-only, n
 | --- | --- | --- |
 | `Database:ConnectionString` | `Database__ConnectionString` | PostgreSQL connection string |
 | `Supabase:ProjectUrl` | `Supabase__ProjectUrl` | DEV/TEST Supabase project URL |
-| `Supabase:PublishableKey` | `Supabase__PublishableKey` | Supabase publishable key (ADMIN Auth) |
+| `Supabase:PublishableKey` | `Supabase__PublishableKey` | Supabase publishable key (ADMIN/USER Auth) |
+| `SupabaseAdmin:ServiceRoleKey` | `SupabaseAdmin__ServiceRoleKey` | service-role secret (ADMIN-only USER administration; server-only) |
 
 There are **no defaults** and no committed credentials. Missing or invalid values fail
 startup loudly (`DatabaseConfigurationException` / `SupabaseConfigurationException`); the
@@ -81,14 +102,22 @@ dotnet restore
 dotnet build
 dotnet run --project src/DMO.Web                            # start the host
 dotnet run --project src/DMO.Web -- migrate                 # apply pending migrations and exit
+dotnet run --project src/DMO.Web -- bootstrap-admin         # deployment-only single-ADMIN bootstrap
 ```
 
-At P1-T02 the migration set is intentionally empty: `migrate` reports that nothing was
-applied and leaves the schema untouched.
+## Shared frontend notes
+
+- `Frontend/Shared/Contracts/` (P2-T01/A3) holds the frozen presentation vocabulary: the ten
+  common states, `RecordStatus`, `AvailabilityState` and the generic action carrier. These are
+  presentation-only and domain-neutral; they never decide access or persist anything.
+- `wwwroot/css/dmo-components.css` is the A-owned component stylesheet (new file; existing
+  selectors are not rewritten).
+- Build availability stays honest: `ModuleRegistrations.CurrentBuildAvailable` is empty, so no
+  operational destination is advertised until its real surface and route exist.
 
 ## Cross-cutting boundaries
 
-Run as a host process only. P1-T02 adds the authentication/account boundary (ADMIN Supabase
-Auth DEV/TEST, provider-neutral account resolution, runtime session, read-only current
-account). Module Registry, navigation composition, Template/Module access resolution and the
-USER provider mapping arrive in later slices (P1-T03 onward); none is implemented here.
+Run as a host process only. Module Registry, navigation composition, Template/Module access
+resolution, the shared shell, the ADMIN-only administration surfaces and the P2-T01 shared
+component layer are present. Operational industrial Modules remain unimplemented and
+unregistered.

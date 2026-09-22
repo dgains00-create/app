@@ -1,28 +1,28 @@
 # DMO.Infrastructure
 
-Shared infrastructure plumbing: PostgreSQL connection/configuration, the persistence
-context and the migration-runner implementation.
+Shared infrastructure plumbing: PostgreSQL connection/configuration, the persistence context
+and the migration-runner implementation.
 
-No Phase 1 domain schema and no industrial business rules live here.
+No industrial business rules live here.
 
-## P1-T01 contents
+## Contents
 
 | Concern | Type |
 | --- | --- |
 | Connection configuration | `Database/DatabaseOptions.cs` |
 | Connection resolution + validation | `Database/DatabaseConnectionResolver.cs` |
 | Configuration failure | `Database/DatabaseConfigurationException.cs` |
-| Persistence context (single, empty) | `Persistence/DmoDbContext.cs` |
+| Persistence context | `Persistence/DmoDbContext.cs` |
 | Migration runner implementation | `Persistence/EfCoreMigrationRunner.cs` |
+| Product migrations | `Migrations/20260922001736_*` (account/template foundation), `Migrations/20260922001757_*` (template module composition) |
+| Foundation entities + configurations | `Persistence/` (accounts, templates, template modules) |
+| Repository primitives | `Persistence/` (users, templates, accounts) |
 | DI registration | `InfrastructureServiceCollectionExtensions.cs` |
 
-## Deliberately absent
+## Boundaries
 
-- no Phase 1 product tables;
-- no entity classes for USER, ADMIN, Template, Module, Tool or any industrial concept;
-- no raw permission/capability tables;
-- no second database context;
-- no generic repository abstraction;
+- one database context only; no second context and no generic repository abstraction;
+- migrations 001/002 are frozen; later schema changes arrive as **new** migration files;
 - no connection string, credential, host, user or password default.
 
 Configuration is supplied by the environment (see `src/DMO.Web/README.md`). A missing or

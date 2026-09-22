@@ -1,0 +1,74 @@
+@using DMO.Web.Frontend.Shared.Contracts
+@model CommonStateRegionPresentation
+@*
+    A3 shared common-state region (freeze §4). Presentation-only: it renders one supplied
+    state and never decides access, fetches, persists or infers a domain outcome.
+
+    The four states empty / lookup-failed / unavailable / permission-denied render as
+    structurally distinct surfaces (distinct token, heading and live-region behavior) so a
+    consumer can never collapse them (freeze §4 closing rule).
+*@
+@{
+    var regionId = ViewData["CommonStateRegionId"] as string ?? "dmo-state";
+    var heading = Model.State switch
+    {
+        CommonState.Loading => "A carregar",
+        CommonState.Ready => "Pronto",
+        CommonState.Empty => "Sem resultados",
+        CommonState.LookupFailed => "Falha na consulta",
+        CommonState.Unavailable => "Indisponível",
+        CommonState.PermissionDenied => "Acesso negado",
+        CommonState.Saving => "A guardar",
+        CommonState.Submitting => "A submeter",
+        CommonState.Stale => "Informação desatualizada",
+        CommonState.Conflict => "Conflito de dados",
+        _ => "Estado",
+    };
+    // Busy regions announce progress; lookup-failed and conflict announce assertively for the
+    // affected region (freeze §4). Neither steals focus.
+    var announces = Model.IsBusy || Model.IsAssertive;
+    var liveRole = announces ? "status" : null;
+    var livePoliteness = Model.IsAssertive ? "assertive" : "polite";
+}
+<section class="dmo-state dmo-state--@Model.StateToken"
+         data-dmo-state="@Model.StateToken"
+         role="@(liveRole ?? "group")"
+         aria-live="@(announces ? livePoliteness : null)"
+         aria-busy="@(Model.IsBusy ? "true" : null)"
+         aria-label="@Model.RegionLabel"
+         aria-describedby="@(Model.HasReason ? $"{regionId}-reason" : null)">
+    @if (Model.IsWrapped)
+    {
+        @* A common state may wrap, but never replace, the supplied outcome (freeze §11). *@
+        <p class="dmo-state__wrapper" data-dmo-state-wrapper="@Model.WrappingStateToken">
+            Estado geral: @Model.WrappingStateToken
+        </p>
+    }
+    <h2 class="dmo-state__heading" id="@($"{regionId}-heading")">@heading</h2>
+    <p class="dmo-state__message" data-dmo-state-message="@Model.StateToken">@Model.Message</p>
+    @if (Model.HasReason)
+    {
+        <p class="dmo-state__reason" id="@($"{regionId}-reason")" data-dmo-state-reason="@Model.StateToken">@Model.Reason</p>
+    }
+    @if (Model.HasActions)
+    {
+        <ul class="dmo-state__actions" aria-label="Ações disponíveis">
+            @foreach (var action in Model.Actions)
+            {
+                var reasonId = $"{regionId}-action-{action.Key}-reason";
+                <li>
+                    @if (action.Enabled)
+                    {
+                        <button type="button" class="dmo-state__action" data-dmo-action="@action.Key">@action.Label</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="dmo-state__action" data-dmo-action="@action.Key"
+                                disabled aria-disabled="true" aria-describedby="@reasonId">@action.Label</button>
+                        <span class="dmo-state__action-reason" id="@reasonId">@action.DisabledReason</span>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</section>

@@ -2,16 +2,29 @@
 
 Application orchestration and the contracts required by the runtime.
 
-## P1-T01 status
+## Contents
 
-Deliberately minimal. The only contract materialised in this task is the migration-runner
-boundary (`Migrations/`), which the runtime host needs in order to expose a migration entry
-point without knowing how migrations are physically stored or executed.
+| Concern | Location |
+| --- | --- |
+| Migration-runner boundary | `Migrations/` |
+| Canonical Module vocabulary + registry | `Access/ModuleCatalog.cs`, `Access/ModuleRegistry.cs` |
+| Fail-closed access resolution | `Access/AccessResolver.cs`, `Access/AccessOutcome.cs`, `Access/ModuleResolve.cs` |
+| Access facade | `Access/ModuleAccessService.cs` |
+| Account resolution + account models | `Accounts/` |
+| Authentication boundary + session | `Authentication/`, `Session/` |
+| Template model | `Templates/` |
+| Template administration | `TemplateAdministration/` |
+| USER administration | `UserAdministration/` |
 
-Not implemented here, by task scope:
+## Honest build availability
 
-- Users, Templates, Module Registry behaviour, access resolution;
-- authentication workflows;
-- any operational/industrial orchestration.
+`Access/ModuleRegistrations.cs` is the only source of build availability. It is currently
+empty: no industrial operational surface is implemented yet, so no operational Module is
+advertised as available. A Module is registered there only when its real functional surface
+and server-side enforcement exist.
 
-These belong to later Phase 1 slices (P1-T02 onward) and are not pre-built.
+## Boundaries
+
+Application orchestration only. Persistence plumbing lives in `DMO.Infrastructure`;
+host/composition and HTTP surfaces live in `DMO.Web`. No industrial business rule is
+duplicated across those projects.

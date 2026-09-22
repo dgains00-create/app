@@ -1,0 +1,212 @@
+/* P2-T01 (A3) shared generic states, RecordStatus and AvailabilityState — new A-owned component
+   stylesheet. It consumes only the tokens published in dmo-tokens.css and is scoped to its own
+   dmo-state / dmo-status / dmo-availability selectors: no existing selector is rewritten and no
+   shell chrome is painted. Meaning is always carried by visible text; colour/tone is
+   supplementary (freeze §3 rule 6, §10, §11). */
+
+/* ---- common state region (freeze §4) ---------------------------------------------- */
+.dmo-state {
+    margin: .6rem 0 0;
+    padding: .7rem .85rem;
+    border: 1px solid var(--dmo-line);
+    border-left-width: 4px;
+    border-radius: var(--dmo-radius);
+    background: var(--dmo-surface);
+}
+
+.dmo-state__heading {
+    margin: 0;
+    font-size: .95rem;
+}
+
+.dmo-state__message,
+.dmo-state__reason,
+.dmo-state__wrapper {
+    margin: .3rem 0 0;
+    font-size: .84rem;
+}
+
+.dmo-state__reason {
+    color: var(--dmo-muted);
+}
+
+.dmo-state__wrapper {
+    color: var(--dmo-muted);
+    font-size: .74rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.dmo-state__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin: .55rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.dmo-state__action {
+    min-height: var(--dmo-control-height);
+    padding-inline: .7rem;
+    border: 1px solid var(--dmo-line-strong);
+    border-radius: var(--dmo-radius);
+    background: var(--dmo-surface-muted);
+    color: var(--dmo-ink);
+    font: inherit;
+    font-size: .8rem;
+    cursor: pointer;
+}
+
+.dmo-state__action[disabled] {
+    color: var(--dmo-muted);
+    cursor: not-allowed;
+}
+
+.dmo-state__action-reason {
+    display: block;
+    margin-top: .2rem;
+    color: var(--dmo-muted);
+    font-size: .74rem;
+}
+
+/* Distinct accent per state token: the accent never replaces the visible heading/message. */
+.dmo-state--loading { border-left-color: var(--dmo-accent); }
+.dmo-state--ready { border-left-color: var(--dmo-success); }
+.dmo-state--empty { border-left-color: var(--dmo-line-strong); }
+.dmo-state--lookup-failed { border-left-color: var(--dmo-danger); }
+.dmo-state--unavailable { border-left-color: var(--dmo-warning); }
+.dmo-state--permission-denied { border-left-color: var(--dmo-danger); }
+.dmo-state--saving { border-left-color: var(--dmo-accent); }
+.dmo-state--submitting { border-left-color: var(--dmo-accent); }
+.dmo-state--stale { border-left-color: var(--dmo-warning); }
+.dmo-state--conflict { border-left-color: var(--dmo-danger); }
+
+.dmo-state--stale .dmo-state__heading::before { content: "\26A0\00A0"; }
+.dmo-state--conflict .dmo-state__heading::before { content: "\26A0\00A0"; }
+.dmo-state--lookup-failed .dmo-state__heading::before { content: "\26A0\00A0"; }
+
+/* ---- RecordStatus (freeze §10) ---------------------------------------------------- */
+.dmo-status {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .15rem .5rem;
+    border: 1px solid var(--dmo-line-strong);
+    border-radius: var(--dmo-radius);
+    background: var(--dmo-surface-muted);
+    color: var(--dmo-ink);
+    font-size: .78rem;
+}
+
+.dmo-status__marker {
+    font-size: .8rem;
+    line-height: 1;
+}
+
+.dmo-status__text {
+    font-weight: 600;
+}
+
+.dmo-status--neutral { border-color: var(--dmo-line-strong); }
+.dmo-status--info { border-color: var(--dmo-accent); }
+.dmo-status--success { border-color: var(--dmo-success); }
+.dmo-status--warning { border-color: var(--dmo-warning); }
+.dmo-status--danger { border-color: var(--dmo-danger); }
+
+.dmo-status--success .dmo-status__marker { color: var(--dmo-success); }
+.dmo-status--warning .dmo-status__marker { color: var(--dmo-warning); }
+.dmo-status--danger .dmo-status__marker { color: var(--dmo-danger); }
+.dmo-status--info .dmo-status__marker { color: var(--dmo-accent); }
+
+/* ---- AvailabilityState (freeze §11) ----------------------------------------------- */
+.dmo-availability {
+    margin: .6rem 0 0;
+    padding: .7rem .85rem;
+    border: 1px solid var(--dmo-line);
+    border-left-width: 4px;
+    border-radius: var(--dmo-radius);
+    background: var(--dmo-surface);
+}
+
+.dmo-availability__label {
+    margin: 0;
+    font-size: .78rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--dmo-muted);
+}
+
+.dmo-availability__text,
+.dmo-availability__detail {
+    margin: .3rem 0 0;
+    font-size: .84rem;
+}
+
+.dmo-availability__detail {
+    color: var(--dmo-muted);
+}
+
+.dmo-availability__versions,
+.dmo-availability__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin: .55rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.dmo-availability__version,
+.dmo-availability__action {
+    min-height: var(--dmo-control-height);
+    padding-inline: .7rem;
+    border: 1px solid var(--dmo-line-strong);
+    border-radius: var(--dmo-radius);
+    background: var(--dmo-surface-muted);
+    color: var(--dmo-ink);
+    font: inherit;
+    font-size: .8rem;
+    cursor: pointer;
+}
+
+.dmo-availability__version[aria-pressed="true"] {
+    border-color: var(--dmo-accent);
+    font-weight: 700;
+}
+
+.dmo-availability__action[disabled] {
+    color: var(--dmo-muted);
+    cursor: not-allowed;
+}
+
+.dmo-availability__action-reason {
+    display: block;
+    margin-top: .2rem;
+    color: var(--dmo-muted);
+    font-size: .74rem;
+}
+
+/* not-applicable is explicitly NOT an error; only lookup-failed is. */
+.dmo-availability--available { border-left-color: var(--dmo-success); }
+.dmo-availability--not-generated { border-left-color: var(--dmo-line-strong); }
+.dmo-availability--awaiting-approval { border-left-color: var(--dmo-warning); }
+.dmo-availability--workspace-unavailable { border-left-color: var(--dmo-warning); }
+.dmo-availability--file-missing { border-left-color: var(--dmo-warning); }
+.dmo-availability--versions-available { border-left-color: var(--dmo-accent); }
+.dmo-availability--not-applicable { border-left-color: var(--dmo-line); }
+.dmo-availability--lookup-failed { border-left-color: var(--dmo-danger); }
+
+/* ---- shared visual-only hiding used by supplied assistive text -------------------- */
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}

@@ -518,6 +518,18 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   6. `CurrentBuildAvailable` is still `[]` and no route changed.
 - **Completion evidence:** committed component + tests, build/test results recorded by the
   implementing agent, and confirmation that no protected file changed.
+- **STATUS: IMPLEMENTED** — commit `<pending>` in `DMO-MODULAR/main`; response
+  `dev/responses/P2_T01_IMPLEMENTATION_RESPONSE.md`. New A-owned paths:
+  `src/DMO.Web/Frontend/Shared/Contracts/*` (10 presentation contracts),
+  `src/DMO.Web/Pages/Shared/Components/{_CommonStateRegion,_RecordStatus,_AvailabilityState}.cshtml`,
+  `src/DMO.Web/wwwroot/css/dmo-components.css`, plus unit/integration tests under
+  `tests/**/Frontend/Shared/`. Additive registration was already satisfied by the existing
+  `AddRazorPages()`, so `SharedFrontendExtensions.cs` is byte-identical. Documentation slice
+  (ledger 8.1/8.2/8.3): `src/DMO.Application|DMO.Infrastructure|DMO.Web/README.md` refreshed.
+  Verification: build 0 warnings/0 errors; unit 374/374 passed; integration 115 passed /
+  71 env-gated skipped / 0 failed; `git diff --check` clean; 0 migrations; 0 provisional
+  markers in `src/`; `CurrentBuildAvailable` still `[]`; no protected file modified.
+  Awaiting Architect implementation review per `dmo-beta-master/WORKFLOW.md` step 12.
 - **Downstream dependents:** P2-T02…P2-T07 (all consume status/availability/states).
 
 ### P2-T02 — `DenseDataTable` + `AuditTrail` (A4)
@@ -1163,7 +1175,7 @@ Investigated during this planning run and determined **not** to require implemen
 
 | Reconciliation reference | Class | Disposition | Target |
 |---|---|---|---|
-| 7.1 A shared feature components | PARTIAL | READY FOR IMPLEMENTATION | P2-T01, P2-T02, P2-T03 |
+| 7.1 A shared feature components | PARTIAL | PARTIAL: states/RecordStatus/AvailabilityState IMPLEMENTED (P2-T01); table/picker/rows/decisionbar remain | P2-T02, P2-T03 |
 | 7.2 secondary nav / current marking | PARTIAL | READY FOR IMPLEMENTATION | P2-T09 |
 | 7.3 access identities without feature actions | PARTIAL | READY FOR IMPLEMENTATION | P2-T04...P2-T07, P2-T10 |
 | 7 (Q3) P1-T07 accepted-status gap | PARTIAL | CLOSED (P2-T00: ACCEPT review `50e8841…`) | — |
@@ -1184,7 +1196,7 @@ Investigated during this planning run and determined **not** to require implemen
 | 9.15 documents/PDF | MISSING | READY FOR IMPLEMENTATION | P2-T08 |
 | 9.16 Module availability registrations | MISSING | READY FOR IMPLEMENTATION | P2-T10 |
 | 9.17 real destination routes | MISSING | READY FOR IMPLEMENTATION | P2-T10 |
-| 8.1/8.2/8.3 stale READMEs | DIVERGENT (docs) | READY FOR IMPLEMENTATION (trivial) | P2-T01 |
+| 8.1/8.2/8.3 stale READMEs | DIVERGENT (docs) | CLOSED (P2-T01 documentation slice) | — |
 | 10.1 admin logout placement | UNAUTHORIZED (ambig.) | DO NOT IMPLEMENT | — |
 | 10.2 shell status strings | UNAUTHORIZED (ambig.) | DO NOT IMPLEMENT | — |
 | 10.3 unused shell slots | UNAUTHORIZED (ambig.) | DEFERRED BY DESIGN | P2-T01/P2-T03 consume |
