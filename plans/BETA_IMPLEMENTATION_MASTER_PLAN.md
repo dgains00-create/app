@@ -631,10 +631,13 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   empty/lookup-failed distinction.
 - **Acceptance criteria:** the six bullet behaviors above each have a failing-if-removed test;
   no consumer URL is constructed by the component; no attribution synthesis is observable.
-- **STATUS: CONTRACT AUTHORED — AWAITING ARCHITECT PLAN ACCEPT** (not implemented). The formal
-  implementation contract is
-  `plans/contracts/P2-T02_DENSE_DATA_TABLE_AUDIT_TRAIL_CONTRACT.md`; authoring response
-  `dev/responses/P2_T02_CONTRACT_AUTHORING_RESPONSE.md`. The contract pins both components to the
+- **STATUS: P2-T02 IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION
+  REVIEW.** The formal implementation contract is
+  `plans/contracts/P2-T02_DENSE_DATA_TABLE_AUDIT_TRAIL_CONTRACT.md` at accepted contract SHA
+  `e79186a81d5cd934fe32a100bc8dd9dd08bf509a`, accepted by Architect PLAN ACCEPT at
+  `dmo-work` SHA `f1ddb968e026dc6cf2569d8de64400d8c3044514`; authoring response
+  `dev/responses/P2_T02_CONTRACT_AUTHORING_RESPONSE.md`; implementation response
+  `dev/responses/P2_T02_IMPLEMENTATION_RESPONSE.md`. The contract pins both components to the
   binding DMO fixed desktop layout policy (canonical 1366 × 768; no breakpoint reflow, no
   table-to-card conversion, no required-column hiding, no action relocation; keyboard-reachable
   local horizontal scroll), reuses the accepted P2-T01 state/status/action primitives without
@@ -642,9 +645,12 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   DecisionBar/ProductionContextStrip), defines no backend/persistence/route/authorization seam,
   and records 3 CONTRACT QUESTIONS (Q1 browser-level JS verification and Q3 plain-text vs
   rendered cell content defaults accepted; Q2 resolved by Architect review with AuditTrail
-  entry status absent). No implementation, no
-  application change, no self-acceptance: P2-T02 remains unauthorized until an Architect
-  `PLAN ACCEPT` on the contract per `dmo-beta-master/WORKFLOW.md` steps 4–7.
+  entry status absent). Implementation is additive only: 17 new shared contract types, 3 new
+  shared partials, 2 new generic static assets, additive CSS and new unit/rendered tests; no
+  P2-T01 artifact modified, no route or availability registration added, `CurrentBuildAvailable`
+  still `[]`. **Not self-accepted and not closed:** formal closure requires independent
+  verification and an Architect implementation review per `dmo-beta-master/WORKFLOW.md` step 12.
+  P2-T03 remains unauthorized and unimplemented.
 - **Downstream dependents:** P2-T04 (Job On history), P2-T05/P2-T06 (Controlo lists),
   P2-T07 (Boquilhas History), P2-T08 (audit/decision history rendering).
 

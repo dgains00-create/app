@@ -1,0 +1,14 @@
+@*
+    P2-T02 (A4) additive asset include helper (contract §14.5).
+
+    Emits exactly one tag per shared A-owned asset so a consumer needs a single
+    `<partial name="_SharedComponentAssets" />` line. It does not modify the protected shell,
+    does not insert anything into `_Layout` and does not emit the component markup itself;
+    direct `<link>`/`<script>` tags on a page remain permitted.
+
+    The referenced `href`/`src` values are fixed static asset paths owned by this repository —
+    no consumer URL is constructed and no route is registered.
+*@
+<link rel="stylesheet" href="~/css/dmo-components.css" asp-append-version="true" />
+<script src="~/js/dmo-focus.js" defer></script>
+<script src="~/js/dmo-dense-table.js" defer></script>

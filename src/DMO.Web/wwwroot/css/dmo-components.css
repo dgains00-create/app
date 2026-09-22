@@ -210,3 +210,362 @@
     white-space: nowrap;
     border: 0;
 }
+
+/* ===================================================================================
+   P2-T02 (A4) — DenseDataTable + AuditTrail. Additive only: new dmo-table* / dmo-audit*
+   selectors appended to the existing A-owned sheet. No existing selector is rewritten, no
+   new design token and no hex palette is introduced, and there is NO @media/@container or
+   any other width-conditional rule: the fixed desktop composition (canonical 1366 x 768)
+   never reflows, converts to cards, hides a column or relocates an action (contract §4, §9).
+   Meaning is always carried by visible text; colour is supplementary.
+   =================================================================================== */
+
+/* ---- DenseDataTable (contract §5, §9) --------------------------------------------- */
+.dmo-table {
+    margin: .6rem 0 0;
+}
+
+.dmo-table__summary {
+    margin: 0 0 .35rem;
+    font-size: .8rem;
+    color: var(--dmo-muted);
+}
+
+.dmo-table__filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--dmo-space-3);
+    margin: 0 0 .4rem;
+}
+
+.dmo-table__filter {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--dmo-space-2);
+    font-size: .78rem;
+    color: var(--dmo-muted);
+}
+
+.dmo-table__filter-control {
+    min-height: var(--dmo-control-height);
+    padding-inline: var(--dmo-space-2);
+    border: 1px solid var(--dmo-line-strong);
+    border-radius: var(--dmo-radius);
+    background: var(--dmo-surface);
+    color: var(--dmo-ink);
+    font: inherit;
+    font-size: .8rem;
+}
+
+/* The local horizontal scroll container is keyboard reachable and never traps focus. */
+.dmo-table__scroll {
+    overflow-x: auto;
+    border: 1px solid var(--dmo-line);
+    border-radius: var(--dmo-radius);
+    background: var(--dmo-surface);
+}
+
+.dmo-table__scroll:focus-visible {
+    outline: 2px solid var(--dmo-focus);
+    outline-offset: -2px;
+}
+
+.dmo-table__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .82rem;
+    color: var(--dmo-ink);
+}
+
+.dmo-table__caption {
+    padding: .3rem var(--dmo-space-2);
+    text-align: start;
+    font-size: .74rem;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--dmo-muted);
+}
+
+/* Compact uniform vertical rhythm; emphasis by weight, never by colour alone. */
+.dmo-table__header {
+    padding: var(--dmo-space-1) var(--dmo-space-2);
+    border-bottom: 1px solid var(--dmo-line-strong);
+    background: var(--dmo-surface-muted);
+    font-size: .76rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+    white-space: nowrap;
+    text-align: start;
+    vertical-align: bottom;
+}
+
+.dmo-table__header--start, .dmo-table__cell--start { text-align: start; }
+.dmo-table__header--center, .dmo-table__cell--center { text-align: center; }
+.dmo-table__header--end, .dmo-table__cell--end { text-align: end; }
+
+/* Advisory, token-driven minimum width only: never authority to hide, reorder or convert. */
+.dmo-table__header--compact, .dmo-table__cell--compact { min-width: calc(var(--dmo-space-5) * 3); }
+.dmo-table__header--wide, .dmo-table__cell--wide { min-width: calc(var(--dmo-space-5) * 6); }
+
+/* The component-owned trailing control cell keeps its fixed last position at every width. */
+.dmo-table__header--controls-cell {
+    text-align: end;
+    white-space: nowrap;
+}
+
+.dmo-table__sort {
+    border: 0;
+    background: none;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.dmo-table__sort[aria-label]::after { content: "\00A0\25B4\25BE"; font-weight: 400; opacity: .55; }
+
+.dmo-table__row {
+    border-bottom: 1px solid var(--dmo-line);
+}
+
+.dmo-table__row:last-child {
+    border-bottom: 0;
+}
+
+.dmo-table__row:focus-visible {
+    outline: 2px solid var(--dmo-focus);
+    outline-offset: -2px;
+}
+
+/* Selection is programmatic (aria-selected) AND carries the visible marker element. */
+.dmo-table__row--selected,
+.dmo-table__row[data-dmo-row-selected="true"] {
+    background: var(--dmo-surface-muted);
+}
+
+.dmo-table__row--selected .dmo-table__cell,
+.dmo-table__row[data-dmo-row-selected="true"] .dmo-table__cell {
+    box-shadow: inset 3px 0 0 0 var(--dmo-accent);
+}
+
+/* Cell content wraps instead of being truncated: no clipping and no hidden data. */
+.dmo-table__cell {
+    padding: var(--dmo-space-1) var(--dmo-space-2);
+    border-bottom: 1px solid var(--dmo-line);
+    vertical-align: top;
+    white-space: normal;
+    overflow-wrap: break-word;
+    line-height: 1.3;
+}
+
+.dmo-table__slots {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--dmo-space-1);
+    margin-inline-end: var(--dmo-space-1);
+}
+
+.dmo-table__marker {
+    color: var(--dmo-accent);
+    font-weight: 700;
+}
+
+.dmo-table__row-stale {
+    padding: 0 var(--dmo-space-1);
+    border: 1px solid var(--dmo-warning);
+    border-radius: var(--dmo-radius);
+    font-size: .7rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--dmo-warning);
+}
+
+.dmo-table__status-slot {
+    display: inline-flex;
+    align-items: center;
+}
+
+.dmo-table__cell--controls {
+    text-align: end;
+    white-space: nowrap;
+}
+
+.dmo-table__open,
+.dmo-table__action,
+.dmo-table__page {
+    min-height: var(--dmo-control-height);
+    padding-inline: var(--dmo-space-2);
+    border: 1px solid var(--dmo-line-strong);
+    border-radius: var(--dmo-radius);
+    background: var(--dmo-surface-muted);
+    color: var(--dmo-ink);
+    font: inherit;
+    font-size: .78rem;
+    cursor: pointer;
+}
+
+.dmo-table__action { margin-inline-start: var(--dmo-space-1); }
+
+.dmo-table__open[disabled],
+.dmo-table__action[disabled],
+.dmo-table__page[disabled] {
+    color: var(--dmo-muted);
+    cursor: not-allowed;
+}
+
+.dmo-table__open:focus-visible,
+.dmo-table__action:focus-visible,
+.dmo-table__page:focus-visible,
+.dmo-table__sort:focus-visible,
+.dmo-table__filter-control:focus-visible {
+    outline: 2px solid var(--dmo-focus);
+    outline-offset: 1px;
+}
+
+.dmo-table__action-reason {
+    display: block;
+    margin-top: .2rem;
+    color: var(--dmo-muted);
+    font-size: .74rem;
+    white-space: normal;
+}
+
+.dmo-table__paging {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--dmo-space-2);
+    margin: .4rem 0 0;
+}
+
+.dmo-table__page-label {
+    font-size: .78rem;
+    color: var(--dmo-muted);
+}
+
+/* State/displaced spacing stays consistent with the P2-T01 state region below. */
+.dmo-table > .dmo-state,
+.dmo-table__scroll + .dmo-table__paging + .dmo-state {
+    margin-top: .5rem;
+}
+
+/* ---- AuditTrail (contract §6, §9) -------------------------------------------------- */
+.dmo-audit {
+    margin: .6rem 0 0;
+}
+
+.dmo-audit__label {
+    margin: 0 0 .35rem;
+    font-size: .74rem;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--dmo-muted);
+}
+
+.dmo-audit__context {
+    margin: 0 0 .35rem;
+    font-size: .78rem;
+    color: var(--dmo-muted);
+}
+
+.dmo-audit__entries {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--dmo-line);
+}
+
+/* One compact block per entry, hairline separation, no cards and no decorative whitespace. */
+.dmo-audit__entry {
+    padding: var(--dmo-space-2) 0;
+    border-bottom: 1px solid var(--dmo-line);
+}
+
+.dmo-audit__entry-action {
+    margin: 0;
+    font-size: .84rem;
+    font-weight: 600;
+    color: var(--dmo-ink);
+}
+
+.dmo-audit__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--dmo-space-1) var(--dmo-space-3);
+    margin: .2rem 0 0;
+    font-size: .76rem;
+    color: var(--dmo-muted);
+}
+
+.dmo-audit__fact {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--dmo-space-1);
+}
+
+.dmo-audit__fact-label {
+    font-size: .7rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.dmo-audit__fact-value {
+    color: var(--dmo-ink);
+}
+
+.dmo-audit__detail {
+    display: flex;
+    gap: var(--dmo-space-2);
+    margin: .2rem 0 0;
+    font-size: .78rem;
+}
+
+.dmo-audit__detail-label {
+    min-width: calc(var(--dmo-space-5) * 2);
+    font-size: .7rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--dmo-muted);
+}
+
+.dmo-audit__detail-value {
+    color: var(--dmo-ink);
+    overflow-wrap: break-word;
+}
+
+.dmo-audit__action {
+    min-height: var(--dmo-control-height);
+    margin-top: var(--dmo-space-2);
+    padding-inline: var(--dmo-space-2);
+    border: 1px solid var(--dmo-line-strong);
+    border-radius: var(--dmo-radius);
+    background: var(--dmo-surface-muted);
+    color: var(--dmo-ink);
+    font: inherit;
+    font-size: .78rem;
+    cursor: pointer;
+}
+
+.dmo-audit__action[disabled] {
+    color: var(--dmo-muted);
+    cursor: not-allowed;
+}
+
+.dmo-audit__action:focus-visible {
+    outline: 2px solid var(--dmo-focus);
+    outline-offset: 1px;
+}
+
+.dmo-audit__action-reason {
+    display: block;
+    margin-top: .2rem;
+    color: var(--dmo-muted);
+    font-size: .74rem;
+}
+
+.dmo-audit > .dmo-state {
+    margin-top: .5rem;
+}

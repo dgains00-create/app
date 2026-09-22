@@ -1,0 +1,148 @@
+@using System.Globalization
+@using DMO.Web.Frontend.Shared.Contracts
+@model AuditTrailPresentation
+@*
+    P2-T02 (A4) shared AuditTrail surface (contract §6, §7.2, §8.2, §9).
+
+    Read-only presentation of supplied historical/audit events. It creates no audit fact,
+    resolves no actor, generates no timestamp, reads no clock or culture, computes no diff,
+    infers no ordering and persists nothing. Entries render in EXACTLY the supplied sequence:
+    no sorting, no reordering and no chronology claim (a plain <ul>, never an <ol>).
+
+    `AuditTrail` is the shared supplied-event primitive. `HISTÓRICO` (local module history) and
+    `HISTÓRICO GLOBAL` (a future top-level aggregating module) are different concepts and are
+    not implemented here.
+
+    There is NO entry-level status (contract Q2 resolved ABSENT).
+
+    Every non-ready surface is delegated to the accepted P2-T01 common-state partial; no
+    audit-specific state vocabulary exists.
+*@
+@{
+    var regionId = ViewData["AuditTrailRegionId"] as string ?? "dmo-audit";
+}
+<section class="dmo-audit"
+         data-dmo-audit="true"
+         data-dmo-audit-state="@Model.StateToken"
+         aria-label="@Model.RegionLabel">
+
+    @if (Model.HasContextText)
+    {
+        @* Supplied parent-controlled filter/page context, rendered verbatim; never computed or applied. *@
+        <p class="dmo-audit__context" data-dmo-audit-context="true">@Model.ContextText</p>
+    }
+
+    @if (Model.RendersEntries)
+    {
+        <p class="dmo-audit__label" data-dmo-audit-label="true">@Model.RegionLabel</p>
+        @if (Model.HasEntries)
+        {
+            <ul class="dmo-audit__entries" data-dmo-audit-entries="true">
+                @foreach (var entry in Model.Entries)
+                {
+                    @* Supplied order is authoritative; no ordering direction is asserted. *@
+                    <li class="dmo-audit__entry"
+                        data-dmo-entry="@entry.Key"
+                        data-dmo-entry-interactive="@(entry.IsInteractive ? "true" : null)">
+                        <p class="dmo-audit__entry-action" data-dmo-audit-action="true">@entry.ActionText</p>
+                        @if (entry.HasAttribution || entry.HasTimestampText)
+                        {
+                            <p class="dmo-audit__meta">
+                                @if (entry.HasAttribution)
+                                {
+                                    @*
+                                        The supplied actor, else the supplied explicit attribution-unavailable
+                                        text. A missing actor is never substituted with a session/current user.
+                                    *@
+                                    <span class="dmo-audit__fact dmo-audit__fact--actor">
+                                        <span class="dmo-audit__fact-label">Ator</span>
+                                        <span class="dmo-audit__fact-value" data-dmo-audit-actor="true">@entry.AttributionText</span>
+                                    </span>
+                                }
+                                @if (entry.HasTimestampText)
+                                {
+                                    @*
+                                        The supplied human-readable display text is always the visible value and is
+                                        rendered verbatim; the supplied semantic value is the machine value only.
+                                    *@
+                                    <span class="dmo-audit__fact dmo-audit__fact--time">
+                                        <span class="dmo-audit__fact-label">Data/hora</span>
+                                        @if (entry.HasTimestampValue)
+                                        {
+                                            <time class="dmo-audit__fact-value"
+                                                  data-dmo-audit-timestamp="true"
+                                                  datetime="@entry.TimestampValue.GetValueOrDefault().ToString("O", CultureInfo.InvariantCulture)">@entry.TimestampText</time>
+                                        }
+                                        else
+                                        {
+                                            <span class="dmo-audit__fact-value" data-dmo-audit-timestamp="true">@entry.TimestampText</span>
+                                        }
+                                    </span>
+                                }
+                            </p>
+                        }
+                        @if (entry.HasDetail)
+                        {
+                            <p class="dmo-audit__detail" data-dmo-audit-detail-line="true">
+                                <span class="dmo-audit__detail-label">Detalhe</span>
+                                <span class="dmo-audit__detail-value" data-dmo-audit-detail="true">@entry.Detail</span>
+                            </p>
+                        }
+                        @if (entry.HasBeforeDetail)
+                        {
+                            <p class="dmo-audit__detail" data-dmo-audit-before-line="true">
+                                <span class="dmo-audit__detail-label">Antes</span>
+                                <span class="dmo-audit__detail-value" data-dmo-audit-before="true">@entry.BeforeDetail</span>
+                            </p>
+                        }
+                        @if (entry.HasAfterDetail)
+                        {
+                            <p class="dmo-audit__detail" data-dmo-audit-after-line="true">
+                                <span class="dmo-audit__detail-label">Depois</span>
+                                <span class="dmo-audit__detail-value" data-dmo-audit-after="true">@entry.AfterDetail</span>
+                            </p>
+                        }
+                        @if (entry.DetailAction is { Visible: true } detailAction)
+                        {
+                            var reasonId = $"{regionId}-entry-{entry.Key}-action-{detailAction.Key}-reason";
+                            @*
+                                The entry's only interactive element: the supplied generic detail action.
+                                No edit/delete/restore/mutation control exists anywhere in AuditTrail.
+                                The control carries the shared focus-return hook for the consumer surface.
+                            *@
+                            if (detailAction.Enabled)
+                            {
+                                <button type="button"
+                                        class="dmo-audit__action"
+                                        data-dmo-detail="@entry.Key"
+                                        data-dmo-action="@detailAction.Key"
+                                        data-dmo-focus-return="true">@detailAction.Label</button>
+                            }
+                            else
+                            {
+                                <button type="button"
+                                        class="dmo-audit__action"
+                                        data-dmo-detail="@entry.Key"
+                                        data-dmo-action="@detailAction.Key"
+                                        data-dmo-focus-return="true"
+                                        disabled
+                                        aria-disabled="true"
+                                        aria-describedby="@reasonId">@detailAction.Label</button>
+                                <span class="dmo-audit__action-reason" id="@reasonId" data-dmo-action-reason="@detailAction.Key">@detailAction.DisabledReason</span>
+                            }
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    }
+
+    @if (Model.ShowsStateSurface)
+    {
+        @* Delegated to the accepted P2-T01 state region: no audit-specific state markup exists.
+           The explicit app-root path keeps the delegation independent of the calling page's
+           folder, so a consumer page needs no view-location configuration. *@
+        ViewData["CommonStateRegionId"] = $"{regionId}-state";
+        <partial name="~/Pages/Shared/Components/_CommonStateRegion.cshtml" model="Model.ToStateRegion()" />
+    }
+</section>

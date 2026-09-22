@@ -1,0 +1,268 @@
+@using System.Globalization
+@using DMO.Web.Frontend.Shared.Contracts
+@model DenseTablePresentation
+@*
+    P2-T02 (A4) shared DenseDataTable surface (contract §5, §7.1, §8.1, §9).
+
+    Presentation and generic interaction mechanics only. It renders the supplied, ordered
+    column set and the supplied, ordered row set exactly as given; it never filters, sorts,
+    pages, counts, fetches, persists, authorizes, resolves an identity or constructs a URL.
+    Every non-ready surface is delegated to the accepted P2-T01 common-state partial rather
+    than re-implemented here, so `empty`, `lookup-failed`, `unavailable` and
+    `permission-denied` stay mutually distinct.
+
+    Fixed desktop composition (contract §4): no breakpoint rule, no table-to-card conversion,
+    no required-column hiding, no column reordering and no action relocation. An over-wide
+    table uses the keyboard-reachable local horizontal scroll container below.
+*@
+@{
+    var regionId = ViewData["DenseTableRegionId"] as string ?? "dmo-table";
+    // Marks the region busy while retained rows are shown, instead of replacing them with a
+    // loading surface: retained rows are rendered in supplied order and labelled stale.
+    var regionBusy = Model.RetainsStaleRows;
+}
+<div class="dmo-table"
+     data-dmo-dense-table="true"
+     data-dmo-table-state="@Model.StateToken"
+     data-dmo-selection-enabled="@(Model.SelectionEnabled ? "true" : "false")"
+     data-dmo-open-enabled="@(Model.OpenEnabled ? "true" : "false")"
+     aria-busy="@(regionBusy ? "true" : null)">
+
+    @if (Model.HasResultSummary)
+    {
+        @* Supplied result/metadata text, rendered verbatim and announced politely (contract §5.5, AC-14). *@
+        <p class="dmo-table__summary" data-dmo-table-summary="true" role="status" aria-live="polite">@Model.ResultSummary</p>
+    }
+
+    @if (Model.HasFilters)
+    {
+        @*
+            Controlled, consumer-owned filter affordances. Rendered with their supplied values
+            and with no action/method/URL: the consumer owns the target and the wiring.
+        *@
+        <div class="dmo-table__filters" data-dmo-table-filters="true">
+            @foreach (var filter in Model.Filters)
+            {
+                <label class="dmo-table__filter">
+                    <span class="dmo-table__filter-label">@filter.Label</span>
+                    @if (filter.HasOptions)
+                    {
+                        <select class="dmo-table__filter-control"
+                                data-dmo-filter="@filter.Key"
+                                data-dmo-filter-value="@filter.Value">
+                            @foreach (var option in filter.SuppliedOptions)
+                            {
+                                if (string.Equals(option.Value, filter.Value, StringComparison.Ordinal))
+                                {
+                                    <option value="@option.Value" data-dmo-filter-option="@option.Value" selected>@option.Label</option>
+                                }
+                                else
+                                {
+                                    <option value="@option.Value" data-dmo-filter-option="@option.Value">@option.Label</option>
+                                }
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        <input type="text"
+                               class="dmo-table__filter-control"
+                               data-dmo-filter="@filter.Key"
+                               data-dmo-filter-value="@filter.Value"
+                               value="@filter.Value" />
+                    }
+                </label>
+            }
+        </div>
+    }
+
+    @if (Model.RendersTable || Model.RetainsHeaderContext)
+    {
+        @*
+            The local horizontal scroll container is keyboard reachable, labelled and carries no
+            key handler, so it never traps focus (contract §8.1, AC-30).
+        *@
+        <div class="dmo-table__scroll"
+             data-dmo-table-scroll="true"
+             role="region"
+             tabindex="0"
+             aria-label="@Model.Caption">
+            <table class="dmo-table__table" data-dmo-table="true">
+                <caption class="dmo-table__caption">@Model.Caption</caption>
+                <thead>
+                    <tr class="dmo-table__header-row">
+                        @foreach (var column in Model.Columns)
+                        {
+                            @* All supplied columns render, in exactly the supplied order, at every width. *@
+                            var ariaSort = Model.Sort is { } sort && string.Equals(sort.ColumnKey, column.Key, StringComparison.Ordinal)
+                                ? sort.AriaSortToken
+                                : null;
+                            <th scope="col"
+                                class="dmo-table__header dmo-table__header--@column.AlignmentToken dmo-table__header--@column.WidthHintToken"
+                                data-dmo-column="@column.Key"
+                                data-dmo-column-priority="@(column.HasPriority ? column.Priority!.Value.ToString(CultureInfo.InvariantCulture) : null)"
+                                data-dmo-column-sortable="@(column.Sortable ? "true" : null)"
+                                aria-label="@(column.HasAccessibleHeading ? column.AccessibleHeading : null)"
+                                aria-sort="@ariaSort">
+                                @if (column.Sortable)
+                                {
+                                    @* The sort affordance requests a sort; the component never sorts. *@
+                                    <button type="button"
+                                            class="dmo-table__sort"
+                                            data-dmo-sort="@column.Key"
+                                            aria-label="@(column.HasAccessibleHeading ? column.AccessibleHeading : null)">@column.Heading</button>
+                                }
+                                else
+                                {
+                                    @column.Heading
+                                }
+                            </th>
+                        }
+                        @if (Model.HasControlColumn)
+                        {
+                            @* Component-owned trailing control cell: fixed last position, independent of width and content. *@
+                            <th scope="col" class="dmo-table__header dmo-table__header--controls dmo-table__header--controls-cell" data-dmo-column-controls="true">@Model.ControlColumnHeading</th>
+                        }
+                    </tr>
+                </thead>
+                @if (Model.HasRows)
+                {
+                    <tbody>
+                        @foreach (var row in Model.Rows)
+                        {
+                            @* Rows render in exactly the supplied order; the opaque key is the only identity used. *@
+                            var isSelected = Model.SelectionEnabled && string.Equals(Model.SelectedKey, row.Key, StringComparison.Ordinal);
+                            var isInteractive = Model.SelectionEnabled || Model.OpenEnabled;
+                            <tr class="dmo-table__row@(isSelected ? " dmo-table__row--selected" : string.Empty)"
+                                data-dmo-row="true"
+                                data-dmo-row-key="@row.Key"
+                                aria-selected="@(Model.SelectionEnabled ? (isSelected ? "true" : "false") : null)"
+                                tabindex="@(isInteractive ? "0" : null)">
+                                @for (var index = 0; index < row.Cells.Count; index++)
+                                {
+                                    var column = Model.Columns[index];
+                                    <td class="dmo-table__cell dmo-table__cell--@column.AlignmentToken dmo-table__cell--@column.WidthHintToken" data-dmo-column="@column.Key">
+                                        @if (index == 0)
+                                        {
+                                            <span class="dmo-table__slots">
+                                                @if (isSelected)
+                                                {
+                                                    @* Visible, non-colour-only selection indicator: aria-selected carries the fact. *@
+                                                    <span class="dmo-table__marker" data-dmo-row-marker="true" aria-hidden="true">&#9656;</span>
+                                                }
+                                                @if (Model.RetainsStaleRows)
+                                                {
+                                                    @* Retained rows are labelled stale with visible text, never colour alone. *@
+                                                    <span class="dmo-table__row-stale" data-dmo-row-stale="true" data-dmo-row-stale-text="Desatualizada">Desatualizada</span>
+                                                }
+                                                @if (row.HasStatus)
+                                                {
+                                                    @* The designated row status slot, rendered by the accepted P2-T01 partial. *@
+                                                    <span class="dmo-table__status-slot" data-dmo-row-status="true">
+                                                        <partial name="~/Pages/Shared/Components/_RecordStatus.cshtml" model="row.VisibleStatus" />
+                                                    </span>
+                                                }
+                                            </span>
+                                        }
+                                        @row.Cells[index].Text
+                                    </td>
+                                }
+                                @if (Model.HasControlColumn)
+                                {
+                                    <td class="dmo-table__cell dmo-table__cell--controls" data-dmo-row-controls="true">
+                                        @if (Model.OpenEnabled)
+                                        {
+                                            @* The explicit open control exists only when open is consumer-enabled. *@
+                                            <button type="button"
+                                                    class="dmo-table__open"
+                                                    data-dmo-open="@row.Key"
+                                                    data-dmo-row-key="@row.Key"
+                                                    aria-label="@($"{DenseTablePresentation.GenericOpenControlLabel} — {row.AccessibleContext}")">@DenseTablePresentation.GenericOpenControlLabel</button>
+                                        }
+                                        @foreach (var action in row.VisibleActions)
+                                        {
+                                            var reasonId = $"{regionId}-row-{row.Key}-action-{action.Key}-reason";
+                                            if (action.Enabled)
+                                            {
+                                                <button type="button"
+                                                        class="dmo-table__action"
+                                                        data-dmo-action="@action.Key"
+                                                        data-dmo-row-key="@row.Key"
+                                                        data-dmo-action-scope="row"
+                                                        data-dmo-action-pending="@action.PendingLabel"
+                                                        aria-label="@($"{action.Label} — {row.AccessibleContext}")">@action.Label</button>
+                                            }
+                                            else
+                                            {
+                                                @* A disabled action always exposes its supplied, associated reason. *@
+                                                <button type="button"
+                                                        class="dmo-table__action"
+                                                        data-dmo-action="@action.Key"
+                                                        data-dmo-row-key="@row.Key"
+                                                        data-dmo-action-scope="row"
+                                                        data-dmo-action-pending="@action.PendingLabel"
+                                                        aria-label="@($"{action.Label} — {row.AccessibleContext}")"
+                                                        disabled
+                                                        aria-disabled="true"
+                                                        aria-describedby="@reasonId">@action.Label</button>
+                                                <span class="dmo-table__action-reason" id="@reasonId" data-dmo-action-reason="@action.Key">@action.DisabledReason</span>
+                                            }
+                                        }
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                }
+            </table>
+        </div>
+
+        @if (Model.Paging is { } paging)
+        {
+            @*
+                Consumer-owned paging: the supplied page label is rendered verbatim and no page
+                arithmetic is performed. Previous/next are supplied generic actions.
+            *@
+            <div class="dmo-table__paging" data-dmo-table-paging="true">
+                <span class="dmo-table__page-label" data-dmo-page-label="true">@paging.PageLabel</span>
+                @if (paging.Previous is { Visible: true } previous)
+                {
+                    var previousReasonId = $"{regionId}-paging-{previous.Key}-reason";
+                    if (previous.Enabled)
+                    {
+                        <button type="button" class="dmo-table__page" data-dmo-page="previous" data-dmo-action="@previous.Key">@previous.Label</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="dmo-table__page" data-dmo-page="previous" data-dmo-action="@previous.Key"
+                                disabled aria-disabled="true" aria-describedby="@previousReasonId">@previous.Label</button>
+                        <span class="dmo-table__action-reason" id="@previousReasonId" data-dmo-action-reason="@previous.Key">@previous.DisabledReason</span>
+                    }
+                }
+                @if (paging.Next is { Visible: true } next)
+                {
+                    var nextReasonId = $"{regionId}-paging-{next.Key}-reason";
+                    if (next.Enabled)
+                    {
+                        <button type="button" class="dmo-table__page" data-dmo-page="next" data-dmo-action="@next.Key">@next.Label</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="dmo-table__page" data-dmo-page="next" data-dmo-action="@next.Key"
+                                disabled aria-disabled="true" aria-describedby="@nextReasonId">@next.Label</button>
+                        <span class="dmo-table__action-reason" id="@nextReasonId" data-dmo-action-reason="@next.Key">@next.DisabledReason</span>
+                    }
+                }
+            </div>
+        }
+    }
+
+    @if (Model.ShowsStateSurface)
+    {
+        @* Delegated to the accepted P2-T01 state region: no table-specific state markup exists.
+           The explicit app-root path keeps the delegation independent of the calling page's
+           folder, so a consumer page needs no view-location configuration. *@
+        ViewData["CommonStateRegionId"] = $"{regionId}-state";
+        <partial name="~/Pages/Shared/Components/_CommonStateRegion.cshtml" model="Model.ToStateRegion()" />
+    }
+</div>
