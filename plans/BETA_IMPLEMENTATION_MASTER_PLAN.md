@@ -425,7 +425,7 @@ and they must not be resolved by invention.
 
 | Ref | Nature | What is absent | Blocking workstream | Required artefact |
 |---|---|---|---|---|
-| B1 | Backend/interface contract | Concrete Tool/Job On/CM/MF/BQ query + mutation contract and physical schema have not been published as an accepted contract | P2-T04+ (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T04 per Beta `WORKFLOW.md` |
+| B1 | Backend/interface contract | Concrete Tool/Job On/CM/MF/BQ query + mutation contract and physical schema have not been published as an accepted contract | P2-T04+ (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T04 per Beta `WORKFLOW.md`. **Authored now:** `plans/contracts/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT.md` — status **CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW (`AWAITING PLAN ACCEPT`)**. B1 is **not** resolved: resolution requires the Architect's `PLAN ACCEPT` of that contract. |
 | B2 | Backend/interface contract | Concrete Peso/Pegamentos/Folha/Resumo calculate/persist/submit/read contract; **extended** to cover the Controlo_Create → Definições surfaces (repairer register, per-machine assignments, document base directory, email lists, email templates) settled in `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` | P2-T05/P2-T06 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T05 |
 | B3 | Backend/interface contract | Concrete Boquilhas aggregate/movement/edit-audit/close-reopen contract and `repairer_id` schema/query shape. The canonical `repairer_id` **directory source is now settled** (Controlo_Create → Definições), as are machine-assignment autonomy and historical repairer preservation (`…DELTA.md` §3.6, §4, §5, §6); the physical schema/query/endpoint contract is still absent | P2-T07 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T07 |
 | B4 | Backend/interface contract | Document generation contract + directory/filesystem capability (`Infrastructure/Files`, `Infrastructure/Pdf` do not exist); **extended** to cover the operator-configured base directory (configure/change/verify accessibility) and sending through configured email lists/templates (`…DELTA.md` §7, §8, §9) | P2-T08 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T08 |
@@ -434,6 +434,13 @@ These do **not** block P2-T01, P2-T02, P2-T03 (shared frontend primitives), whos
 the already-accepted A1 freeze plus `dmo-beta-master/contracts/SHARED_FRONTEND.md` and
 `IMPLEMENTATION_MODEL.md`. They also do not block P2-T04–P2-T08 **planning**, which this
 document completes.
+
+**Blocker status (recorded 2026-09-22, P2-T04 contract-authoring task).**
+
+| Blocker | Status |
+|---|---|
+| **B1** (P2-T04 Tool/Job On/context contract) | **CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW** (`AWAITING PLAN ACCEPT`). The contract is `plans/contracts/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT.md`. No implementation is authorized by it: per Beta `WORKFLOW.md` step 6 the Architect must return `PLAN ACCEPT` first. The contract's own §21 records 22 NON-BLOCKING authority questions, each with a pinned default; no physical-schema-critical question remains BLOCKING. |
+| **B2**, **B3**, **B4** | **UNCHANGED / OPEN** — no contract authored by this task. |
 
 ---
 
@@ -839,6 +846,24 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
 - **Completion evidence:** committed implementation + tests + the `PLAN ACCEPT` contract it was
   built against.
 - **Downstream dependents:** P2-T05, P2-T07, P2-T08, P2-T10.
+- **CONTRACT STATUS: AUTHORED — AWAITING ARCHITECT PLAN REVIEW.** The B1 contract is
+  `plans/contracts/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT.md`, status
+  **P2-T04 CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW** and **B1 AWAITING PLAN ACCEPT**.
+  It fixes the physical schema (6 tables: `tools`, `tool_machines`, `job_ons`, `cm_contexts`,
+  `mf_contexts`, `bq_contexts`; every FK `RESTRICT`), the exact keys/constraints/indexes, the
+  canonical Tool identity tuple (`tool_type, reference, lot`), the Job On production uniqueness
+  tuple (`reference, production_number`), the frozen context set (`tool_type`/`tool_reference`/
+  `tool_lot` only, with `processo` deliberately **not** a Job On or context fact), the query
+  contracts (reference → productions, Tool search, context resolution, both fichas), the shared
+  Tool search/select/create orchestration and its origin-state boundary, the duplication and
+  create/edit/delete transaction boundaries, the dependency-probe seam for delete refusal, the
+  repository/application interfaces and result vocabulary, the complete 14-route
+  endpoint/route/policy matrix, the one-new-migration contract and a 106-criterion / 155-test
+  test-to-acceptance matrix. It records **22 NON-BLOCKING** authority questions with pinned
+  defaults and **no** BLOCKING physical-schema question. **P2-T04 is still unimplemented and
+  unauthorized:** implementation requires the Architect's `PLAN ACCEPT` per Beta `WORKFLOW.md`
+  step 6. `ModuleRegistrations.CurrentBuildAvailable` is still `[]`, no route is registered, no
+  migration was added and no application code was changed by the authoring task.
 
 ### P2-T05 — Controlo Create (Peso, Comparação, Pegamentos, Folha, Resumo) + shared Peso read model
 
@@ -1484,5 +1509,6 @@ Investigated during this planning run and determined **not** to require implemen
 | 11 A4 P1-T07 status | AMBIGUITY | RESOLVED, to P2-T00 | P2-T00 |
 | 11 canonical order | AMBIGUITY | ALREADY SATISFIED | — |
 | 11 Peso vocabulary | AMBIGUITY | RESOLVED | P2-T05/P2-T06 |
+| **B1** Tool/Job On/context backend contract | BLOCKER | **CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW** (NOT RESOLVED; requires `PLAN ACCEPT`) | P2-T04 |
 
 **Counts.** PARTIAL items dispositioned: **4/4**. MISSING items mapped: **17/17**. Ambiguities resolved: **7/7** (HISTÓRICO GLOBAL scope, missing design plan, P1-T07 status, canonical order, Peso vocabulary, plus the section-10 wiring set as three DO-NOT-IMPLEMENT resolutions). Ambiguities remaining BLOCKED BY AUTHORITY: **0**. Intra-workstream contract-authoring gaps (B1-B4): 4, none blocking planning.

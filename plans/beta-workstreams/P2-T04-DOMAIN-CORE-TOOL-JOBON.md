@@ -98,6 +98,31 @@ reviewed (`PLAN ACCEPT`) before implementation. The contract must fix, at minimu
 
 Do **not** invent schema beyond what the authored contract fixes.
 
+### 5.1 Contract status (recorded)
+
+**P2-T04: CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW.**
+**B1: AWAITING PLAN ACCEPT — NOT RESOLVED.**
+
+The B1 contract has been authored at
+`plans/contracts/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT.md` and fixes every item §5 lists:
+the physical schema/keys (canonical Tool, Job On occurrence, CM/MF/BQ contexts, the Tool
+machine-compatibility relation, the explicit duplication-source relation), the canonical Tool
+identity tuple and the production uniqueness tuple, the frozen contextual value set, the query
+shapes (reference → productions, Tool search, context resolution, Job On/Tool reads), the shared
+Tool search/select/create orchestration, the create/duplicate transaction boundaries, the delete
+dependency rule and probe seam, the complete route/endpoint set with its module policy per route,
+plus a one-migration contract and a 106-criterion / 155-test acceptance matrix.
+
+It records **22 NON-BLOCKING authority questions** with pinned defaults and **no BLOCKING**
+physical-schema question.
+
+**Implementation remains unauthorized and not started.** Per `dmo-beta-master/WORKFLOW.md` step 6,
+no code may be written until the Architect reviews that contract and returns `PLAN ACCEPT`. B1 is
+**not** resolved by authoring; it is resolved by the Architect's plan acceptance.
+Authoring verification: application code unchanged, 0 migrations added, Supabase untouched,
+`ModuleRegistrations.CurrentBuildAvailable` still `[]`, existing suite green
+(468 unit / 201 integration passed, 71 environment-gated skipped).
+
 ## 6. Explicit non-scope
 
 - Full Job On lifecycle (revisions, verification catalogue, family sheets, print orchestration).
