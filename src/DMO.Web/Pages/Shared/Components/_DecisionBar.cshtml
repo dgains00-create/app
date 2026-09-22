@@ -1,0 +1,119 @@
+@using DMO.Web.Frontend.Shared.Contracts
+@model DecisionBarPresentation
+@*
+    P2-T03 (A6) shared decision bar (contract §3.4, §3.4.3, §3.4.4, §5.4, §6.4).
+
+    Generic action presentation only. It renders the supplied actions in exactly the supplied order,
+    each carrying its supplied classification, with supplied visible/enabled/disabled-reason/pending
+    presentation. The classification never reorders, relocates or filters an action.
+
+    It encodes no transition: no approval, rejection, reopening, submission, closing, movement,
+    release, repair or warehouse meaning exists in this markup, and the bar disables nothing because
+    of the region state. Availability is exactly the supplied availability, with one frozen
+    exception: the action named by the controlled pending key cannot be invoked again until the
+    consumer releases it, so it renders disabled and busy while keeping its accessible name.
+
+    Fixed desktop composition (contract §6): one fixed horizontal action region. No breakpoint rule,
+    no card conversion, no vertical stacking and no relocation of an action into an overflow menu.
+*@
+@{
+    var regionId = ViewData["DecisionBarRegionId"] as string ?? "dmo-decision";
+}
+<div class="dmo-decision"
+     data-dmo-decision-bar="true"
+     data-dmo-decision-state="@Model.StateToken"
+     data-dmo-pending-action="@Model.PendingActionKey"
+     role="group"
+     aria-label="@Model.RegionLabelOrDefault"
+     aria-busy="@(Model.IsRegionBusy ? "true" : null)">
+
+    @if (Model.HasStatusText)
+    {
+        @* Optional supplied help/status text, rendered verbatim. *@
+        <p class="dmo-decision__status" data-dmo-decision-status="true">@Model.StatusText</p>
+    }
+
+    <div class="dmo-decision__actions" data-dmo-decision-actions="true">
+        @foreach (var action in Model.VisibleActions)
+        {
+            var pending = Model.IsActionPending(action);
+            var unavailable = Model.IsActionUnavailable(action);
+            var reasonId = $"{regionId}-action-{action.Key}-reason";
+            <span class="dmo-decision__slot" data-dmo-action-group="@action.GroupToken">
+                @if (action.RequiresTextualGroupMeaning)
+                {
+                    @* Risk classification is never colour-only: a visible textual marker accompanies it. *@
+                    <span class="dmo-decision__marker" data-dmo-risk-marker="true" aria-hidden="true">!</span>
+                }
+                @if (pending)
+                {
+                    @* The frozen duplicate-invocation block: pending, busy, disabled, name preserved. *@
+                    <button type="button"
+                            class="dmo-decision__action dmo-decision__action--@action.GroupToken"
+                            data-dmo-action="@action.Key"
+                            data-dmo-action-key="@action.Key"
+                            data-dmo-action-group="@action.GroupToken"
+                            data-dmo-action-pending="@action.Action.PendingLabel"
+                            aria-label="@action.Label"
+                            aria-busy="true"
+                            disabled
+                            aria-disabled="true">
+                        <span class="dmo-decision__label">@action.Label</span>
+                        @if (action.RequiresTextualGroupMeaning)
+                        {
+                            <span class="visually-hidden" data-dmo-group-qualifier="true">@DecisionBarPresentation.RiskGroupQualifier</span>
+                        }
+                        @if (Model.ShowsPendingText(action))
+                        {
+                            <span class="dmo-decision__pending" data-dmo-action-pending-text="true">@action.Action.PendingLabel</span>
+                        }
+                    </button>
+                }
+                else if (unavailable)
+                {
+                    @* A disabled action always exposes its supplied, associated reason. *@
+                    <button type="button"
+                            class="dmo-decision__action dmo-decision__action--@action.GroupToken"
+                            data-dmo-action="@action.Key"
+                            data-dmo-action-key="@action.Key"
+                            data-dmo-action-group="@action.GroupToken"
+                            data-dmo-action-pending="@action.Action.PendingLabel"
+                            aria-label="@action.Label"
+                            disabled
+                            aria-disabled="true"
+                            aria-describedby="@reasonId">
+                        <span class="dmo-decision__label">@action.Label</span>
+                        @if (action.RequiresTextualGroupMeaning)
+                        {
+                            <span class="visually-hidden" data-dmo-group-qualifier="true">@DecisionBarPresentation.RiskGroupQualifier</span>
+                        }
+                    </button>
+                    <span class="dmo-decision__action-reason" id="@reasonId" data-dmo-action-reason="@action.Key">@action.Action.DisabledReason</span>
+                }
+                else
+                {
+                    <button type="button"
+                            class="dmo-decision__action dmo-decision__action--@action.GroupToken"
+                            data-dmo-action="@action.Key"
+                            data-dmo-action-key="@action.Key"
+                            data-dmo-action-group="@action.GroupToken"
+                            data-dmo-action-pending="@action.Action.PendingLabel"
+                            aria-label="@action.Label">
+                        <span class="dmo-decision__label">@action.Label</span>
+                        @if (action.RequiresTextualGroupMeaning)
+                        {
+                            <span class="visually-hidden" data-dmo-group-qualifier="true">@DecisionBarPresentation.RiskGroupQualifier</span>
+                        }
+                    </button>
+                }
+            </span>
+        }
+    </div>
+
+    @if (Model.ShowsStateSurface)
+    {
+        @* Delegated to the accepted P2-T01 state region: the state adds context and never disables a supplied action. *@
+        ViewData["CommonStateRegionId"] = $"{regionId}-state";
+        <partial name="~/Pages/Shared/Components/_CommonStateRegion.cshtml" model="Model.ToStateRegion()" />
+    }
+</div>

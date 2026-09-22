@@ -1,0 +1,92 @@
+@using DMO.Web.Frontend.Shared.Contracts
+@model ToolSummaryRowPresentation
+@*
+    P2-T03 (A5) shared compact summary row (contract §3.2, §3.2.3, §5.2, §6.4).
+
+    Presentation only. It renders exactly the supplied facts, in the fixed presentation slot order,
+    with the supplied status rendered by the accepted P2-T01 status partial and the supplied actions
+    rendered through the accepted P2-T01 action carrier.
+
+    It performs no lookup and no inference: nothing is resolved, computed, aggregated, reformatted
+    or defaulted, an absent optional slot renders nothing at all (never a zero, a false, a dash or
+    an empty cell), and the row performs no selection arbitration of its own.
+
+    Fixed desktop composition (contract §6): facts region, status slot and the trailing action
+    region keep their structural positions at every desktop width; there is no breakpoint rule, no
+    card conversion and no relocation of the supplied actions.
+*@
+@{
+    var regionId = ViewData["ToolSummaryRowRegionId"] as string ?? "dmo-summary";
+}
+<div class="dmo-summary"
+     data-dmo-summary-row="true"
+     data-dmo-item-key="@Model.ItemKey"
+     data-dmo-summary-state="@Model.StateToken"
+     data-dmo-selected="@(Model.Selected ? "true" : "false")">
+
+    @if (Model.IsReady)
+    {
+        @if (Model.Selected)
+        {
+            @* Controlled selected presentation fact of the enclosing consumer surface, non-colour-only. *@
+            <span class="dmo-summary__marker" data-dmo-selected-marker="true" aria-hidden="true">&#9656;</span>
+        }
+        <span class="dmo-summary__facts" data-dmo-summary-facts="true">
+            @foreach (var fact in Model.VisibleFacts)
+            {
+                <span class="dmo-summary__fact" data-dmo-summary-fact="@fact.Label">
+                    <span class="dmo-summary__fact-label" data-dmo-fact-label="true">@fact.Label</span>
+                    <span class="dmo-summary__fact-value" data-dmo-fact-value="true">@fact.Value</span>
+                </span>
+            }
+        </span>
+        @if (Model.HasStatus)
+        {
+            @* The designated status slot, rendered by the accepted P2-T01 status partial. *@
+            <span class="dmo-summary__status" data-dmo-summary-status="true">
+                <partial name="~/Pages/Shared/Components/_RecordStatus.cshtml" model="Model.Status" />
+            </span>
+        }
+        @if (Model.HasActions)
+        {
+            <span class="dmo-summary__actions" data-dmo-summary-actions="true">
+                @foreach (var action in Model.VisibleActions)
+                {
+                    var reasonId = $"{regionId}-action-{action.Key}-reason";
+                    var accessibleName = Model.HasAccessibleContext
+                        ? $"{action.Label} — {Model.AccessibleContext}"
+                        : action.Label;
+                    if (action.Enabled)
+                    {
+                        <button type="button"
+                                class="dmo-summary__action"
+                                data-dmo-action="@action.Key"
+                                data-dmo-item-key="@Model.ItemKey"
+                                data-dmo-action-pending="@action.PendingLabel"
+                                aria-label="@accessibleName">@action.Label</button>
+                    }
+                    else
+                    {
+                        @* A disabled action always exposes its supplied, associated reason. *@
+                        <button type="button"
+                                class="dmo-summary__action"
+                                data-dmo-action="@action.Key"
+                                data-dmo-item-key="@Model.ItemKey"
+                                data-dmo-action-pending="@action.PendingLabel"
+                                aria-label="@accessibleName"
+                                disabled
+                                aria-disabled="true"
+                                aria-describedby="@reasonId">@action.Label</button>
+                        <span class="dmo-summary__action-reason" id="@reasonId" data-dmo-action-reason="@action.Key">@action.DisabledReason</span>
+                    }
+                }
+            </span>
+        }
+    }
+    else
+    {
+        @* Delegated to the accepted P2-T01 state region: a non-ready row renders no supplied facts. *@
+        ViewData["CommonStateRegionId"] = $"{regionId}-state";
+        <partial name="~/Pages/Shared/Components/_CommonStateRegion.cshtml" model="Model.ToStateRegion()" />
+    }
+</div>

@@ -569,3 +569,486 @@
 .dmo-audit > .dmo-state {
     margin-top: .5rem;
 }
+
+/* ===================================================================================
+P2-T03 (A5/A6) — picker, compact summary row, repeated rows and action region. Additive only:
+new dmo-picker* / dmo-summary* / dmo-rows* / dmo-decision* selectors, published tokens only, and
+no breakpoint, container or width-conditional rule of any kind. The fixed desktop composition is
+preserved at every width; when the assigned region is narrower than the component's own content the
+component scrolls locally inside its own keyboard-reachable overflow container instead of
+reflowing, stacking, converting to cards, hiding a required control or moving an action.
+=================================================================================== */
+
+/* ---- picker (contract §3.1, §6.4) ------------------------------------------------ */
+
+.dmo-picker {
+    display: flex;
+    flex-direction: column;
+    gap: var(--dmo-space-2);
+    padding: var(--dmo-space-2);
+    border: 1px solid var(--dmo-line);
+    border-radius: var(--dmo-radius);
+    background: var(--dmo-surface);
+    color: var(--dmo-ink);
+}
+
+.dmo-picker__summary {
+    margin: 0;
+    color: var(--dmo-muted);
+    font-size: .78rem;
+}
+
+.dmo-picker__context {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--dmo-space-2) var(--dmo-space-4);
+    padding-bottom: var(--dmo-space-1);
+    border-bottom: 1px solid var(--dmo-line);
+}
+
+.dmo-picker__expected-type,
+.dmo-picker__context-fact,
+.dmo-picker__fact {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--dmo-space-1);
+}
+
+.dmo-picker__context-label,
+.dmo-picker__fact-label {
+    color: var(--dmo-muted);
+    font-size: .74rem;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+}
+
+.dmo-picker__context-value,
+.dmo-picker__fact-value {
+    font-weight: 600;
+}
+
+.dmo-picker__search {
+    display: flex;
+    align-items: center;
+    gap: var(--dmo-space-2);
+}
+
+.dmo-picker__search-label {
+    color: var(--dmo-muted);
+    font-size: .8rem;
+}
+
+.dmo-picker__query {
+    flex: 1 1 auto;
+    min-width: 12rem;
+    height: var(--dmo-control-height);
+    padding: 0 var(--dmo-space-2);
+    border: 1px solid var(--dmo-line-strong);
+    border-radius: var(--dmo-radius);
+    background: var(--dmo-surface);
+    color: var(--dmo-ink);
+    font: inherit;
+}
+
+.dmo-picker__search-button,
+.dmo-picker__select,
+.dmo-picker__create,
+.dmo-picker__cancel {
+    height: var(--dmo-control-height);
+    padding: 0 var(--dmo-space-3);
+    border: 1px solid var(--dmo-line-strong);
+    border-radius: var(--dmo-radius);
+    background: var(--dmo-surface-muted);
+    color: var(--dmo-ink);
+    font: inherit;
+    cursor: pointer;
+}
+
+.dmo-picker__create {
+    border-color: var(--dmo-accent);
+    background: var(--dmo-accent);
+    color: var(--dmo-surface);
+    font-weight: 600;
+}
+
+.dmo-picker__create:focus-visible,
+.dmo-picker__cancel:focus-visible,
+.dmo-picker__select:focus-visible,
+.dmo-picker__search-button:focus-visible {
+    outline: 3px solid var(--dmo-focus);
+    outline-offset: 2px;
+}
+
+/* The candidate list is the component's own local scroll region: content is never hidden. */
+.dmo-picker__candidates-scroll {
+    max-height: 16rem;
+    overflow-x: auto;
+    overflow-y: auto;
+    border: 1px solid var(--dmo-line);
+    border-radius: var(--dmo-radius);
+    background: var(--dmo-surface);
+}
+
+.dmo-picker__candidates-scroll:focus-visible {
+    outline: 3px solid var(--dmo-focus);
+    outline-offset: 2px;
+}
+
+.dmo-picker__candidates {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.dmo-picker__candidate {
+    display: flex;
+    align-items: center;
+    gap: var(--dmo-space-2);
+    padding: var(--dmo-space-1) var(--dmo-space-2);
+    border-bottom: 1px solid var(--dmo-line);
+}
+
+.dmo-picker__candidate:last-child {
+    border-bottom: 0;
+}
+
+/* Selection is programmatic (aria-selected) and additionally carries the visible marker. */
+.dmo-picker__candidate--selected {
+    background: var(--dmo-surface-muted);
+    box-shadow: inset 3px 0 0 0 var(--dmo-accent);
+}
+
+.dmo-picker__marker {
+    color: var(--dmo-accent);
+    font-weight: 700;
+}
+
+.dmo-picker__facts {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    gap: var(--dmo-space-1) var(--dmo-space-3);
+    min-width: 0;
+}
+
+.dmo-picker__select {
+    flex: 0 0 auto;
+    margin-left: auto;
+}
+
+.dmo-picker__select-reason,
+.dmo-picker__cancel-reason {
+    margin: 0;
+    color: var(--dmo-muted);
+    font-size: .74rem;
+}
+
+.dmo-picker__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--dmo-space-2);
+    padding-top: var(--dmo-space-1);
+    border-top: 1px solid var(--dmo-line);
+}
+
+.dmo-picker__cancel {
+    margin-left: auto;
+}
+
+.dmo-picker > .dmo-state {
+    margin-top: .5rem;
+}
+
+/* ---- compact summary row (contract §3.2, §6.4) ----------------------------------- */
+
+.dmo-summary {
+    display: flex;
+    align-items: center;
+    gap: var(--dmo-space-2);
+    padding: var(--dmo-space-1) var(--dmo-space-2);
+    border-bottom: 1px solid var(--dmo-line);
+    color: var(--dmo-ink);
+}
+
+.dmo-summary__marker {
+    color: var(--dmo-accent);
+    font-weight: 700;
+}
+
+.dmo-summary__facts {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    gap: var(--dmo-space-1) var(--dmo-space-3);
+    min-width: 0;
+}
+
+.dmo-summary__fact {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--dmo-space-1);
+}
+
+.dmo-summary__fact-label {
+    color: var(--dmo-muted);
+    font-size: .74rem;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+}
+
+.dmo-summary__fact-value {
+    font-weight: 600;
+}
+
+.dmo-summary__status,
+.dmo-summary__actions {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--dmo-space-1);
+}
+
+.dmo-summary__action {
+    height: var(--dmo-control-height);
+    padding: 0 var(--dmo-space-2);
+    border: 1px solid var(--dmo-line-strong);
+    border-radius: var(--dmo-radius);
+    background: var(--dmo-surface-muted);
+    color: var(--dmo-ink);
+    font: inherit;
+    cursor: pointer;
+}
+
+.dmo-summary__action:focus-visible {
+    outline: 3px solid var(--dmo-focus);
+    outline-offset: 2px;
+}
+
+.dmo-summary__action-reason {
+    color: var(--dmo-muted);
+    font-size: .74rem;
+}
+
+/* ---- repeated rows (contract §3.3, §6.4) ----------------------------------------- */
+
+.dmo-rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--dmo-space-2);
+    color: var(--dmo-ink);
+}
+
+/* The row grid never reflows: it keeps its column rhythm and scrolls locally when needed. */
+.dmo-rows__scroll {
+    overflow-x: auto;
+    border: 1px solid var(--dmo-line);
+    border-radius: var(--dmo-radius);
+    background: var(--dmo-surface);
+}
+
+.dmo-rows__scroll:focus-visible {
+    outline: 3px solid var(--dmo-focus);
+    outline-offset: 2px;
+}
+
+.dmo-rows__row {
+    display: grid;
+    grid-template-columns: minmax(9rem, 14rem) 1fr auto;
+    align-items: start;
+    gap: var(--dmo-space-2);
+    padding: var(--dmo-space-2);
+    border-bottom: 1px solid var(--dmo-line);
+}
+
+.dmo-rows__row:last-child {
+    border-bottom: 0;
+}
+
+.dmo-rows__row-context {
+    color: var(--dmo-muted);
+    font-size: .8rem;
+    font-weight: 600;
+}
+
+.dmo-rows__field {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+    min-width: 0;
+}
+
+.dmo-rows__field-label {
+    color: var(--dmo-muted);
+    font-size: .74rem;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+}
+
+.dmo-rows__control {
+    height: var(--dmo-control-height);
+    padding: 0 var(--dmo-space-2);
+    border: 1px solid var(--dmo-line-strong);
+    border-radius: var(--dmo-radius);
+    background: var(--dmo-surface);
+    color: var(--dmo-ink);
+    font: inherit;
+}
+
+.dmo-rows__control[readonly] {
+    background: var(--dmo-surface-muted);
+    color: var(--dmo-muted);
+}
+
+.dmo-rows__control:focus-visible {
+    outline: 3px solid var(--dmo-focus);
+    outline-offset: 2px;
+}
+
+.dmo-rows__field-reason,
+.dmo-rows__validation,
+.dmo-rows__remove-reason,
+.dmo-rows__add-reason,
+.dmo-rows__readonly-reason {
+    color: var(--dmo-muted);
+    font-size: .74rem;
+}
+
+.dmo-rows__validation {
+    font-weight: 600;
+}
+
+/* Validation tone is supplementary: the supplied text always carries the meaning. */
+.dmo-rows__validation[data-dmo-validation-tone="warning"] {
+    color: var(--dmo-warning);
+}
+
+.dmo-rows__validation[data-dmo-validation-tone="danger"] {
+    color: var(--dmo-danger);
+}
+
+.dmo-rows__validation[data-dmo-validation-tone="success"] {
+    color: var(--dmo-success);
+}
+
+.dmo-rows__validation[data-dmo-validation-tone="info"] {
+    color: var(--dmo-accent-dark);
+}
+
+.dmo-rows__remove,
+.dmo-rows__add {
+    height: var(--dmo-control-height);
+    padding: 0 var(--dmo-space-3);
+    border: 1px solid var(--dmo-line-strong);
+    border-radius: var(--dmo-radius);
+    background: var(--dmo-surface-muted);
+    color: var(--dmo-ink);
+    font: inherit;
+    cursor: pointer;
+}
+
+.dmo-rows__remove {
+    justify-self: end;
+}
+
+.dmo-rows__remove:focus-visible,
+.dmo-rows__add:focus-visible {
+    outline: 3px solid var(--dmo-focus);
+    outline-offset: 2px;
+}
+
+.dmo-rows__add-region {
+    display: flex;
+    align-items: center;
+    gap: var(--dmo-space-2);
+}
+
+.dmo-rows > .dmo-state {
+    margin-top: .5rem;
+}
+
+/* ---- action region (contract §3.4, §6.4) ----------------------------------------- */
+
+.dmo-decision {
+    display: flex;
+    flex-direction: column;
+    gap: var(--dmo-space-2);
+    color: var(--dmo-ink);
+}
+
+.dmo-decision__status {
+    margin: 0;
+    color: var(--dmo-muted);
+    font-size: .8rem;
+}
+
+/* One fixed horizontal action region: supplied order is preserved and never stacked. */
+.dmo-decision__actions {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: var(--dmo-space-2);
+    overflow-x: auto;
+}
+
+.dmo-decision__slot {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--dmo-space-1);
+    flex: 0 0 auto;
+}
+
+.dmo-decision__marker {
+    color: var(--dmo-danger);
+    font-weight: 700;
+}
+
+.dmo-decision__action {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--dmo-space-1);
+    height: var(--dmo-control-height);
+    padding: 0 var(--dmo-space-3);
+    border: 1px solid var(--dmo-line-strong);
+    border-radius: var(--dmo-radius);
+    background: var(--dmo-surface-muted);
+    color: var(--dmo-ink);
+    font: inherit;
+    cursor: pointer;
+}
+
+.dmo-decision__action--primary {
+    border-color: var(--dmo-accent);
+    background: var(--dmo-accent);
+    color: var(--dmo-surface);
+    font-weight: 600;
+}
+
+.dmo-decision__action--danger {
+    border-color: var(--dmo-danger);
+    color: var(--dmo-danger);
+    font-weight: 600;
+}
+
+.dmo-decision__action:focus-visible {
+    outline: 3px solid var(--dmo-focus);
+    outline-offset: 2px;
+}
+
+.dmo-decision__pending {
+    color: var(--dmo-muted);
+    font-size: .74rem;
+    font-weight: 600;
+}
+
+.dmo-decision__action--primary .dmo-decision__pending {
+    color: var(--dmo-surface-muted);
+}
+
+.dmo-decision__action-reason {
+    color: var(--dmo-muted);
+    font-size: .74rem;
+}
+
+.dmo-decision > .dmo-state {
+    margin-top: .5rem;
+}

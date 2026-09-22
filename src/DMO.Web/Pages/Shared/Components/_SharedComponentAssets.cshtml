@@ -1,5 +1,6 @@
 @*
-    P2-T02 (A4) additive asset include helper (contract §14.5).
+    P2-T02 (A4) additive asset include helper, extended additively by P2-T03 (A5/A6)
+    (contract §14.5 / P2-T03 Appendix B.5).
 
     Emits exactly one tag per shared A-owned asset so a consumer needs a single
     `<partial name="_SharedComponentAssets" />` line. It does not modify the protected shell,
@@ -8,7 +9,12 @@
 
     The referenced `href`/`src` values are fixed static asset paths owned by this repository —
     no consumer URL is constructed and no route is registered.
+
+    The P2-T03 extension appended the two new generic adapters and left the three accepted tags
+    above them byte-identical, so no accepted asset reference was removed, reordered or replaced.
 *@
 <link rel="stylesheet" href="~/css/dmo-components.css" asp-append-version="true" />
 <script src="~/js/dmo-focus.js" defer></script>
 <script src="~/js/dmo-dense-table.js" defer></script>
+<script src="~/js/dmo-tool-picker.js" defer></script>
+<script src="~/js/dmo-measurement-rows.js" defer></script>

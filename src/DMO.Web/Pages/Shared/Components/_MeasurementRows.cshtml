@@ -1,0 +1,177 @@
+@using DMO.Web.Frontend.Shared.Contracts
+@model MeasurementRowsPresentation
+@*
+    P2-T03 (A6) shared repeated-row mechanics surface (contract §3.3, §3.3.5, §3.3.6, §5.3, §6.4).
+
+    Generic repeated-row mechanics only. It renders the supplied ordered rows and generic add/remove
+    controls, enforces the configured minimum, exposes the supplied removal-disabled reason, and
+    renders the consumer-supplied validation display verbatim.
+
+    It defines no field list, no field naming, no formula, no tolerance, no nominal value, no
+    capacity, no weight, no unit and no validation rule: consumers own row contents entirely and
+    the component never computes a verdict from a supplied value. Supplied values are rendered
+    verbatim in every retained state, so a state change never loses entered work.
+
+    Fixed desktop composition (contract §6): the row grid, the trailing remove control and the add
+    region keep their structural positions at every desktop width. There is no breakpoint rule, no
+    card conversion, no required-control hiding and no relocation; an over-wide row grid scrolls
+    locally inside its own keyboard-reachable overflow container.
+*@
+@{
+    var regionId = ViewData["MeasurementRowsRegionId"] as string ?? "dmo-rows";
+    var readOnly = Model.FieldsReadOnly;
+    var addReasonId = $"{regionId}-add-reason";
+    var readOnlyReasonId = $"{regionId}-readonly-reason";
+    var minimumReached = Model.Rows.Count <= Model.MinimumRowCount;
+}
+<div class="dmo-rows"
+     data-dmo-measurement-rows="true"
+     data-dmo-rows-state="@Model.StateToken"
+     data-dmo-minimum="@Model.MinimumRowCount"
+     data-dmo-rows-count="@Model.Rows.Count"
+     data-dmo-minimum-reached="@(minimumReached ? "true" : "false")"
+     aria-busy="@(Model.IsBusy ? "true" : null)"
+     aria-label="@Model.RegionLabel">
+
+    @* Structural changes are announced politely; the region never steals focus. *@
+    <p class="dmo-rows__announcement visually-hidden" data-dmo-rows-announcement="true" role="status" aria-live="polite"></p>
+
+    @if (Model.RendersRows)
+    {
+        <div class="dmo-rows__scroll"
+             data-dmo-rows-scroll="true"
+             role="region"
+             tabindex="0"
+             aria-label="@Model.RegionLabel">
+            @foreach (var row in Model.Rows)
+            {
+                @* Rows render in exactly the supplied order; the opaque frontend key is the only identity used. *@
+                <div class="dmo-rows__row"
+                     data-dmo-row="true"
+                     data-dmo-row-key="@row.Key"
+                     data-dmo-row-context="@row.AccessibleContext">
+                    <span class="dmo-rows__row-context" data-dmo-row-context-label="true">@row.AccessibleContext</span>
+                    @foreach (var rowField in row.Fields)
+                    {
+                        var controlId = $"{regionId}-row-{row.Key}-field-{rowField.Key}";
+                        var fieldReasonId = $"{controlId}-reason";
+                        var fieldDescribedBy = !rowField.Editable
+                            ? fieldReasonId
+                            : readOnly ? readOnlyReasonId : null;
+                        <label class="dmo-rows__field" for="@controlId" data-dmo-field-container="@rowField.Key">
+                            <span class="dmo-rows__field-label" data-dmo-field-label="true">@rowField.Label</span>
+                            @if (rowField.Kind == MeasurementRowFieldKind.Choice)
+                            {
+                                <select class="dmo-rows__control dmo-rows__control--choice"
+                                        id="@controlId"
+                                        data-dmo-field="@rowField.Key"
+                                        data-dmo-field-kind="@rowField.KindToken"
+                                        data-dmo-row-key="@row.Key"
+                                        disabled="@(readOnly || !rowField.Editable ? "disabled" : null)"
+                                        aria-disabled="@(readOnly || !rowField.Editable ? "true" : null)"
+                                        aria-describedby="@fieldDescribedBy">
+                                    @foreach (var option in rowField.Options)
+                                    {
+                                        <option value="@option.Value"
+                                                data-dmo-field-option="@option.Value"
+                                                selected="@(string.Equals(option.Value, rowField.Value, StringComparison.Ordinal))">@option.Label</option>
+                                    }
+                                </select>
+                            }
+                            else
+                            {
+                                <input class="dmo-rows__control dmo-rows__control--@rowField.KindToken"
+                                       id="@controlId"
+                                       type="@(rowField.Kind == MeasurementRowFieldKind.Numeric ? "number" : "text")"
+                                       data-dmo-field="@rowField.Key"
+                                       data-dmo-field-kind="@rowField.KindToken"
+                                       data-dmo-row-key="@row.Key"
+                                       value="@rowField.Value"
+                                       readonly="@(readOnly ? "readonly" : null)"
+                                       disabled="@(!rowField.Editable ? "disabled" : null)"
+                                       aria-disabled="@(readOnly || !rowField.Editable ? "true" : null)"
+                                       aria-describedby="@fieldDescribedBy" />
+                            }
+                            @if (!rowField.Editable)
+                            {
+                                @* A read-only supplied field always exposes its supplied reason. *@
+                                <span class="dmo-rows__field-reason" id="@fieldReasonId" data-dmo-field-reason="@rowField.Key">@rowField.DisabledReason</span>
+                            }
+                            @if (rowField.HasValidationText)
+                            {
+                                @* Consumer-supplied validation display only: no verdict is computed here. *@
+                                <span class="dmo-rows__validation"
+                                      data-dmo-field-validation="@rowField.Key"
+                                      data-dmo-validation-tone="@rowField.ValidationToneToken">@rowField.ValidationText</span>
+                            }
+                        </label>
+                    }
+                    @if (row.HasValidationText)
+                    {
+                        <span class="dmo-rows__validation dmo-rows__validation--row"
+                              data-dmo-row-validation="@row.Key"
+                              data-dmo-validation-tone="@row.ValidationToneToken">@row.ValidationText</span>
+                    }
+                    @{
+                        var removeReasonId = $"{regionId}-row-{row.Key}-remove-reason";
+                    }
+                    @if (Model.RemoveControlEnabled)
+                    {
+                        <button type="button"
+                                class="dmo-rows__remove"
+                                data-dmo-remove="@row.Key"
+                                data-dmo-row-key="@row.Key"
+                                aria-label="@($"{MeasurementRowsPresentation.GenericRemoveLabel} — {row.AccessibleContext}")">@MeasurementRowsPresentation.GenericRemoveLabel</button>
+                    }
+                    else
+                    {
+                        @* Removal is disabled and always exposes the supplied reason it is disabled for. *@
+                        <button type="button"
+                                class="dmo-rows__remove"
+                                data-dmo-remove="@row.Key"
+                                data-dmo-row-key="@row.Key"
+                                aria-label="@($"{MeasurementRowsPresentation.GenericRemoveLabel} — {row.AccessibleContext}")"
+                                disabled
+                                aria-disabled="true"
+                                aria-describedby="@removeReasonId">@MeasurementRowsPresentation.GenericRemoveLabel</button>
+                        <span class="dmo-rows__remove-reason" id="@removeReasonId" data-dmo-remove-reason="@row.Key">@Model.RemovalDisabledReason</span>
+                    }
+                </div>
+            }
+        </div>
+
+        @if (readOnly && Model.StructuralReason is not null)
+        {
+            <p class="dmo-rows__readonly-reason" id="@readOnlyReasonId" data-dmo-readonly-reason="true">@Model.StructuralReason</p>
+        }
+    }
+
+    @if (Model.ShowsAddControl)
+    {
+        <div class="dmo-rows__add-region" data-dmo-rows-add-region="true">
+            @if (Model.AddControlEnabled)
+            {
+                <button type="button"
+                        class="dmo-rows__add"
+                        data-dmo-add="true">@MeasurementRowsPresentation.GenericAddLabel</button>
+            }
+            else
+            {
+                <button type="button"
+                        class="dmo-rows__add"
+                        data-dmo-add="true"
+                        disabled
+                        aria-disabled="true"
+                        aria-describedby="@addReasonId">@MeasurementRowsPresentation.GenericAddLabel</button>
+                <span class="dmo-rows__add-reason" id="@addReasonId" data-dmo-add-reason="true">@Model.AddControlDisabledReason</span>
+            }
+        </div>
+    }
+
+    @if (Model.ShowsStateSurface)
+    {
+        @* Delegated to the accepted P2-T01 state region: no rows-specific state markup exists. *@
+        ViewData["CommonStateRegionId"] = $"{regionId}-state";
+        <partial name="~/Pages/Shared/Components/_CommonStateRegion.cshtml" model="Model.ToStateRegion()" />
+    }
+</div>

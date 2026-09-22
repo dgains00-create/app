@@ -1,0 +1,187 @@
+@using DMO.Web.Frontend.Shared.Contracts
+@model ToolPickerPresentation
+@*
+    P2-T03 (A5) shared picker surface (contract §3.1, §3.1.9, §5.1, §6.4).
+
+    Presentation and generic interaction mechanics only. It renders the supplied controlled search
+    state and the supplied candidate list exactly as given, arbitrates only the explicit candidate
+    selection, and never selects anything by itself: there is no auto-selection path anywhere in
+    this markup, not even when exactly one candidate is supplied.
+
+    Every non-ready surface is delegated to the accepted P2-T01 common-state partial rather than
+    re-implemented here, so empty / lookup-failed / unavailable / permission-denied stay mutually
+    distinct and a failed lookup can never look like "no results".
+
+    Fixed desktop composition (contract §6): one fixed structural order — context region, search
+    row, candidate list, action row. No breakpoint rule, no card conversion, no required-control
+    hiding and no relocation of the create or cancel controls; an over-wide candidate list scrolls
+    locally inside its own overflow container.
+*@
+@{
+    var regionId = ViewData["ToolPickerRegionId"] as string ?? "dmo-picker";
+    var queryId = $"{regionId}-query";
+    var selectReasonId = $"{regionId}-select-reason";
+    var cancelReasonId = $"{regionId}-cancel-reason";
+}
+<section class="dmo-picker"
+         data-dmo-picker="true"
+         data-dmo-picker-state="@Model.StateToken"
+         data-dmo-origin-token="@Model.OriginToken"
+         aria-busy="@(Model.IsBusy ? "true" : null)"
+         aria-label="@Model.RegionLabel">
+
+    @if (Model.HasResultSummary)
+    {
+        @* Supplied result/count text, rendered verbatim and announced politely (contract §3.1.9). *@
+        <p class="dmo-picker__summary" data-dmo-picker-summary="true" role="status" aria-live="polite">@Model.ResultSummary</p>
+    }
+
+    @if (Model.HasExpectedTypeLabel || Model.HasOriginContext)
+    {
+        @* Supplied origin orientation: expected type and origin-context facts, kept separate from editable content. *@
+        <div class="dmo-picker__context" data-dmo-picker-origin-context="true">
+            @if (Model.HasExpectedTypeLabel)
+            {
+                <span class="dmo-picker__expected-type" data-dmo-picker-expected-type="true">
+                    <span class="dmo-picker__context-label" data-dmo-expected-type-label="true">@ToolPickerPresentation.GenericExpectedTypeQualifier</span>
+                    <span class="dmo-picker__context-value" data-dmo-expected-type-value="true">@Model.ExpectedTypeLabel</span>
+                </span>
+            }
+            @foreach (var fact in Model.OriginContext)
+            {
+                <span class="dmo-picker__context-fact" data-dmo-origin-fact="@fact.Label">
+                    <span class="dmo-picker__context-label" data-dmo-fact-label="true">@fact.Label</span>
+                    <span class="dmo-picker__context-value" data-dmo-fact-value="true">@fact.Value</span>
+                </span>
+            }
+        </div>
+    }
+
+    @if (Model.ShowsSearch)
+    {
+        @*
+            Explicit, controlled search state. The supplied query is rendered verbatim and is never
+            mutated here. The search affordance and Enter request a search; neither selects a
+            candidate, and the region emits no form target and constructs no address.
+        *@
+        <div class="dmo-picker__search" data-dmo-picker-search="true">
+            <label class="dmo-picker__search-label" for="@queryId" data-dmo-search-label="true">@ToolPickerPresentation.GenericSearchLabel</label>
+            <input class="dmo-picker__query"
+                   id="@queryId"
+                   type="text"
+                   data-dmo-search-input="true"
+                   data-dmo-search-query="@Model.Query"
+                   value="@Model.Query" />
+            <button type="button"
+                    class="dmo-picker__search-button"
+                    data-dmo-search-request="true"
+                    data-dmo-origin-token="@Model.OriginToken">@ToolPickerPresentation.GenericSearchLabel</button>
+        </div>
+    }
+
+    @if (Model.ShowsCandidates)
+    {
+        @*
+            Every supplied candidate is presented separately, in supplied order. There is no merge,
+            de-duplication, grouping, ranking or collapse, and the candidate body is not an
+            activation target: only the explicit select control selects.
+        *@
+        <div class="dmo-picker__candidates-scroll" data-dmo-picker-candidates-scroll="true" role="region" tabindex="0" aria-label="@Model.RegionLabel">
+            <ul class="dmo-picker__candidates" data-dmo-picker-candidates="true">
+                @foreach (var candidate in Model.Candidates)
+                {
+                    var isSelected = Model.IsCandidateSelected(candidate.Key);
+                    <li class="dmo-picker__candidate@(isSelected ? " dmo-picker__candidate--selected" : string.Empty)"
+                        data-dmo-candidate="true"
+                        data-dmo-candidate-key="@candidate.Key"
+                        data-dmo-candidate-context="@candidate.AccessibleContext"
+                        aria-selected="@(isSelected ? "true" : "false")">
+                        @if (isSelected)
+                        {
+                            @* Programmatic selection is carried by aria-selected; this marker keeps it non-colour-only. *@
+                            <span class="dmo-picker__marker" data-dmo-candidate-marker="true" aria-hidden="true">&#9656;</span>
+                        }
+                        <span class="dmo-picker__facts" data-dmo-candidate-facts="true">
+                            @foreach (var fact in candidate.Facts)
+                            {
+                                <span class="dmo-picker__fact" data-dmo-candidate-fact="@fact.Label">
+                                    <span class="dmo-picker__fact-label" data-dmo-fact-label="true">@fact.Label</span>
+                                    <span class="dmo-picker__fact-value" data-dmo-fact-value="true">@fact.Value</span>
+                                </span>
+                            }
+                        </span>
+                        @if (Model.SelectControlsEnabled)
+                        {
+                            <button type="button"
+                                    class="dmo-picker__select"
+                                    data-dmo-select-candidate="@candidate.Key"
+                                    data-dmo-candidate-key="@candidate.Key"
+                                    aria-label="@($"{ToolPickerPresentation.GenericSelectControlLabel} — {candidate.AccessibleContext}")">@ToolPickerPresentation.GenericSelectControlLabel</button>
+                        }
+                        else
+                        {
+                            @* A pending consumer subflow: the retained candidates stay available to read, not to select. *@
+                            <button type="button"
+                                    class="dmo-picker__select"
+                                    data-dmo-select-candidate="@candidate.Key"
+                                    data-dmo-candidate-key="@candidate.Key"
+                                    aria-label="@($"{ToolPickerPresentation.GenericSelectControlLabel} — {candidate.AccessibleContext}")"
+                                    disabled
+                                    aria-disabled="true"
+                                    aria-describedby="@selectReasonId">@ToolPickerPresentation.GenericSelectControlLabel</button>
+                        }
+                    </li>
+                }
+            </ul>
+        </div>
+        @if (!Model.SelectControlsEnabled && Model.SelectUnavailableReason is not null)
+        {
+            <p class="dmo-picker__select-reason" id="@selectReasonId" data-dmo-select-reason="true">@Model.SelectUnavailableReason</p>
+        }
+    }
+
+    @if (Model.ShowsCreate || Model.ShowsCancel)
+    {
+        <div class="dmo-picker__actions" data-dmo-picker-actions="true">
+            @if (Model.ShowsCreate)
+            {
+                @* The create affordance exists only because the consumer supplied it visible and enabled. *@
+                <button type="button"
+                        class="dmo-picker__create"
+                        data-dmo-create="@Model.CreateAction!.Key"
+                        data-dmo-action="@Model.CreateAction!.Key"
+                        data-dmo-origin-token="@Model.OriginToken">@Model.CreateAction!.Label</button>
+            }
+            @if (Model.ShowsCancel)
+            {
+                @* Cancel/return is preserved in every presented state and returns to the origin without a selection. *@
+                if (Model.CancelEnabled)
+                {
+                    <button type="button"
+                            class="dmo-picker__cancel"
+                            data-dmo-cancel="@Model.CancelActionKey"
+                            data-dmo-action="@Model.CancelActionKey">@Model.CancelLabel</button>
+                }
+                else
+                {
+                    <button type="button"
+                            class="dmo-picker__cancel"
+                            data-dmo-cancel="@Model.CancelActionKey"
+                            data-dmo-action="@Model.CancelActionKey"
+                            disabled
+                            aria-disabled="true"
+                            aria-describedby="@cancelReasonId">@Model.CancelLabel</button>
+                    <span class="dmo-picker__cancel-reason" id="@cancelReasonId" data-dmo-cancel-reason="true">@Model.CancelDisabledReason</span>
+                }
+            }
+        </div>
+    }
+
+    @if (Model.ShowsStateSurface)
+    {
+        @* Delegated to the accepted P2-T01 state region: no picker-specific state markup exists.
+           The explicit app-root path keeps the delegation independent of the calling page's folder. *@
+        ViewData["CommonStateRegionId"] = $"{regionId}-state";
+        <partial name="~/Pages/Shared/Components/_CommonStateRegion.cshtml" model="Model.ToStateRegion()" />
+    }
+</section>
