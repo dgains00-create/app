@@ -7,15 +7,7 @@
                href="@destination.Href"
                aria-current="@(destination.IsCurrent ? "page" : null)">@destination.Label</a>
         }
-        @if (Model.ProvisionalDestinations.Count > 0)
-        {
-            <span class="dmo-contract-label">PROVISIONAL FRONTEND CONTRACT</span>
-            @foreach (var fixture in Model.ProvisionalDestinations)
-            {
-                <span class="dmo-primary-link is-provisional" aria-disabled="true" title="Destino ainda não disponível">@fixture.Label</span>
-            }
-        }
-        @if (Model.LiveDestinations.Count == 0 && Model.ProvisionalDestinations.Count == 0)
+        @if (Model.LiveDestinations.Count == 0)
         {
             <span class="dmo-nav-empty">Sem destinos operacionais disponíveis</span>
         }

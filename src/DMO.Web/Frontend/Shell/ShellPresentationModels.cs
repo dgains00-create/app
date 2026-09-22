@@ -15,16 +15,17 @@ public sealed record PrimaryDestinationPresentation(
     IReadOnlyList<ModuleId> GrantedModuleIds,
     bool IsCurrent = false);
 
-public sealed record ProvisionalDestinationPresentation(string DestinationId, string Label);
-
 public sealed record SecondaryDestinationPresentation(
     string Label,
     string Href,
     bool IsCurrent = false);
 
+/// <summary>
+/// Navigation state of the shared shell: the live destinations actually available in this
+/// build plus whether operational access resolution failed closed.
+/// </summary>
 public sealed record NavigationPresentation(
     IReadOnlyList<PrimaryDestinationPresentation> LiveDestinations,
-    IReadOnlyList<ProvisionalDestinationPresentation> ProvisionalDestinations,
     bool AccessResolutionFailed);
 
 public sealed record ShellPresentation(

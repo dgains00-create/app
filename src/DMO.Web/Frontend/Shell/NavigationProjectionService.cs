@@ -8,20 +8,14 @@ namespace DMO.Web.Frontend.Shell;
 /// Projects P1-T04 effective access into visible destinations. This is presentation only;
 /// route authorization remains the server-side Module gate.
 /// </summary>
+/// <remarks>
+/// The projection has exactly one source: effective granted Modules ∩ published available
+/// Module definitions ∩ non-contextual Modules carrying a <c>DestinationId</c> ∩ Modules whose
+/// destination route is actually registered. Nothing is invented when that intersection is
+/// empty — the shell then renders its operational empty state.
+/// </remarks>
 public sealed class NavigationProjectionService
 {
-    private static readonly IReadOnlyList<ProvisionalDestinationPresentation> A2Fixtures =
-    [
-        new("job-on", "Job On"),
-        new("controlo", "Controlo"),
-        new("reparacao-interna", "Reparação Interna"),
-        new("boquilhas", "Boquilhas"),
-        new("armazem", "Armazém"),
-        new("reparacao-programada", "Reparação Programada"),
-        new("tampoes", "Tampões"),
-        new("historia", "História"),
-    ];
-
     private readonly IModuleAccessService _access;
     private readonly IModuleRegistry _registry;
     private readonly IDestinationRouteRegistry _routes;
@@ -40,18 +34,22 @@ public sealed class NavigationProjectionService
         CurrentAccount current,
         CancellationToken cancellationToken)
     {
+        // ADMIN (like any non-operational account) has no operational Template and therefore no
+        // operational destination. USER access resolution is never invoked for it.
         if (current is not CurrentAccount.User(var account))
         {
-            return new NavigationPresentation([], ProvisionalFixturesWhenNeeded(), false);
+            return new NavigationPresentation([], false);
         }
 
         var outcome = await _access.ResolveUserAccessAsync(
             new AccountResolution.User(account),
             cancellationToken);
 
+        // A denied resolution fails closed: no destination is advertised and the failure is
+        // surfaced so the shell can render its fail-closed status.
         if (outcome is not AccessOutcome.Granted(var effectiveModules))
         {
-            return new NavigationPresentation([], ProvisionalFixturesWhenNeeded(), true);
+            return new NavigationPresentation([], true);
         }
 
         // Effective access is intersected with the published build registry. Contextual-only
@@ -66,7 +64,7 @@ public sealed class NavigationProjectionService
             .Cast<PrimaryDestinationPresentation>()
             .ToArray();
 
-        return new NavigationPresentation(live, ProvisionalFixturesWhenNeeded(), false);
+        return new NavigationPresentation(live, false);
     }
 
     private PrimaryDestinationPresentation? CreateDestination(
@@ -88,7 +86,4 @@ public sealed class NavigationProjectionService
             route,
             modules.Select(module => module.Id).ToArray());
     }
-
-    private IReadOnlyList<ProvisionalDestinationPresentation> ProvisionalFixturesWhenNeeded() =>
-        _registry.AvailableModules.Count == 0 ? A2Fixtures : [];
 }
