@@ -1,0 +1,10 @@
+@model IReadOnlyList<SecondaryDestinationPresentation>
+@if (Model.Count > 0)
+{
+    <nav class="dmo-secondary-nav" aria-label="Navegação local">
+        @foreach (var destination in Model)
+        {
+            <a href="@destination.Href" aria-current="@(destination.IsCurrent ? "page" : null)">@destination.Label</a>
+        }
+    </nav>
+}

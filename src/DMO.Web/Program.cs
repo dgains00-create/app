@@ -7,6 +7,7 @@ using DMO.Infrastructure.Database;
 using DMO.Web.Auth;
 using DMO.Web.Authorization;
 using DMO.Web.Endpoints;
+using DMO.Web.Frontend.Shared;
 using DMO.Web.Startup;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Options;
@@ -70,6 +71,11 @@ try
     // roles, Template names or navigation visibility.
     builder.Services.AddModuleAuthorization();
 
+    // ---- A2 shared frontend seam ----------------------------------------------------
+    // Razor Pages and shared presentation services only. Industrial routes, feature
+    // services and Module registrations remain with their owning workstreams.
+    builder.Services.AddDmoSharedFrontend();
+
     // ---- P1-T03 single-ADMIN bootstrap (deployment-only command) -------------------
     // Exactly three inputs (env/user-secrets only): AdminBootstrap__Email,
     // AdminBootstrap__DisplayName, AdminBootstrap__AuthIdentityId (the exact provider
@@ -110,9 +116,12 @@ if (StartupCommands.IsBootstrapAdminCommand(args))
     return await StartupCommands.RunBootstrapAdminAsync(app.Services, app.Logger);
 }
 
+app.UseDmoSharedFrontend();
 app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapTechnicalEndpoints();
 app.MapAuthEndpoints();
+app.MapDmoSharedFrontend();
 
 return await StartupCommands.RunHostAsync(app);

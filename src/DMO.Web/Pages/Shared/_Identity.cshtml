@@ -1,0 +1,15 @@
+@model IdentityPresentation
+<div class="dmo-identity" aria-label="Identidade da sessão">
+    <span class="dmo-identity-name">@Model.DisplayName</span>
+    <span class="dmo-identity-meta">
+        @Model.AccountKind
+        @if (!string.IsNullOrWhiteSpace(Model.SecondaryIdentifier))
+        {
+            <span aria-hidden="true"> · </span><span>@Model.SecondaryIdentifier</span>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.RoleLabel))
+        {
+            <span aria-hidden="true"> · </span><span>@Model.RoleLabel</span>
+        }
+    </span>
+</div>

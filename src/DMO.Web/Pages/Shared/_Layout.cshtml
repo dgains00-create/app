@@ -1,0 +1,48 @@
+@{
+    var shell = ViewData["DmoShell"] as ShellPresentation
+        ?? throw new InvalidOperationException("The shared operational layout requires shell presentation data.");
+}
+<!doctype html>
+<html lang="pt">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] · DMO</title>
+    <link rel="stylesheet" href="~/css/dmo-tokens.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dmo-shell.css" asp-append-version="true" />
+</head>
+<body>
+    <a class="dmo-skip-link" href="#dmo-main">Saltar para o conteúdo</a>
+    <header class="dmo-app-header">
+        <div class="dmo-header-inner">
+            <a class="dmo-brand" href="/" aria-label="DMO — início">
+                <span class="dmo-brand-mark" aria-hidden="true">D</span>
+                <span><strong>DMO</strong><small>Operações industriais</small></span>
+            </a>
+            <partial name="_Identity" model="shell.Identity" />
+        </div>
+        <partial name="Navigation/_PrimaryNavigation" model="shell.Navigation" />
+    </header>
+
+    <div class="dmo-page-frame">
+        <header class="dmo-page-heading">
+            <div>
+                <span class="dmo-eyebrow">Área de trabalho</span>
+                <h1>@shell.PageTitle</h1>
+                <p>@shell.PageContext</p>
+            </div>
+            <div class="dmo-page-actions" aria-label="Ações da página">
+                <span class="dmo-action-placeholder">Sem ações disponíveis</span>
+            </div>
+        </header>
+        <partial name="Navigation/_SecondaryNavigation" model="shell.SecondaryNavigation" />
+        <main id="dmo-main" tabindex="-1">
+            @RenderBody()
+        </main>
+    </div>
+
+    <div class="dmo-announcement" role="status" aria-live="polite" aria-atomic="true">
+        @shell.StatusMessage
+    </div>
+</body>
+</html>
