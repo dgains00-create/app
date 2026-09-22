@@ -518,7 +518,8 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   6. `CurrentBuildAvailable` is still `[]` and no route changed.
 - **Completion evidence:** committed component + tests, build/test results recorded by the
   implementing agent, and confirmation that no protected file changed.
-- **STATUS: IMPLEMENTED** — commit `<pending>` in `DMO-MODULAR/main`; response
+- **STATUS: IMPLEMENTED** — implementation commit `72c38c26fa03a81465de72bed07c57f087530618`
+  in `DMO-MODULAR/main`; response
   `dev/responses/P2_T01_IMPLEMENTATION_RESPONSE.md`. New A-owned paths:
   `src/DMO.Web/Frontend/Shared/Contracts/*` (10 presentation contracts),
   `src/DMO.Web/Pages/Shared/Components/{_CommonStateRegion,_RecordStatus,_AvailabilityState}.cshtml`,
