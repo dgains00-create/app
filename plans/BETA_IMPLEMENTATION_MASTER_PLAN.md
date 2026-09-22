@@ -458,6 +458,13 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
 - **Completion evidence:** committed review document with the inspected SHA.
 - **Downstream dependents:** removes the caveat on P1-T07 as "accepted foundation" for
   P2-T10.
+- **STATUS: CLOSED.** Architect implementation review
+  `dmo-work/dev/reviews/P1-T07_NAVIGATION_USER_SHELL_IMPLEMENTATION_REVIEW.md` @
+  `50e884135fb885f8d2a3e55393d25d246d69a39c` — verdict **ACCEPT**, inspecting
+  `DMO-MODULAR@0b47690936599b6a71342b68b1cf36cfe4b64264`. No application code changed.
+  Verification: build 0 warnings/0 errors; unit 335/335 passed; integration 102 passed /
+  71 env-gated skipped / 0 failed; `git diff --check` clean; 0 migrations;
+  `CurrentBuildAvailable` still `[]`. P1-T07 may now be treated as accepted foundation.
 
 ### P2-T01 — Shared generic states + `RecordStatus` + `AvailabilityState` (A3)
 
@@ -1159,7 +1166,7 @@ Investigated during this planning run and determined **not** to require implemen
 | 7.1 A shared feature components | PARTIAL | READY FOR IMPLEMENTATION | P2-T01, P2-T02, P2-T03 |
 | 7.2 secondary nav / current marking | PARTIAL | READY FOR IMPLEMENTATION | P2-T09 |
 | 7.3 access identities without feature actions | PARTIAL | READY FOR IMPLEMENTATION | P2-T04...P2-T07, P2-T10 |
-| 7 (Q3) P1-T07 accepted-status gap | PARTIAL | READY (governance) | P2-T00 |
+| 7 (Q3) P1-T07 accepted-status gap | PARTIAL | CLOSED (P2-T00: ACCEPT review `50e8841…`) | — |
 | 9.1 Job On create/view/edit | MISSING | READY FOR IMPLEMENTATION | P2-T04 |
 | 9.2 Job On duplicate | MISSING | READY FOR IMPLEMENTATION | P2-T04 |
 | 9.3 reference to productions | MISSING | READY FOR IMPLEMENTATION | P2-T04 |
