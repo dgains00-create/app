@@ -692,7 +692,12 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   identity string appears in any shared contract type or fixture.
 - **Downstream dependents:** P2-T04 (Tool orchestration is B/C/E shared), P2-T05 (MeasurementRows
   in Peso/Pegamentos), P2-T06/P2-T07 (DecisionBar actions).
-- **STATUS: CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW.** The formal implementation
+- **CONTRACT STATUS: PLAN ACCEPTED.** The Architect reviewed
+  `plans/contracts/P2-T03_TOOLPICKER_ROWS_DECISIONBAR_CONTRACT.md` at
+  `71a12476b3298eacdda2918966199c306cc0ae29` and returned **PLAN ACCEPT** (review record
+  `dev/reviews/P2-T03_TOOLPICKER_ROWS_DECISIONBAR_CONTRACT_PLAN_REVIEW.md` at
+  `c8af762fbc75764c81ccb5ad09b24ae364a56516` in `dmo-work`), disposing Q1–Q6 as ACCEPT DEFAULT with
+  no required corrections. The formal implementation
   contract is `plans/contracts/P2-T03_TOOLPICKER_ROWS_DECISIONBAR_CONTRACT.md`; authoring response
   `dev/responses/P2_T03_CONTRACT_AUTHORING_RESPONSE.md`. The contract pins all four components to
   the binding DMO fixed desktop layout policy (canonical 1366 × 768; no breakpoint reflow, no card
@@ -706,10 +711,23 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   defines no backend/persistence/route/authorization/Supabase seam, protects the P2-T04+ boundary,
   and records a **complete** test-to-acceptance matrix (52 acceptance criteria ↔ 99 tests,
   bidirectional coverage) plus 6 CONTRACT QUESTIONS, all NON-BLOCKING with pinned defaults.
-  **Not implemented and not self-accepted:** P2-T03 implementation is unauthorized until the
-  Architect reviews the committed contract and returns `PLAN ACCEPT`, disposing Q1–Q6. No
-  application code was changed by the authoring task; `CurrentBuildAvailable` is still `[]`;
-  P2-T04 has not started.
+- **STATUS: P2-T03 IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION
+  REVIEW.** Implementation commit `8a84c35f0db45ebba50170f112433d8107be4fdf`; implementation response
+  `dev/responses/P2_T03_IMPLEMENTATION_RESPONSE.md`. Implemented exactly against the accepted
+  contract and within A-owned paths only: 30 new shared contract types, 4 new shared Razor partials,
+  2 new generic static assets, an additive `dmo-components.css` block and an additive
+  `_SharedComponentAssets.cshtml` extension (the three accepted tags are byte-identical). No route,
+  availability registration, migration, package, project, configuration, Auth, Supabase or
+  application-behaviour change; `ModuleRegistrations.CurrentBuildAvailable` is still `[]`. The
+  accepted 52-criterion / 99-test matrix is implemented one-to-one (TP1–TP18, RTP1–RTP9, TR1–TR9,
+  RTR1–RTR5, MR1–MR16, RMR1–RMR8, DB1–DB11, RDB1–RDB6, RTS1–RTS3, ST1–ST9, RG1–RG5) plus 5 additive
+  evidence tests for the Architect's O1–O5 observations. Verified: build 0 errors (1 pre-existing
+  warning in the accepted `P2T02RegressionTests.cs`, which is not modified); `DMO.UnitTests`
+  468 passed / 0 failed / 0 skipped; `DMO.IntegrationTests` 201 passed / 71 environment-gated
+  skipped / 0 failed; 0 migrations. **Not self-accepted and not closed:** formal closure requires
+  independent verification and an Architect implementation review per `dmo-beta-master/WORKFLOW.md`
+  step 12. **P2-T04 remains unauthorized and has not started**; no P2-T03 artifact encodes P2-T04
+  semantics.
 
 ### P2-T09 — Secondary navigation + current-destination wiring
 
