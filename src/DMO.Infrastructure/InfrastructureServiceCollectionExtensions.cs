@@ -64,6 +64,10 @@ public static class InfrastructureServiceCollectionExtensions
 
         services.AddScoped<IMigrationRunner, EfCoreMigrationRunner>();
 
+        // P1-T03 persistence foundation: persistence-backed account/authentication lookups
+        // and the repository primitives (one DmoDbContext, scoped per request).
+        services.AddPersistenceFoundation();
+
         return services;
     }
 }

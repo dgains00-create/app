@@ -10,12 +10,13 @@ namespace DMO.Web.Endpoints;
 /// </summary>
 /// <remarks>
 /// <para>
-/// P1-T02 posture: <c>POST /auth/login</c> performs real authentication (ADMIN through
-/// Supabase Auth DEV/TEST; USER declared unavailable), then real account resolution. A
-/// session is established <b>only</b> when authentication succeeds <b>and</b> resolution
-/// returns an active ADMIN/USER. In P1-T02 production no account can resolve
-/// (<c>UnavailableAccountLookup</c>), so no session is ever established and the surface
-/// fails closed — it can never be mistaken for completed login functionality.
+/// P1-T03 posture: <c>POST /auth/login</c> performs real authentication (ADMIN through
+/// Supabase Auth DEV/TEST; USER through the persistence-backed company_number → carrier
+/// email → Supabase password grant), then real account resolution against the persisted
+/// mapping (<c>PersistenceAccountLookup</c>). A session is established <b>only</b> when
+/// authentication succeeds <b>and</b> resolution returns an active ADMIN/USER; any other
+/// outcome fails closed — the surface can never be mistaken for completed login
+/// functionality when no mapping or no active account exists.
 /// </para>
 /// <para>
 /// <c>POST /auth/logout</c> only clears the runtime session state. <c>GET /auth/me</c> is

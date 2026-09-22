@@ -8,7 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace DMO.IntegrationTests;
 
 /// <summary>
-/// Proposed P1-T01 test — the migration mechanism works and Phase 1 creates no schema.
+/// P1-T01/P1-T03 test — the migration mechanism works and Phase 1 models exactly the
+/// persistence-foundation schema.
 /// </summary>
 /// <remarks>
 /// PROPOSED — NOT EXECUTED. Awaiting Architect review before first execution.
@@ -17,7 +18,7 @@ namespace DMO.IntegrationTests;
 public sealed class MigrationRunnerTests
 {
     [Fact]
-    public void PersistenceContext_DeclaresNoEntityTypes()
+    public void PersistenceContext_DeclaresExactlyTheFoundationEntities()
     {
         // Preconditions: the single application context, built without touching a database.
         var options = new DbContextOptionsBuilder<DmoDbContext>()
@@ -26,14 +27,20 @@ public sealed class MigrationRunnerTests
 
         using var context = new DmoDbContext(options);
 
-        // Assertion: Phase 1 declares no persisted entity, so no product table is implied.
-        Assert.Empty(context.Model.GetEntityTypes());
+        // P1-T03 assertion: the context models exactly the four persistence-foundation
+        // tables (Migration 001 + 002). No other Phase 1 table is implied.
+        var modelled = context.Model.GetEntityTypes()
+            .Select(e => e.GetTableName())
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
+
+        Assert.Equal(
+            new[] { "admin_accounts", "template_modules", "templates", "users" },
+            modelled);
 
         // Required non-effect: none of the forbidden Phase 1 tables is modelled.
-        var modelled = context.Model.GetEntityTypes().Select(e => e.GetTableName()).ToList();
         foreach (var forbidden in new[]
                  {
-                     "users", "admin_accounts", "templates", "template_modules",
                      "permissions", "capabilities", "roles", "settings", "admin_audit_events",
                  })
         {

@@ -76,7 +76,7 @@ public sealed class CurrentAccountContextTests
     public async Task CurrentAccount_ResolutionNoAccess_ReturnsNone()
     {
         // Preconditions: a session exists but the application lookup cannot resolve it
-        // (P1-T02 production posture with UnavailableAccountLookup).
+        // (fail-closed production posture when no persisted mapping exists).
         var session = new StubSession
         {
             Identity = new AuthenticatedIdentity("subject-3", AuthenticationPath.Admin),

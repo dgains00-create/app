@@ -14,6 +14,9 @@ public static class StartupCommands
     /// <summary>Command token that selects the migration entry point.</summary>
     public const string MigrateCommand = "migrate";
 
+    /// <summary>Command token that selects the single-ADMIN bootstrap entry point.</summary>
+    public const string BootstrapAdminCommand = "bootstrap-admin";
+
     /// <summary>Exit code returned when the migration entry point succeeds.</summary>
     public const int SuccessExitCode = 0;
 
@@ -21,15 +24,16 @@ public static class StartupCommands
     public const int FailureExitCode = 1;
 
     /// <summary>
-    /// Determines whether the supplied arguments select the migration entry point.
+    /// Determines whether the supplied arguments select the first meaningful entry point.
     /// </summary>
     /// <param name="args">Process arguments.</param>
-    /// <returns><c>true</c> when the first meaningful argument is <c>migrate</c> or <c>--migrate</c>.</returns>
+    /// <param name="command">Command token to match.</param>
+    /// <returns><c>true</c> when the first meaningful argument is <c>command</c> or <c>--command</c>.</returns>
     /// <remarks>
     /// Matched on the first argument only, so an ASP.NET Core switch such as
-    /// <c>--environment Production</c> is never mistaken for the command.
+    /// <c>--environment Production</c> is never mistaken for a command.
     /// </remarks>
-    public static bool IsMigrationCommand(string[]? args)
+    private static bool IsCommand(string[]? args, string command)
     {
         if (args is null || args.Length == 0)
         {
@@ -38,9 +42,23 @@ public static class StartupCommands
 
         var first = args[0];
 
-        return string.Equals(first, MigrateCommand, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(first, $"--{MigrateCommand}", StringComparison.OrdinalIgnoreCase);
+        return string.Equals(first, command, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(first, $"--{command}", StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// Determines whether the supplied arguments select the migration entry point.
+    /// </summary>
+    /// <param name="args">Process arguments.</param>
+    /// <returns><c>true</c> when the first meaningful argument is <c>migrate</c> or <c>--migrate</c>.</returns>
+    public static bool IsMigrationCommand(string[]? args) => IsCommand(args, MigrateCommand);
+
+    /// <summary>
+    /// Determines whether the supplied arguments select the single-ADMIN bootstrap entry point.
+    /// </summary>
+    /// <param name="args">Process arguments.</param>
+    /// <returns><c>true</c> when the first meaningful argument is <c>bootstrap-admin</c> or <c>--bootstrap-admin</c>.</returns>
+    public static bool IsBootstrapAdminCommand(string[]? args) => IsCommand(args, BootstrapAdminCommand);
 
     /// <summary>
     /// Applies pending migrations and returns a process exit code.
@@ -91,6 +109,36 @@ public static class StartupCommands
         {
             // Includes DatabaseConfigurationException: fail loudly, never start on a default.
             logger.LogError(ex, "Migration runner failed: {Message}", ex.Message);
+            return FailureExitCode;
+        }
+    }
+
+    /// <summary>
+    /// Runs the single-ADMIN bootstrap entry point and returns a process exit code.
+    /// </summary>
+    /// <param name="services">The application service provider.</param>
+    /// <param name="logger">Logger used to report the technical outcome.</param>
+    /// <returns><see cref="SuccessExitCode"/> on success, <see cref="FailureExitCode"/> otherwise.</returns>
+    /// <remarks>
+    /// The bootstrap is deployment-only (DEV/TEST) and idempotent; it performs no provider
+    /// call and holds no service credentials. Any failure (incomplete configuration or an
+    /// existing conflicting mapping) returns the failure code without modifying the row.
+    /// </remarks>
+    public static async Task<int> RunBootstrapAdminAsync(IServiceProvider services, ILogger logger)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(logger);
+
+        await using var scope = services.CreateAsyncScope();
+
+        try
+        {
+            var command = scope.ServiceProvider.GetRequiredService<AdminBootstrapCommand>();
+            return await command.ExecuteAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "ADMIN bootstrap failed: {Message}", ex.Message);
             return FailureExitCode;
         }
     }

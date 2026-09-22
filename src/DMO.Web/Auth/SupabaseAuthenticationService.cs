@@ -7,7 +7,8 @@ using Microsoft.Extensions.Options;
 namespace DMO.Web.Auth;
 
 /// <summary>
-/// Production <see cref="IAuthenticationBoundary"/>.
+/// Production <see cref="IAuthenticationBoundary"/> — the single production authentication
+/// boundary for both the ADMIN and USER flows.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -16,10 +17,17 @@ namespace DMO.Web.Auth;
 /// <c>service_role</c> and no secret key is used or stored.
 /// </para>
 /// <para>
-/// <b>USER path</b> (<see cref="UserLoginRequest"/>): fails closed by declaration. No USER
-/// provider flow exists in P1-T02 because the durable <c>company_number → provider
-/// identity</c> mapping requires P1-T03 persistence. Nothing is invented: no synthetic
-/// email, no hidden lookup, no local password store.
+/// <b>USER path</b> (<see cref="UserLoginRequest"/>): the USER types
+/// <c>company_number + password</c> only. The boundary resolves the account's provisioned
+/// carrier email for the company number through the narrow
+/// <see cref="IUserAuthenticationLookup"/> persistence contract (never EF directly), then
+/// performs the real Supabase password grant with that carrier email. The company number is
+/// never converted into an email, never sent to the provider as an email, and no synthetic
+/// email and no local password store exist.
+/// </para>
+/// <para>
+/// Unknown company number → <see cref="AuthenticationFailureReason.InvalidCredentials"/>
+/// with <b>no provider round trip</b>.
 /// </para>
 /// <para>
 /// <b>Transport</b> (verified against the current official Supabase documentation and the
@@ -52,20 +60,24 @@ public sealed class SupabaseAuthenticationService : IAuthenticationBoundary
     private readonly HttpClient _httpClient;
     private readonly SupabaseOptions _options;
     private readonly ILogger<SupabaseAuthenticationService> _logger;
+    private readonly IUserAuthenticationLookup _userLookup;
 
-    /// <summary>Creates the service over the configured HTTP client and options.</summary>
+    /// <summary>Creates the service over the configured HTTP client, options and USER lookup.</summary>
     public SupabaseAuthenticationService(
         HttpClient httpClient,
         IOptions<SupabaseOptions> options,
-        ILogger<SupabaseAuthenticationService> logger)
+        ILogger<SupabaseAuthenticationService> logger,
+        IUserAuthenticationLookup userLookup)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(userLookup);
 
         _httpClient = httpClient;
         _options = options.Value;
         _logger = logger;
+        _userLookup = userLookup;
     }
 
     /// <inheritdoc />
@@ -78,27 +90,32 @@ public sealed class SupabaseAuthenticationService : IAuthenticationBoundary
         return request switch
         {
             AdminLoginRequest admin => await AuthenticateAdminAsync(admin, cancellationToken),
-            UserLoginRequest => Failed(AuthenticationFailureReason.ProviderUnavailable),
+            UserLoginRequest user => await AuthenticateUserAsync(user, cancellationToken),
             _ => Failed(AuthenticationFailureReason.ProviderUnavailable),
         };
     }
 
-    private async Task<AuthenticationOutcome> AuthenticateAdminAsync(
-        AdminLoginRequest request,
+    /// <summary>
+    /// Performs the shared GoTrue password-grant + user-verification exchange and produces
+    /// the minimal authenticated identity on the given path.
+    /// </summary>
+    /// <remarks>
+    /// The <paramref name="email"/> parameter is the provider credential carrier: for ADMIN
+    /// it is the presented ADMIN email; for USER it is the persisted carrier email resolved
+    /// from the company number. The company number itself is never sent here.
+    /// </remarks>
+    private async Task<AuthenticationOutcome> ExchangeGrantAsync(
+        string email,
+        string password,
+        AuthenticationPath path,
         CancellationToken cancellationToken)
     {
-        // A blank credential can never authenticate; do not send it to the provider.
-        if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
-        {
-            return Failed(AuthenticationFailureReason.InvalidCredentials);
-        }
-
         TokenResponse? tokenResponse;
         try
         {
             using var tokenRequest = new HttpRequestMessage(HttpMethod.Post, TokenEndpointPath);
             tokenRequest.Headers.TryAddWithoutValidation("apikey", _options.PublishableKey);
-            tokenRequest.Content = JsonContent.Create(new { email = request.Email, password = request.Password });
+            tokenRequest.Content = JsonContent.Create(new { email, password });
 
             using var tokenHttpResponse = await _httpClient.SendAsync(tokenRequest, cancellationToken);
 
@@ -163,10 +180,74 @@ public sealed class SupabaseAuthenticationService : IAuthenticationBoundary
             return Failed(AuthenticationFailureReason.ProviderError);
         }
 
-        // Internal linkage only: the subject plus the mechanical ADMIN path. No email, no
-        // claims, no token enter the application.
+        // Internal linkage only: the subject plus the mechanical path. No email, no claims,
+        // no token enter the application.
         return new AuthenticationOutcome.Authenticated(
-            new AuthenticatedIdentity(subject, AuthenticationPath.Admin));
+            new AuthenticatedIdentity(subject, path));
+    }
+
+    private async Task<AuthenticationOutcome> AuthenticateAdminAsync(
+        AdminLoginRequest request,
+        CancellationToken cancellationToken)
+    {
+        // A blank credential can never authenticate; do not send it to the provider.
+        if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
+        {
+            return Failed(AuthenticationFailureReason.InvalidCredentials);
+        }
+
+        return await ExchangeGrantAsync(
+            request.Email,
+            request.Password,
+            AuthenticationPath.Admin,
+            cancellationToken);
+    }
+
+    private async Task<AuthenticationOutcome> AuthenticateUserAsync(
+        UserLoginRequest request,
+        CancellationToken cancellationToken)
+    {
+        // A blank company number/password can never authenticate; do not send it to the
+        // provider and do not touch persistence.
+        if (string.IsNullOrWhiteSpace(request.CompanyNumber) || string.IsNullOrWhiteSpace(request.Password))
+        {
+            return Failed(AuthenticationFailureReason.InvalidCredentials);
+        }
+
+        // 1. company_number -> persisted carrier email (narrow persistence contract; unique
+        // exact match; no provider call yet). The company number is never converted into an
+        // email and never sent to the provider as an email.
+        UserLoginIdentity? loginIdentity;
+        try
+        {
+            loginIdentity = await _userLookup.GetByCompanyNumberAsync(
+                request.CompanyNumber,
+                cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "USER authentication lookup failed for company number; treated as provider-unavailable.");
+            return Failed(AuthenticationFailureReason.ProviderUnavailable);
+        }
+
+        // 2. Unknown company number -> InvalidCredentials, with no provider round trip.
+        if (loginIdentity is null || string.IsNullOrWhiteSpace(loginIdentity.CarrierEmail))
+        {
+            return Failed(AuthenticationFailureReason.InvalidCredentials);
+        }
+
+        // 3. Real Supabase password grant with the carrier email + the presented password.
+        return await ExchangeGrantAsync(
+            loginIdentity.CarrierEmail,
+            request.Password,
+            AuthenticationPath.User,
+            cancellationToken);
     }
 
     private AuthenticationOutcome MapHttpFailure(HttpStatusCode statusCode)

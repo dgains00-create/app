@@ -24,7 +24,9 @@ public sealed class SupabaseAuthenticationServiceTests
     private const string TestProjectUrl = "https://test.invalid";
     private const string TestPublishableKey = "sb_publishable_test_key";
 
-    private static SupabaseAuthenticationService CreateService(FakeHttpMessageHandler handler)
+    private static SupabaseAuthenticationService CreateService(
+        FakeHttpMessageHandler handler,
+        IUserAuthenticationLookup? lookup = null)
     {
         var httpClient = new HttpClient(handler) { BaseAddress = new Uri(TestProjectUrl + "/") };
 
@@ -35,7 +37,8 @@ public sealed class SupabaseAuthenticationServiceTests
                 ProjectUrl = TestProjectUrl,
                 PublishableKey = TestPublishableKey,
             }),
-            NullLogger<SupabaseAuthenticationService>.Instance);
+            NullLogger<SupabaseAuthenticationService>.Instance,
+            lookup ?? new FakeUserAuthenticationLookup(new UserLoginIdentity("carrier@dmo.test")));
     }
 
     /// <summary>
@@ -203,21 +206,24 @@ public sealed class SupabaseAuthenticationServiceTests
     }
 
     [Fact]
-    public async Task UserRequest_FailsClosed_NoUserProviderFlow()
+    public async Task UserRequest_UnknownCompanyNumber_RejectedWithoutProviderCall()
     {
-        // Preconditions: a USER login request against the production boundary.
+        // Preconditions: a USER login request whose company number has no persisted mapping
+        // (the lookup returns no carrier). The USER flow is real since P1-T03.
         var handler = HappyPathHandler();
-        var service = CreateService(handler);
+        var lookup = new FakeUserAuthenticationLookup(_ => null);
+        var service = CreateService(handler, lookup);
 
         // Action: authenticate.
         var outcome = await service.AuthenticateAsync(
             new UserLoginRequest("2661", "secret"), CancellationToken.None);
 
-        // Assertions: declared fail-closed; no HTTP call is made and company_number is never
-        // transformed into an email (P1-T03 owns the durable mapping).
+        // Assertions: invalid credentials with no provider round trip; company_number is
+        // never transformed into an email and no synthetic email is built.
         var failed = Assert.IsType<AuthenticationOutcome.Failed>(outcome);
-        Assert.Equal(AuthenticationFailureReason.ProviderUnavailable, failed.Reason);
+        Assert.Equal(AuthenticationFailureReason.InvalidCredentials, failed.Reason);
         Assert.Empty(handler.Requests);
+        Assert.Equal("2661", Assert.Single(lookup.CompanyNumbers));
     }
 
     [Fact]

@@ -5,6 +5,7 @@ using DMO.Application.Accounts;
 using DMO.Application.Authentication;
 using DMO.Infrastructure;
 using DMO.Infrastructure.Database;
+using DMO.IntegrationTests.Auth.Fakes;
 using DMO.IntegrationTests.Host;
 using DMO.Web.Auth;
 using DMO.Web.Endpoints;
@@ -19,10 +20,13 @@ using Microsoft.Extensions.Options;
 namespace DMO.IntegrationTests.Auth;
 
 /// <summary>
-/// P1-T02 production-posture tests — what actually happens when production composition is
-/// used: ADMIN authentication transport is stubbed at the HTTP boundary (never the real
-/// project), resolution stays the real fail-closed lookup, and the USER flow is declared
-/// unavailable.
+/// P1-T03 production-posture tests — what happens with production composition: the ADMIN
+/// and USER authentication transports are stubbed at the HTTP boundary (never the real
+/// project), the real <see cref="SupabaseAuthenticationService"/> logic runs, and account
+/// resolution is the real <see cref="AccountResolver"/> over the production-registered
+/// <see cref="DMO.Infrastructure.Persistence.PersistenceAccountLookup"/> shape. The
+/// persistence data source is the documented test-host seam (empty mapping): the real DB
+/// emptiness behaviour is covered by the env-gated persistence integration tests.
 /// </summary>
 [Collection(ProcessEnvironmentCollection.Name)]
 public sealed class ProductionFailClosedTests
@@ -31,23 +35,14 @@ public sealed class ProductionFailClosedTests
     public async Task ProductionLogin_Admin_FailsClosedAtAccountStep()
     {
         // Preconditions: production composition, with ONLY the Supabase transport stubbed
-        // (the real SupabaseAuthenticationService logic runs over a fake transport; account
-        // resolution is the real AccountResolver + UnavailableAccountLookup).
+        // (the real SupabaseAuthenticationService logic runs over a fake transport), and the
+        // persistence data source empty (no ADMIN mapping exists).
         using var factory = new DmoWebApplicationFactory().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
             {
-                services.RemoveAll<SupabaseAuthenticationService>();
-                services.RemoveAll<IAuthenticationBoundary>();
-                services.AddScoped<SupabaseAuthenticationService>(provider =>
-                    new SupabaseAuthenticationService(
-                        new HttpClient(new StubTransportHandler())
-                        {
-                            BaseAddress = new Uri("https://dmo-test-placeholder.invalid/"),
-                        },
-                        provider.GetRequiredService<IOptions<SupabaseOptions>>(),
-                        provider.GetRequiredService<ILogger<SupabaseAuthenticationService>>()));
-                services.AddScoped<IAuthenticationBoundary>(provider =>
-                    provider.GetRequiredService<SupabaseAuthenticationService>());
+                ReplaceTransport(services);
+                services.RemoveAll<IAccountLookup>();
+                services.AddScoped<IAccountLookup>(_ => new FakeTestAccountLookup());
             }));
         using var client = factory.CreateClient();
 
@@ -55,8 +50,8 @@ public sealed class ProductionFailClosedTests
         var login = await client.PostAsJsonAsync(
             AuthEndpoints.LoginPath, new { email = "admin@dmo.test", password = "secret" });
 
-        // Assertions: authentication can succeed, but account resolution fails closed until
-        // P1-T03 supplies the durable ADMIN mapping — no session is established.
+        // Assertions: authentication succeeds, but account resolution fails closed with no
+        // persisted ADMIN mapping — no session is established.
         Assert.Equal(HttpStatusCode.Forbidden, login.StatusCode);
 
         var me = await client.GetFromJsonAsync<JsonElement>(AuthEndpoints.CurrentAccountPath);
@@ -64,19 +59,58 @@ public sealed class ProductionFailClosedTests
     }
 
     [Fact]
-    public async Task ProductionLogin_User_FailsClosedNoUserProviderFlow()
+    public async Task ProductionLogin_User_FailsClosedAtAccountStep()
     {
-        // Preconditions: pure production composition — no test replacement at all.
-        using var factory = new DmoWebApplicationFactory();
+        // Preconditions: production composition with the real extended USER flow (stubbed
+        // transport; the carrier lookup supplies a persisted carrier email) and an empty
+        // account mapping.
+        using var factory = new DmoWebApplicationFactory().WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+            {
+                ReplaceTransport(services);
+                services.RemoveAll<IUserAuthenticationLookup>();
+                services.AddScoped<IUserAuthenticationLookup>(
+                    _ => new FakeIntegrationUserAuthenticationLookup(
+                        new UserLoginIdentity("carrier@dmo.test")));
+                services.RemoveAll<IAccountLookup>();
+                services.AddScoped<IAccountLookup>(_ => new FakeTestAccountLookup());
+            }));
         using var client = factory.CreateClient();
 
         // Action: a company_number + password USER attempt.
         var login = await client.PostAsJsonAsync(
             AuthEndpoints.LoginPath, new { companyNumber = "2661", password = "secret" });
 
-        // Assertions: the USER provider flow is declared unavailable in P1-T02 (the durable
-        // mapping is P1-T03); the company number is never turned into an email.
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, login.StatusCode);
+        // Assertions: the USER flow is real since P1-T03 (no longer 503 by declaration), but
+        // with no persisted USER mapping the resolution fails closed — no session.
+        Assert.Equal(HttpStatusCode.Forbidden, login.StatusCode);
+
+        var me = await client.GetFromJsonAsync<JsonElement>(AuthEndpoints.CurrentAccountPath);
+        Assert.Equal("none", me.GetProperty("accountType").GetString());
+    }
+
+    [Fact]
+    public async Task ProductionLogin_User_UnknownCompanyNumber_ReturnsUnauthorized()
+    {
+        // Preconditions: production composition with real extended service; the company
+        // number has no persisted carrier mapping (lookup returns null) — no provider call.
+        using var factory = new DmoWebApplicationFactory().WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+            {
+                ReplaceTransport(services);
+                services.RemoveAll<IUserAuthenticationLookup>();
+                services.AddScoped<IUserAuthenticationLookup>(
+                    _ => new FakeIntegrationUserAuthenticationLookup(null));
+            }));
+        using var client = factory.CreateClient();
+
+        // Action: USER login with an unknown company number.
+        var login = await client.PostAsJsonAsync(
+            AuthEndpoints.LoginPath, new { companyNumber = "999999", password = "secret" });
+
+        // Assertions: rejected as invalid credentials at the authentication step (401); no
+        // company_number is ever sent to the provider as an email.
+        Assert.Equal(HttpStatusCode.Unauthorized, login.StatusCode);
 
         var me = await client.GetFromJsonAsync<JsonElement>(AuthEndpoints.CurrentAccountPath);
         Assert.Equal("none", me.GetProperty("accountType").GetString());
@@ -109,6 +143,27 @@ public sealed class ProductionFailClosedTests
     }
 
     /// <summary>
+    /// Replaces the Supabase transport with a stub answering the GoTrue token + user
+    /// endpoints. Never touches the real project. The real service logic still runs.
+    /// </summary>
+    private static void ReplaceTransport(IServiceCollection services)
+    {
+        services.RemoveAll<SupabaseAuthenticationService>();
+        services.RemoveAll<IAuthenticationBoundary>();
+        services.AddScoped<SupabaseAuthenticationService>(provider =>
+            new SupabaseAuthenticationService(
+                new HttpClient(new StubTransportHandler())
+                {
+                    BaseAddress = new Uri("https://dmo-test-placeholder.invalid/"),
+                },
+                provider.GetRequiredService<IOptions<SupabaseOptions>>(),
+                provider.GetRequiredService<ILogger<SupabaseAuthenticationService>>(),
+                provider.GetRequiredService<IUserAuthenticationLookup>()));
+        services.AddScoped<IAuthenticationBoundary>(provider =>
+            provider.GetRequiredService<SupabaseAuthenticationService>());
+    }
+
+    /// <summary>
     /// Test-only transport stub answering the GoTrue token + user endpoints with fixed
     /// success bodies. Never touches the real project.
     /// </summary>
@@ -125,7 +180,7 @@ public sealed class ProductionFailClosedTests
                 return Task.FromResult(Json(HttpStatusCode.OK, new { access_token = "stubbed-token" }));
             }
 
-            return Task.FromResult(Json(HttpStatusCode.OK, new { id = "stubbed-admin-subject" }));
+            return Task.FromResult(Json(HttpStatusCode.OK, new { id = "stubbed-subject" }));
         }
 
         private static HttpResponseMessage Json(HttpStatusCode statusCode, object body) =>

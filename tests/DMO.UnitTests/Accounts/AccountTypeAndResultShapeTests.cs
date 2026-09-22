@@ -24,12 +24,11 @@ public sealed class AccountTypeAndResultShapeTests
     }
 
     [Fact]
-    public void AccountResolution_HasNoTemplateAccessSemantics()
+    public void AccountResolution_HasNoModuleOrAccessSemantics()
     {
-        // Required non-effect: no resolution/account type introduces Template, Module or
-        // access fields — a Template/access outcome is structurally impossible from these
-        // types (verified over the public surface of every P1-T02 account type).
-
+        // Required non-effect: no account/result type introduces Module, Access, Permission
+        // or Capability members. Template appears ONLY as the nullable UserAccount.TemplateId
+        // persistence fact (P1-T03); it grants nothing and is checked separately.
         Type[] accountTypes =
         [
             typeof(AdminAccount),
@@ -51,8 +50,7 @@ public sealed class AccountTypeAndResultShapeTests
                 .ToArray();
 
             Assert.DoesNotContain(memberNames, name =>
-                name.Contains("Template", StringComparison.OrdinalIgnoreCase)
-                || name.Contains("Module", StringComparison.OrdinalIgnoreCase)
+                name.Contains("Module", StringComparison.OrdinalIgnoreCase)
                 || name.Contains("Access", StringComparison.OrdinalIgnoreCase)
                 || name.Contains("Permission", StringComparison.OrdinalIgnoreCase)
                 || name.Contains("Capability", StringComparison.OrdinalIgnoreCase));
@@ -73,10 +71,10 @@ public sealed class AccountTypeAndResultShapeTests
     }
 
     [Fact]
-    public void UserAccount_HasNoTemplateState()
+    public void UserAccount_CarriesOnlyTheNullableTemplateIdFact()
     {
-        // Required non-effect: the USER account record carries no Template reference and no
-        // Template/access state in P1-T02.
+        // P1-T03: the USER account record carries exactly the nullable TemplateId persistence
+        // fact (grants nothing, no resolver branch reads it); no Module/access state exists.
         var properties = typeof(UserAccount)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Select(property => property.Name)
@@ -84,8 +82,19 @@ public sealed class AccountTypeAndResultShapeTests
             .ToArray();
 
         Assert.Equal(
-            new[] { "AccountId", "CompanyNumber", "DisplayName", "Email", "IsActive", "RoleLabel" },
+            new[]
+            {
+                "AccountId", "CompanyNumber", "DisplayName", "Email", "IsActive", "RoleLabel", "TemplateId",
+            },
             properties);
+
+        // The only Template-shaped member on the USER model is the nullable TemplateId.
+        var templateMembers = typeof(UserAccount)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Select(property => property.Name)
+            .Where(name => name.Contains("Template", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        Assert.Equal(new[] { "TemplateId" }, templateMembers);
     }
 
     [Fact]

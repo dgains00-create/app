@@ -68,7 +68,8 @@ public sealed class LiveDevTestSupabaseAdminAuthTests
                 ProjectUrl = projectUrl,
                 PublishableKey = publishableKey,
             }),
-            NullLogger<SupabaseAuthenticationService>.Instance);
+            NullLogger<SupabaseAuthenticationService>.Instance,
+            new DMO.IntegrationTests.Auth.Fakes.FakeIntegrationUserAuthenticationLookup());
 
         var outcome = await service.AuthenticateAsync(
             new AdminLoginRequest(adminEmail!, adminPassword!), CancellationToken.None);

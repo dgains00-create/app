@@ -6,7 +6,6 @@ using DMO.Infrastructure;
 using DMO.Infrastructure.Database;
 using DMO.Web.Auth;
 using DMO.Web.Endpoints;
-using DMO.Web.Resolution;
 using DMO.Web.Startup;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Options;
@@ -19,10 +18,12 @@ try
 {
     builder.Services.AddDmoInfrastructure(builder.Configuration);
 
-    // ---- P1-T02 authentication + account boundary -------------------------------
+    // ---- P1-T02/P1-T03 authentication + account boundary ---------------------------
     // ADMIN authentication is real Supabase Auth against the DEV/TEST project using only
-    // the project URL and the publishable key. No service_role, no secret key, no fake
-    // provider, no in-memory account store.
+    // the project URL and the publishable key. The USER flow (P1-T03) resolves the
+    // persisted carrier email for company_number through the narrow IUserAuthenticationLookup
+    // and then uses the same Supabase password grant. No service_role, no secret key, no
+    // fake provider, no in-memory account store.
 
     builder.Services.Configure<SupabaseOptions>(builder.Configuration.GetSection(SupabaseOptions.SectionName));
 
@@ -35,10 +36,8 @@ try
 
     builder.Services.AddHttpContextAccessor();
 
-    // Runtime session element (cookie scheme). In P1-T02 production no session is ever
-    // established because account resolution always fails closed (UnavailableAccountLookup
-    // until P1-T03); the scheme below is the real mechanism, exercised by tests with
-    // test-only fakes.
+    // Runtime session element (cookie scheme). A session is established only when
+    // authentication succeeds AND account resolution returns an active ADMIN/USER.
     builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
         .AddCookie(options =>
         {
@@ -58,10 +57,17 @@ try
 
     builder.Services.AddScoped<IAuthenticationBoundary>(static provider =>
         provider.GetRequiredService<SupabaseAuthenticationService>());
-    builder.Services.AddScoped<IAccountLookup, UnavailableAccountLookup>();
     builder.Services.AddScoped<IAccountResolver, AccountResolver>();
     builder.Services.AddScoped<ISessionAuthentication, SessionAuthentication>();
     builder.Services.AddScoped<ICurrentAccountContext, CurrentAccountContext>();
+
+    // ---- P1-T03 single-ADMIN bootstrap (deployment-only command) -------------------
+    // Exactly three inputs (env/user-secrets only): AdminBootstrap__Email,
+    // AdminBootstrap__DisplayName, AdminBootstrap__AuthIdentityId (the exact provider
+    // subject of the existing Supabase Auth ADMIN identity). No provider call is made.
+    builder.Services.Configure<AdminBootstrapOptions>(
+        builder.Configuration.GetSection(AdminBootstrapOptions.SectionName));
+    builder.Services.AddScoped<AdminBootstrapCommand>();
 }
 catch (DatabaseConfigurationException ex)
 {
@@ -81,10 +87,18 @@ catch (SupabaseConfigurationException ex)
 var app = builder.Build();
 
 // `--migrate` (or `migrate`) is a technical entry point that applies pending migrations and
-// exits. At P1-T02 no product migration exists, so it applies nothing and reports that.
+// exits. P1-T03 adds the first two product migrations (AccountAndTemplateFoundation and
+// TemplateModuleComposition).
 if (StartupCommands.IsMigrationCommand(args))
 {
     return await StartupCommands.RunMigrateAsync(app.Services, app.Logger);
+}
+
+// `--bootstrap-admin` (or `bootstrap-admin`) is the deployment-only single-ADMIN bootstrap
+// (DEV/TEST), idempotent and provider-free.
+if (StartupCommands.IsBootstrapAdminCommand(args))
+{
+    return await StartupCommands.RunBootstrapAdminAsync(app.Services, app.Logger);
 }
 
 app.UseAuthentication();
