@@ -15,7 +15,7 @@
 | Starting `DMO-MODULAR/origin/main` (implementation base) | `e79186a81d5cd934fe32a100bc8dd9dd08bf509a` |
 | Accepted contract SHA | `e79186a81d5cd934fe32a100bc8dd9dd08bf509a` — `plans/contracts/P2-T02_DENSE_DATA_TABLE_AUDIT_TRAIL_CONTRACT.md` |
 | Architect PLAN ACCEPT review SHA (`dmo-work`) | `f1ddb968e026dc6cf2569d8de64400d8c3044514` — `dev/reviews/P2-T02_DENSE_DATA_TABLE_AUDIT_TRAIL_PLAN_REREVIEW.md` ("Verdict: PLAN ACCEPT") |
-| Implementation commit SHA | recorded in the immediately following governance/ledger commit (no history rewrite) |
+| Implementation commit SHA | `04601f9a827797481acd8ce4f76a6d2b1eb21af6` (`P2-T02: implement DenseDataTable + AuditTrail (A4)`) |
 | Working tree before work | CLEAN, local `main` fast-forwarded to `origin/main` (`e79186a`) with no local commits discarded |
 
 Pre-flight verification performed before any code change:

@@ -632,7 +632,8 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
 - **Acceptance criteria:** the six bullet behaviors above each have a failing-if-removed test;
   no consumer URL is constructed by the component; no attribution synthesis is observable.
 - **STATUS: P2-T02 IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION
-  REVIEW.** The formal implementation contract is
+  REVIEW.** Implementation commit `04601f9a827797481acd8ce4f76a6d2b1eb21af6`. The formal
+  implementation contract is
   `plans/contracts/P2-T02_DENSE_DATA_TABLE_AUDIT_TRAIL_CONTRACT.md` at accepted contract SHA
   `e79186a81d5cd934fe32a100bc8dd9dd08bf509a`, accepted by Architect PLAN ACCEPT at
   `dmo-work` SHA `f1ddb968e026dc6cf2569d8de64400d8c3044514`; authoring response
