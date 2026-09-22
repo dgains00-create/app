@@ -877,3 +877,50 @@ task** — they must be neither rebuilt, refactored, renamed nor re-registered.
   records the exhaustive search used).
 - Where the architecture differs but behaviour is equivalent (e.g. modular Host/Application/
   Infrastructure split vs the Beta's conceptual model), it was **not** classified divergent.
+
+---
+
+## Appendix Z — Terminology Correction Addendum (HISTÓRICO vs HISTÓRICO GLOBAL)
+
+Added after the original reconciliation. It **corrects terminology only**; it changes no
+classification, no evidence and no recommendation in this report.
+
+The report's §11 A1 (and every other occurrence of "História" / "Histórico") conflated two
+concepts that must remain distinct:
+
+1. **HISTÓRICO (local / module-specific)** — history functionality *inside* an operational
+   module (Peso → Histórico, Job On → Histórico, Boquilhas → Histórico, Armazém → Histórico,
+   Reparações → Histórico). It means "show the records/actions/work already performed within
+   this module or operational context". It is **not** a module identity and **not** a
+   top-level destination. Authority for it is per-module: `modules/BOQUILHAS.md` §"History",
+   `modules/CONTROLO_CREATE.md` "Create-side history/document availability views",
+   `modules/CONTROLO_APPROVE.md` "attributed decision/reopen history",
+   `modules/JOB_ON_LIGHT.md` "Reference History search/open tests". This is in Beta scope and
+   is owned by the corresponding workstreams (P2-T05/P2-T06/P2-T07).
+
+2. **HISTÓRICO GLOBAL (top-level aggregating module)** — the distinct top-level module whose
+   responsibility is to aggregate authority-backed operational histories across the system. Its
+   current **technical identity** is `historia` (`ModuleCatalog.Historia`, display label
+   "História", destination `historia`). Authority: `dmo-master/global/ACCESS_MODEL.md` §1 (the
+   11th canonical assignable module) and `dmo-master/modules/HISTORIA.md` (read-only
+   relationship explorer). It is **absent from Beta authority** and is **DEFERRED BY DESIGN**
+   for this Beta.
+
+**Correction to §11 A1.** The item formerly labelled "História: Beta module vs outside Beta
+scope vs global assignable module" is restated as: *HISTÓRICO GLOBAL is a global assignable
+module but not a Beta operational module.* Evidence for local HISTÓRICO in Beta module files
+was **not** and must not be treated as authority for HISTÓRICO GLOBAL; and HISTÓRICO GLOBAL's
+absence from Beta does **not** remove any Beta module's local HISTÓRICO requirement.
+
+**Correction to §6.12 / §9 / §10 / §13 / §14 / §15 references.** Wherever this report said
+"História" as the module, read **HISTÓRICO GLOBAL**. Wherever it described a module's History
+view, read **HISTÓRICO (local)**.
+
+**Naming rule.** Do not rename the code identity `historia` during Beta planning or Beta
+implementation. Record that `historia` is the current technical identity and that its intended
+user-facing meaning maps to HISTÓRICO GLOBAL; a technical rename, if ever required, is a
+separate later task that must not break existing IDs or catalog relationships.
+
+**No classification changes.** The original counts stand. HISTÓRICO GLOBAL remains
+DEFERRED BY DESIGN with its identity preserved, no route and no availability; local HISTÓRICO
+remains a per-module requirement of the operational workstreams.

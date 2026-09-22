@@ -1,0 +1,128 @@
+# P2-T05 — Controlo Create (Peso, Comparação, Pegamentos, Folha, Resumo) + Shared Peso Read Model — IMPLEMENTATION HANDOFF
+
+Master plan: `plans/BETA_IMPLEMENTATION_MASTER_PLAN.md` §7 (P2-T05), §8, §9, §10, §11, §12.
+Class: **Operational module** (Workstream C, Create side).
+Depends on: **P2-T04** (canonical Tool + Job On context) and **P2-T03** (`MeasurementRows`).
+Authority blocker: **B2** — an authored, reviewed `PLAN ACCEPT` contract must exist first.
+
+## 1. Purpose
+
+Deliver the Create side of Controlo: Peso, Comparação, Pegamentos, Folha and Resumo, and
+publish the canonical read-only Peso read model that Controlo Approve consumes.
+
+## 2. Authority
+
+- `dmo-beta-master/modules/CONTROLO_CREATE.md` (full) — included scope, pending association,
+  calculation ownership, measurement rows, comparison, Pegamentos, Folha/Resumo, acceptance.
+- `dmo-beta-master/architecture/RECORD_LIFECYCLES.md` §4–8 — Peso status vocabulary
+  (`Pendente`, `Aprovado`, `Não aprovado`), Comparação as a record/workflow relation, stale as a
+  workflow condition, Folha/Resumo as distinct records.
+- `dmo-beta-master/architecture/CROSS_MODULE_FLOWS.md` — Job On → Controlo Create → Approve.
+- `dmo-beta-master/implementation/BETA_INTEGRATION_SEAMS.md` — "C → D seam"; C owns the shared
+  Peso renderer/read model.
+- `dmo-beta-master/contracts/DOCUMENTS_AND_FILES.md` §2–3 — document identity/naming only
+  (generation is P2-T08).
+- `dmo-master/global/ACCESS_MODEL.md` §9 — Controlo Create as a distinct assignable module
+  sharing the `controlo` destination.
+- `dmo-master/global/INFORMATION_MODEL.md` — the Peso snapshot vs autopopulate distinction.
+
+> **Terminology (binding — master plan §0):** the History in this workstream is **HISTÓRICO
+> (local)** — history functionality *inside* the module. It is not the top-level
+> **HISTÓRICO GLOBAL** module (technical identity `historia`), which is DEFERRED BY DESIGN for
+> this Beta. Do not merge the two, and do not treat one as authority for the other.
+
+## 3. Current implementation starting point
+
+Nothing operational exists (no `peso`/`pegamento`/`resumo`/`controlo_sheet` occurrence anywhere
+in `src/`). Reusable: the P2-T04 hidden context contract, P2-T03's `MeasurementRows`, and the
+shell/components from P2-T01…P2-T03.
+
+## 4. Scope
+
+1. Select/create Job On context; display production context; resolve/reuse CM context.
+2. **Peso** draft/edit/calculation/submission on **one** `peso_id`:
+   - normal relation `peso_id -> cm_id`;
+   - truthful pending case `peso_id -> tool_id`, displayed as **`Job On por associar`** (not an
+     error; does not block measurement/approval; later association is explicit and clears the
+     direct Tool anchor); **no** fake Job On/`cm_id`;
+   - formulas exactly as Beta fixes them:
+     `Capacidade/Volume do CM = Peso de água ÷ configured water-temperature value`;
+     `Peso do vidro = (Capacidade do CM + Volume Marisa/BQ − Volume Punção/PU) × Densidade do vidro`;
+   - water-temperature range 5–35 °C; individual CM results first-class (an average never hides
+     a bad individual result); decimals normalized for presentation only.
+3. **Variable measurement rows** with at least one valid row and stable row identity.
+4. **Comparação** as a Peso record type: explicitly selected `previous_peso_id` (never
+   auto-selected; cross-machine candidates valid when the same canonical Tool is compatible);
+   explicit pairing persisted as `current_peso_id -> previous_peso_id`; stale after a reading
+   change must be rebuilt before submission.
+5. **Pegamentos**: `pegamentos_id -> jobon_id -> cm/mf/bq`; CM/BQ/MF sections; Costura 0° /
+   Contra-costura 90°; signed ovalização; average; single-axis behavior; variable rows; nominal
+   from canonical Tool data; tolerance corridor `nominal ± 0.20`; boundary crossing is a
+   warning; missing nominal → `NotEvaluable` (never invented); invalid/missing required Tool
+   context blocks that sheet with an actionable correction message; Pegamentos may legitimately
+   be absent.
+6. **Folha** (`controlo_sheet_id -> jobon_id`) and **Resumo**
+   (`resumo_id -> jobon_id + applicable contexts`) as **distinct** persisted records.
+7. **Submit** transitions the same `peso_id` into reviewable state with backend truth for
+   state/attribution. Create never approves its own record.
+8. **Publish the canonical read-only Peso sheet/read model** for P2-T06.
+
+## 5. Authority blocker B2 — required contract before execution
+
+The authored, reviewed contract must fix: the Controlo schema and keys (`peso_id`,
+`pegamentos_id`, `controlo_sheet_id`, `resumo_id`); the explicit `previous_peso_id` relation;
+the calculate/persist/submit/read query shapes; transactional boundaries; the read-model shape
+and its versioning; and the endpoint/route names with their module policies.
+
+## 6. Explicit non-scope
+
+- Approval/rejection/reopen decisions (P2-T06).
+- Automatic previous-Peso selection; same-machine-only restriction.
+- Duplicate Tool registry; independent production identity.
+- Frontend-owned formulas or persistence; approval-copy Peso.
+- Document generation or PDF bytes (P2-T08).
+- Any snapshot engine beyond what each record's own historical output requires.
+- No `CurrentBuildAvailable` change and no route registration.
+
+## 7. Expected files/projects
+
+```text
+src/DMO.Domain/                                   (Controlo value objects)
+src/DMO.Application/ControloCreate/               (use cases + repository contracts)
+src/DMO.Infrastructure/Persistence/ + Migrations/ (Controlo schema, NEW migration)
+src/DMO.Web/Pages/Controlo/                       (Create-side surfaces)
+src/DMO.Web/Frontend/Controlo/                    (shared Peso sheet read model)
+src/DMO.Web/Endpoints/
+tests/DMO.UnitTests/  tests/DMO.IntegrationTests/
+```
+
+## 8. Access requirements
+
+`ModuleAuthorizationPolicies.PolicyName(ModuleCatalog.ControloCreate)` on every Create
+route/action. The shared `controlo` destination keeps Create and Approve gates independent.
+
+## 9. Backend / persistence requirements
+
+Per B2. Persist the records and their relations; the process classification is consumed through
+`cm_id -> tool_id` and Peso preserves the configuration actually used as historical evidence —
+not as a second authoritative process owner. No second Job On/Peso authority.
+
+## 10. Required tests
+
+See master plan §11 P2-T05: formulas, water range, individual results visible, `NotEvaluable`,
+stale rebuild, no auto-selection, pending association, distinct Folha/Resumo, same `peso_id`
+through the lifecycle, Create cannot approve.
+
+## 11. Acceptance criteria
+
+Every bullet in `modules/CONTROLO_CREATE.md` "Acceptance criteria"; one `peso_id` from draft to
+submit; previous Peso never automatic; stale Comparação requires rebuild; Folha and Resumo stay
+distinct records; warnings never approve/reject.
+
+## 12. Completion evidence
+
+Committed implementation + tests + the published Peso read-model contract consumed by P2-T06.
+
+## 13. Downstream dependents
+
+P2-T06, P2-T08, P2-T10.
