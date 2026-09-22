@@ -17,6 +17,7 @@
 | P2-T02 implementation SHA / accepted contract SHA | `04601f9a827797481acd8ce4f76a6d2b1eb21af6` / `e79186a81d5cd934fe32a100bc8dd9dd08bf509a` |
 | dmo-beta-master `main` | `78da49248f6cf7a8cbe4ddd946f3c38abbaf322f` |
 | Contract artifact | `plans/contracts/P2-T03_TOOLPICKER_ROWS_DECISIONBAR_CONTRACT.md` |
+| **Contract SHA (committed and pushed to `DMO-MODULAR/main`)** | `71a12476b3298eacdda2918966199c306cc0ae29` |
 | Response artifact | `dev/responses/P2_T03_CONTRACT_AUTHORING_RESPONSE.md` |
 | Implementation authority boundary | P2-T03 is **not** implemented; only planning/contract/governance artifacts were written |
 
@@ -252,6 +253,7 @@ Local execution is developer evidence, not independent CI evidence (this reposit
 
 ```text
 ARCHITECT PLAN REVIEW REQUIRED BEFORE P2-T03 IMPLEMENTATION
+P2-T03 contract SHA = 71a12476b3298eacdda2918966199c306cc0ae29 (pushed to DMO-MODULAR/main)
 ```
 
 The Architect must review the committed contract
