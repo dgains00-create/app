@@ -23,6 +23,77 @@ Authority order used throughout:
 
 ---
 
+## DMO FIXED DESKTOP LAYOUT POLICY (binding)
+
+**Product decision:** DMO is a fixed-layout desktop operational application, not a responsive
+public website.
+
+### Canonical design surface
+
+- The canonical viewport is **1366 × 768**.
+- Every remaining operational frontend surface is designed and validated at 1366 × 768 first.
+- The fixed desktop structure preserves the structural location of navigation, primary and
+  secondary actions, tables, filters, side panels, status information, history access, document
+  actions and all other operational controls.
+- A control must not move to another structural region merely because viewport width changes.
+
+### Structural reflow is prohibited
+
+Do not introduce breakpoint-driven semantic or structural variants. In particular, do not:
+
+- move buttons or actions between headers, footers, table rows, side panels, dropdowns or
+  overflow menus because of viewport width;
+- turn horizontal groups into vertical stacks at a breakpoint;
+- convert tables into cards or hide/reorder required columns at a breakpoint;
+- move a side panel below the main work area;
+- replace desktop navigation with a hamburger or alternate mobile/tablet navigation;
+- change workflow order, action order or component meaning according to screen width.
+
+Mobile, tablet, touch-first and phone-specific layouts are **out of scope** unless a later
+explicit authority decision replaces this policy.
+
+### Larger and smaller viewports
+
+Larger desktop resolutions, including 1920 × 1080 and 2560 × 1440, preserve the same operational
+composition and control locations. Additional space may become outer whitespace, larger margins
+or limited non-structural expansion of a content region; it must not reinterpret the workflow.
+
+When the available window is smaller than the canonical surface, preserve the composition and
+use page-level scrolling or local horizontal/vertical scrolling. Scrolling is preferable to
+structural reflow. Wide tables use local horizontal scrolling while retaining stable columns,
+column order, compact rows and predictable row actions.
+
+### Implementation constraints
+
+Fixed layout does not require arbitrary absolute positioning. Grid, flexbox, reusable CSS,
+controlled min/max sizing and overflow containers remain allowed when they preserve the fixed
+composition. Navigation and side-panel widths, grid columns and action regions may be explicitly
+controlled. A side panel stays beside its main work area; if the composition exceeds the
+viewport, the containing region scrolls instead of moving the panel below it.
+
+The 768 px canonical height is a real constraint. Avoid oversized headers, decorative cards,
+marketing whitespace, repeated titles, excessive vertical padding/margins and unnecessary
+stacking. Keep working data and important actions visible with compact operational density where
+practical.
+
+Design priorities are binding in this order:
+
+1. workflow stability;
+2. predictable control placement;
+3. information density;
+4. readability;
+5. consistency between modules;
+6. visual polish.
+
+This policy binds the shared frontend contract and P2-T02 through P2-T10, including
+DenseDataTable, AuditTrail, ToolPicker, ToolSummaryRow, MeasurementRows, DecisionBar,
+ProductionContextStrip, Tool/Job On, Controlo Create, Controlo Approve, Boquilhas,
+document/history surfaces, secondary navigation and final integration. It changes no domain
+behavior, data contract, authorization, route, module availability or completed P2-T01
+implementation.
+
+---
+
 ## 0. Terminology (binding for all remaining Beta work)
 
 Two different concepts must never be conflated in any current or future Beta document,

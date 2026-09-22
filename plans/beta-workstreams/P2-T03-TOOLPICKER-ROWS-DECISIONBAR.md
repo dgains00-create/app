@@ -6,6 +6,15 @@ Depends on: **P2-T01**.
 Authority blocker: **none** for the *presentation/mechanics*. The Tool **orchestration** that
 consumes this picker belongs to P2-T04 and is authority-blocked there (B1).
 
+## Binding fixed desktop layout
+
+This handoff inherits the master plan's **DMO FIXED DESKTOP LAYOUT POLICY**. Design and
+validation start at **1366 × 768**. ToolPicker, ToolSummaryRow, MeasurementRows and DecisionBar
+remain in their assigned structural regions with stable action placement. Width changes must
+not stack, relocate, hide or move these controls into overflow menus. Larger desktops preserve
+the same composition; smaller windows use containing-region or page scrolling. Mobile/tablet
+variants are out of scope.
+
 ## 1. Purpose
 
 Implement the shared picker, summary row, measurement-row mechanics and decision bar that

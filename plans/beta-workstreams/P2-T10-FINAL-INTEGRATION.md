@@ -5,6 +5,15 @@ Class: **Final integration** — incremental, **per destination**.
 Depends on: whichever of **P2-T04…P2-T08** is being exposed.
 Authority blocker: none beyond the destination's own workstream.
 
+## Binding fixed desktop layout
+
+This handoff inherits and verifies the master plan's **DMO FIXED DESKTOP LAYOUT POLICY**.
+Final integration must validate each operational destination first at **1366 × 768**, then
+confirm that larger desktop resolutions preserve the same composition and control locations.
+Narrow-window checks verify page/local overflow without structural reflow. Acceptance must fail
+for table-to-card conversion, required-column hiding, side-panel stacking, width-driven action
+relocation, alternate mobile/tablet navigation or changed workflow order.
+
 ## 1. Purpose
 
 Wire each completed destination into the application honestly: register Module availability and

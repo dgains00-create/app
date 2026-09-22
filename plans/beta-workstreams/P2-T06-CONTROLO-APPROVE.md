@@ -6,6 +6,15 @@ Depends on: **P2-T05 (strictly)** — D consumes C's submitted Peso read model a
 the renderer.
 Authority blocker: **B2** (shared with P2-T05).
 
+## Binding fixed desktop layout
+
+This handoff inherits the master plan's **DMO FIXED DESKTOP LAYOUT POLICY**. The pending list,
+review surface, audit/history region and DecisionBar are designed first at **1366 × 768** with
+stable columns and stable action placement. Larger desktops preserve the same operational
+composition. Smaller windows scroll instead of moving the DecisionBar, changing review order,
+hiding required columns or converting the list to cards. Mobile/tablet variants are out of
+scope.
+
 ## 1. Purpose
 
 Deliver the Approve side of Controlo: pending list, review of the exact submitted record,

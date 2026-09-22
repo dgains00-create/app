@@ -6,6 +6,15 @@ Depends on: **P2-T01, P2-T02, P2-T03** (shared primitives).
 Authority blocker: **B1** — an authored, reviewed `PLAN ACCEPT` contract must exist before
 execution (see §5).
 
+## Binding fixed desktop layout
+
+This handoff inherits the master plan's **DMO FIXED DESKTOP LAYOUT POLICY**. Tool, Job On and
+ProductionContextStrip surfaces are designed first at **1366 × 768** with compact operational
+density and stable control, table, history and side-panel locations. Larger desktops preserve
+that composition. Smaller windows scroll; they do not reorder the workflow, stack a side panel
+below the work area, hide operational columns or relocate actions. Mobile/tablet variants are
+out of scope.
+
 ## 1. Purpose
 
 Establish the Canonical Tool identity and the Job On production occurrence that Controlo and

@@ -5,6 +5,21 @@ Class: **Shared Beta primitive** (Workstream A, sub-step A4).
 Depends on: **P2-T01** (common states).
 Authority blocker: **none**.
 
+## Binding fixed desktop layout
+
+This handoff inherits the master plan's **DMO FIXED DESKTOP LAYOUT POLICY** and the shared
+frontend contract's fixed desktop section.
+
+- Canonical design and browser-validation surface: **1366 × 768**.
+- `DenseDataTable` uses compact rows, stable required columns, stable column order and
+  predictable row/action locations.
+- It never converts to cards, hides required columns or moves actions because of a breakpoint.
+- An over-wide table uses a keyboard-reachable local horizontal scroll container.
+- `AuditTrail` uses the same fixed desktop composition and remains structurally identical at
+  larger desktop resolutions.
+- Smaller windows scroll rather than trigger structural reflow; mobile/tablet variants are out
+  of scope.
+
 ## 1. Purpose
 
 Implement the shared dense table and audit-trail presentation that Job On history, Controlo
@@ -81,9 +96,14 @@ None.
 1. Selection and open are separate behaviors, each failing-if-removed tested.
 2. The component constructs no consumer URL and mutates nothing on selection.
 3. No attribution synthesis is observable.
-4. Horizontal overflow is keyboard reachable.
-5. `CurrentBuildAvailable` still `[]`; no route changed.
-6. No protected file modified.
+4. At 1366 × 768, required columns remain stable and rows remain compact; over-width content
+   uses keyboard-reachable local horizontal scrolling.
+5. At larger desktop resolutions, table, AuditTrail and action placement remain structurally
+   identical.
+6. No table-to-card conversion, breakpoint-driven required-column hiding, action relocation or
+   mobile/tablet variant exists.
+7. `CurrentBuildAvailable` still `[]`; no route changed.
+8. No protected file modified.
 
 ## 10. Completion evidence
 

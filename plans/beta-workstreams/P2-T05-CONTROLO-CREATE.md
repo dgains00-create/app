@@ -5,6 +5,15 @@ Class: **Operational module** (Workstream C, Create side).
 Depends on: **P2-T04** (canonical Tool + Job On context) and **P2-T03** (`MeasurementRows`).
 Authority blocker: **B2** — an authored, reviewed `PLAN ACCEPT` contract must exist first.
 
+## Binding fixed desktop layout
+
+This handoff inherits the master plan's **DMO FIXED DESKTOP LAYOUT POLICY**. Controlo Create,
+its production context, measurement rows, comparison/history/document surfaces and actions are
+designed first at **1366 × 768**. Their structural placement stays stable at larger desktop
+resolutions. Smaller windows use page or local table/region scrolling; no breakpoint may stack
+or reorder the workflow, convert tables to cards, hide required columns or relocate actions.
+Mobile/tablet variants are out of scope.
+
 ## 1. Purpose
 
 Deliver the Create side of Controlo: Peso, Comparação, Pegamentos, Folha and Resumo, and

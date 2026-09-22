@@ -5,6 +5,15 @@ Class: **Shared Beta primitive** (shared shell extension).
 Depends on: nothing.
 Authority blocker: **none**.
 
+## Binding fixed desktop layout
+
+This handoff inherits the master plan's **DMO FIXED DESKTOP LAYOUT POLICY**. Secondary
+navigation is designed first at **1366 × 768** and retains one stable desktop structure,
+destination order and current-state placement at larger resolutions. It must not switch to a
+hamburger, mobile/tablet navigation, alternate breakpoint hierarchy or width-driven action
+overflow. Smaller windows preserve navigation structure and use the authorized scrolling
+behavior.
+
 ## 1. Purpose
 
 Close the reconciliation's §7.2 PARTIAL: `SecondaryDestinationPresentation` and `IsCurrent`

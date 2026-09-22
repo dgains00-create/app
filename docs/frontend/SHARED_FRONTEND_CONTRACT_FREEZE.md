@@ -27,6 +27,28 @@ Authority:
 4. `diogo-o/dmo-master`, branch `dmo-modular`, for functional/domain/access authority;
 5. current committed `DMO-MODULAR/main` for implementation seams.
 
+## 1A. Binding fixed desktop layout contract
+
+This contract inherits the master plan's **DMO FIXED DESKTOP LAYOUT POLICY**.
+
+- Canonical design and validation viewport: **1366 × 768**.
+- Shared components preserve the same structural composition and action locations at larger
+  desktop resolutions.
+- Breakpoint-driven structural reflow, table-to-card conversion, required-column hiding,
+  action relocation, side-panel stacking and alternate mobile/tablet navigation are prohibited.
+- Smaller windows use page or local overflow; they do not trigger a different semantic layout.
+- Grid/flexbox and reusable CSS remain valid implementation tools when used to preserve this
+  fixed desktop composition.
+- Shared surfaces remain compact enough for the real 768 px vertical constraint: no oversized
+  headers, decorative card inflation, repeated titles or marketing-style whitespace.
+
+For DenseDataTable, all required columns and their order remain stable; an over-wide table uses
+a keyboard-reachable local horizontal scroll container. Descriptor "priority" is presentation
+metadata only and is never authority to hide, reorder or convert a required column at a
+breakpoint. AuditTrail follows the same fixed desktop composition. ToolPicker,
+ToolSummaryRow, MeasurementRows, DecisionBar and ProductionContextStrip keep their consumer-
+assigned structural region; width alone never moves them elsewhere.
+
 ## 2. Contract classifications
 
 ### FINAL PRESENTATION CONTRACT
@@ -131,6 +153,14 @@ Display supplied human-facing production context, visually separate from editabl
 - keep primary facts stable during local feature work;
 - never use a filesystem path or internal ID as the human-facing production identity;
 - never lookup, derive, repair, associate, or persist production facts.
+
+### Fixed desktop geometry
+
+At 1366 × 768 the table uses compact row density, stable columns and predictable action
+placement. The same column order and operational structure remain at larger desktop
+resolutions. If the working region is too narrow, the table scrolls locally on the horizontal
+axis; it never converts to cards, hides required columns or relocates actions by breakpoint.
+AuditTrail retains the same structural region and compact desktop presentation.
 
 ### PROVISIONAL FRONTEND CONTRACT carrier shape and inputs
 
@@ -326,7 +356,8 @@ Dense accessible tabular presentation with controlled selection, opening, filter
 
 ### PROVISIONAL FRONTEND CONTRACT carrier shape and inputs
 
-- column descriptors: heading, accessible label, display alignment/priority, consumer-rendered cell content;
+- column descriptors: heading, accessible label, display alignment/priority, consumer-rendered
+  cell content; priority is not permission to hide, reorder or reflow a required column;
 - rows with opaque keys and supplied display cells;
 - controlled selected key;
 - controlled filters, page index/size, supplied total/result metadata;

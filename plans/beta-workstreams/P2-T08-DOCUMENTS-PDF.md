@@ -7,6 +7,15 @@ a file state applies).
 Authority blocker: **B4** — document-generation contract and the filesystem/PDF capability must
 be authorized first.
 
+## Binding fixed desktop layout
+
+This handoff inherits the master plan's **DMO FIXED DESKTOP LAYOUT POLICY** for every
+document/history/availability surface it renders. Design and validation start at
+**1366 × 768**. Document actions, version/availability information and history access keep
+stable structural locations at larger desktops. Smaller windows scroll rather than moving
+actions into different regions or creating alternate card/mobile layouts. Generated PDF
+geometry remains governed by its document contract, not by browser viewport breakpoints.
+
 ## 1. Purpose
 
 Deliver the document layer: deterministic naming, the directory convention, availability

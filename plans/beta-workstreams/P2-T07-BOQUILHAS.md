@@ -6,6 +6,15 @@ Depends on: **P2-T04** (canonical BQ Tool selection/create and optional `bq_id` 
 **P2-T03** (`MeasurementRows`/`DecisionBar` where applicable).
 Authority blocker: **B3** — an authored, reviewed `PLAN ACCEPT` contract must exist first.
 
+## Binding fixed desktop layout
+
+This handoff inherits the master plan's **DMO FIXED DESKTOP LAYOUT POLICY**. Boquilhas
+operational tables, filters, movement actions, balance/status information, side panel and
+History surface are designed first at **1366 × 768** with compact density and stable locations.
+Larger desktops preserve that composition. Smaller windows use page or local scrolling; tables
+do not become cards, required columns stay visible, the side panel does not move below content
+and actions do not move because of width. Mobile/tablet variants are out of scope.
+
 ## 1. Purpose
 
 Deliver the Boquilhas module: aggregate create (production-linked and standalone), the four
