@@ -1,0 +1,73 @@
+@page
+@model DMO.Web.Pages.Administration.Templates.ListModel
+@{
+    ViewData["Title"] = "Template administration";
+}
+<link rel="stylesheet" href="~/css/dmo-admin-templates.css" asp-append-version="true" />
+
+<p><a asp-page="Create">Create template</a></p>
+
+<form method="post" action="/auth/logout" class="row">
+    <button type="submit">Terminar sessão</button>
+</form>
+
+@if (TempData["message"] is string message)
+{
+    <div class="msg ok">@message</div>
+}
+@if (TempData["error"] is string error)
+{
+    <div class="msg err">@error</div>
+}
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Modules</th>
+            <th>Landing</th>
+            <th>Users</th>
+            <th>Version</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+    @foreach (var template in Model.Templates)
+    {
+        <tr>
+            <td>@template.Name</td>
+            <td>
+                @if (template.Modules.Count == 0)
+                {
+                    <span class="badge off">no modules</span>
+                }
+                else
+                {
+                    @string.Join(", ", template.Modules.Select(module => module.DisplayName))
+                }
+                @if (template.Modules.Any(module => module.State != DMO.Application.TemplateAdministration.TemplateModuleState.Available))
+                {
+                    <span class="badge off">unavailable entry</span>
+                }
+            </td>
+            <td>
+                @if (template.LandingDestinationId is null)
+                {
+                    <span>—</span>
+                }
+                else if (template.LandingIsValid)
+                {
+                    <span>@template.LandingDestinationId</span>
+                }
+                else
+                {
+                    <span class="badge off">@template.LandingDestinationId (inválido)</span>
+                }
+            </td>
+            <td>@template.AssociatedUserCount</td>
+            <td>@template.Version</td>
+            <td><a asp-page="Edit" asp-route-id="@template.TemplateId">Details / edit</a></td>
+        </tr>
+    }
+    </tbody>
+</table>

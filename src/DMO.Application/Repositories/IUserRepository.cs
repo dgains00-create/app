@@ -66,6 +66,19 @@ public interface IUserRepository
     /// <summary>Returns every USER account (active and inactive), ordered.</summary>
     Task<IReadOnlyList<UserAccount>> ListAsync(CancellationToken cancellationToken);
 
+    // ---- P1-T06 additive read (no schema impact) --------------------------------------
+
+    /// <summary>
+    /// Returns the USER accounts currently associated with the given Template through the
+    /// single <c>users.template_id</c> relation, ordered by name then company number
+    /// (active and inactive accounts are both included).
+    /// </summary>
+    /// <remarks>
+    /// P1-T06 addition required by the Template ficha (associated-USER list). It reads the
+    /// exact same persisted relation the USER ficha writes; there is no membership table.
+    /// </remarks>
+    Task<IReadOnlyList<UserAccount>> ListByTemplateAsync(Guid templateId, CancellationToken cancellationToken);
+
     /// <summary>Returns the USER account with the given carrier email (exact match), or <c>null</c>.</summary>
     Task<UserAccount?> GetByEmailAsync(string email, CancellationToken cancellationToken);
 

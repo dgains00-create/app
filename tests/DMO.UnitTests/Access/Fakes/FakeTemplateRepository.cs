@@ -42,6 +42,10 @@ public sealed class FakeTemplateRepository : ITemplateRepository
     public Task DeleteAsync(Guid templateId, int expectedVersion, CancellationToken cancellationToken) =>
         throw new NotSupportedException("Not used by access unit tests.");
 
+    /// <inheritdoc />
+    public Task DeleteWithMembersAsync(Guid templateId, int expectedVersion, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Not used by access unit tests.");
+
     private void ThrowIfFailed()
     {
         if (Failure is not null)

@@ -68,6 +68,16 @@ public sealed class FakeUserRepository : IUserRepository
                 .ToArray());
 
     /// <inheritdoc />
+    public Task<IReadOnlyList<UserAccount>> ListByTemplateAsync(Guid templateId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<UserAccount>>(
+            _rows
+                .Where(row => row.Account.TemplateId == templateId)
+                .Select(row => row.Account)
+                .OrderBy(account => account.DisplayName)
+                .ThenBy(account => account.CompanyNumber)
+                .ToArray());
+
+    /// <inheritdoc />
     public Task<UserAccount?> GetByEmailAsync(string email, CancellationToken cancellationToken) =>
         Task.FromResult(_rows.FirstOrDefault(row => row.Account.Email == email)?.Account);
 
@@ -165,6 +175,21 @@ public sealed class FakeUserRepository : IUserRepository
         EnsureVersion(row, expectedVersion);
         _rows.Remove(row);
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Mirrors the database-layer null-out the atomic delete-with-members performs
+    /// (<c>UPDATE users SET template_id = NULL WHERE template_id = @id</c>): every reference
+    /// is cleared <b>without</b> a USER version bump — the null-out is not an
+    /// optimistic-concurrency write by the USER surface, exactly like the real repository.
+    /// </summary>
+    public void NullTemplateReferences(Guid templateId)
+    {
+        foreach (var row in _rows.Where(candidate => candidate.Account.TemplateId == templateId).ToArray())
+        {
+            var account = row.Account;
+            row.Account = account with { TemplateId = null };
+        }
     }
 
     private int FindIndex(Guid userId)

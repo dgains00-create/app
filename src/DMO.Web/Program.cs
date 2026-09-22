@@ -2,6 +2,7 @@ using DMO.Application.Accounts;
 using DMO.Application.Authentication;
 using DMO.Application.Migrations;
 using DMO.Application.Session;
+using DMO.Application.TemplateAdministration;
 using DMO.Application.UserAdministration;
 using DMO.Infrastructure;
 using DMO.Infrastructure.Database;
@@ -105,6 +106,11 @@ try
         provider.GetRequiredService<SupabaseAdminUserService>());
     builder.Services.AddScoped<IUserAdministrationService, UserAdministrationService>();
 
+    // ---- P1-T06 ADMIN-only Template administration -------------------------------------
+    // Orchestrates the persistence primitives + the Module Registry (availability/landing
+    // validation). Pages and endpoints share the same service and the same ADMIN gate.
+    builder.Services.AddScoped<ITemplateAdministrationService, TemplateAdministrationService>();
+
     // One ADMIN-only policy (dmo.administration) + scoped handler; deliberately outside the
     // Module policy namespace. Administration is ADMIN-account functionality, not a Module.
     builder.Services.AddAdministrationAuthorization();
@@ -152,5 +158,6 @@ app.MapTechnicalEndpoints();
 app.MapAuthEndpoints();
 app.MapDmoSharedFrontend();
 app.MapUserAdministrationEndpoints();
+app.MapTemplateAdministrationEndpoints();
 
 return await StartupCommands.RunHostAsync(app);

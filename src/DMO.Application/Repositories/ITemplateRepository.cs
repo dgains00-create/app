@@ -30,4 +30,23 @@ public interface ITemplateRepository
 
     /// <summary>Deletes the Template against an expected version (stale version → conflict).</summary>
     Task DeleteAsync(Guid templateId, int expectedVersion, CancellationToken cancellationToken);
+
+    // ---- P1-T06 additive write (no schema impact) -------------------------------------
+
+    /// <summary>
+    /// Deletes the Template with the accepted atomic delete-with-members sequence in
+    /// <b>one</b> transaction: the expected version is verified <b>inside</b> the
+    /// destructive transaction (stale → conflict, rollback, nothing changed); every
+    /// <c>users.template_id</c> reference to the Template is nulled in the same transaction;
+    /// then the Template row is deleted (composition cascade-removes
+    /// <c>template_modules</c>). USER rows are never cascade-deleted and keep their active
+    /// state; <c>users.template_id</c> becomes <c>null</c>.
+    /// </summary>
+    /// <remarks>
+    /// P1-T06 addition: the P1-T03 <see cref="DeleteAsync"/> deliberately fails at the
+    /// database layer when the Template is referenced (<c>users.template_id</c> is ON DELETE
+    /// RESTRICT); this primitive is the atomic null-out workflow that P1-T03 explicitly
+    /// deferred to P1-T06.
+    /// </remarks>
+    Task DeleteWithMembersAsync(Guid templateId, int expectedVersion, CancellationToken cancellationToken);
 }

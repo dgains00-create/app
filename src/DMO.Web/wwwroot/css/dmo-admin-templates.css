@@ -1,0 +1,106 @@
+/* P1-T06 ADMIN-only Template administration — content styling rendered inside the A2 shared
+   operational shell (dmo-tokens.css / dmo-shell.css). Scope by descendant to avoid painting
+   the shell chrome. Mirrors the P1-T05 USER administration sheet (dmo-admin-users.css). */
+
+.dmo-page-frame .msg {
+    margin: .8rem 0;
+    padding: .5rem .8rem;
+    border: 1px solid;
+}
+
+.dmo-page-frame .msg.ok {
+    background: #e6f4ea;
+    border-color: #9ccc9c;
+}
+
+.dmo-page-frame .msg.err {
+    background: #fdecea;
+    border-color: #e0a3a3;
+}
+
+.dmo-page-frame .warn {
+    background: #fff8e1;
+    border: 1px solid #e0c060;
+    padding: .5rem .8rem;
+    margin: .8rem 0;
+}
+
+.dmo-page-frame .empty {
+    color: #666;
+    font-style: italic;
+}
+
+.dmo-page-frame .badge {
+    font-size: .85rem;
+    padding: .1rem .45rem;
+    border: 1px solid #999;
+    border-radius: 999px;
+}
+
+.dmo-page-frame .badge.on {
+    background: #e6f4ea;
+}
+
+.dmo-page-frame .badge.off {
+    background: #fdecea;
+}
+
+.dmo-page-frame table {
+    border-collapse: collapse;
+    margin-top: .6rem;
+}
+
+.dmo-page-frame th,
+.dmo-page-frame td {
+    border: 1px solid #bbb;
+    padding: .35rem .7rem;
+    text-align: left;
+    vertical-align: top;
+}
+
+.dmo-page-frame th {
+    background: #f2f2f2;
+}
+
+.dmo-page-frame label {
+    display: block;
+    margin-top: .7rem;
+}
+
+.dmo-page-frame input[type=text] {
+    min-width: 22rem;
+    padding: .25rem;
+}
+
+.dmo-page-frame input[type=number].order {
+    width: 4.5rem;
+    padding: .25rem;
+}
+
+.dmo-page-frame select {
+    padding: .25rem;
+}
+
+.dmo-page-frame .row {
+    margin-top: 1rem;
+}
+
+.dmo-page-frame fieldset {
+    margin-top: 1rem;
+}
+
+.dmo-page-frame .actions-inline form,
+.dmo-page-frame .actions-inline a {
+    display: inline-block;
+    margin-right: .6rem;
+}
+
+.dmo-page-frame form.inline {
+    display: inline-block;
+    margin-right: .5rem;
+}
+
+.dmo-page-frame a.danger,
+.dmo-page-frame button.danger {
+    color: #a33;
+}

@@ -133,6 +133,46 @@ public sealed class TemplateRepository : ITemplateRepository
         await transaction.CommitAsync(cancellationToken);
     }
 
+    /// <inheritdoc />
+    public async Task DeleteWithMembersAsync(Guid templateId, int expectedVersion, CancellationToken cancellationToken)
+    {
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+
+        // 1. Version verified INSIDE the destructive transaction: a stale concurrent write is
+        //    never erased — the whole sequence rolls back and nothing changes.
+        var entity = await _context.Templates
+            .SingleOrDefaultAsync(candidate => candidate.TemplateId == templateId, cancellationToken)
+            ?? throw new InvalidOperationException(
+                $"Template '{templateId}' was not found (deleted or invalid identifier).");
+
+        if (entity.Version != expectedVersion)
+        {
+            throw new ConcurrencyConflictException(
+                $"Template '{templateId}' was modified concurrently (expected version {expectedVersion}, " +
+                $"current version {entity.Version}); reload and retry.");
+        }
+
+        // 2. Atomic null-out of every USER reference, INSIDE the same transaction and BEFORE
+        //    the row delete. users.template_id is ON DELETE RESTRICT, so the references must
+        //    be cleared first; this UPDATE covers every user currently assigned at the moment
+        //    it runs (committed membership included), active or inactive. USER rows themselves
+        //    are never cascade-deleted and keep their active state.
+        await _context.Users
+            .Where(user => user.TemplateId == templateId)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(user => user.TemplateId, (Guid?)null),
+                cancellationToken);
+
+        // 3. Delete the row; template_modules is cascade-removed by the database.
+        _context.Templates.Remove(entity);
+
+        // 4. One commit for the null-out + delete (or a full rollback on any failure — e.g. a
+        //    membership write committed between the null-out and this delete re-introduces a
+        //    RESTRICT violation and the entire transaction rolls back: no half-state).
+        await SaveAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     private void AddComposition(Guid templateId, IReadOnlyList<TemplateModule> modules, DateTimeOffset now)
     {
         foreach (var module in modules)

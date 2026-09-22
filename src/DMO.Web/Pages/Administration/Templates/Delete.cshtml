@@ -1,0 +1,28 @@
+@page "{id:guid}"
+@model DMO.Web.Pages.Administration.Templates.DeleteModel
+@{
+    ViewData["Title"] = "Delete template";
+    var ficha = Model.Ficha!;
+}
+<link rel="stylesheet" href="~/css/dmo-admin-templates.css" asp-append-version="true" />
+
+<div asp-validation-summary="All" class="msg err"></div>
+
+<p>
+    <strong>Confirm deletion of</strong> @ficha.Name.
+</p>
+<p>
+    @ficha.Users.Count user(s) are currently associated with this template. Deleting it removes
+    the template and its module composition; every associated user keeps their account and their
+    active state but <strong>loses the Template</strong> — their access fails closed until an
+    administrator assigns a new Template. This requires explicit confirmation. Edits made
+    concurrently with the confirmation are never silently overwritten.
+</p>
+
+<form method="post">
+    <input asp-for="ExpectedVersion" type="hidden" />
+    <div class="row">
+        <button type="submit" class="danger">Delete template</button>
+        <a asp-page="Edit" asp-route-id="@ficha.TemplateId">Cancel</a>
+    </div>
+</form>

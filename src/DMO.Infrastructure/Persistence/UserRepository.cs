@@ -189,6 +189,19 @@ public sealed class UserRepository : IUserRepository
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<UserAccount>> ListByTemplateAsync(Guid templateId, CancellationToken cancellationToken)
+    {
+        // Same ordering convention as ListAsync; order at the entity level BEFORE the domain
+        // projection so the ordering translates, and read the single users.template_id relation.
+        var ordered = _context.Users
+            .Where(user => user.TemplateId == templateId)
+            .OrderBy(user => user.Name)
+            .ThenBy(user => user.CompanyNumber);
+
+        return await Project(ordered).ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
     public Task<UserAccount?> GetByEmailAsync(string email, CancellationToken cancellationToken)
         => Project(_context.Users.Where(user => user.Email == email))
             .FirstOrDefaultAsync(cancellationToken);

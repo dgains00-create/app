@@ -1,0 +1,55 @@
+@page
+@model DMO.Web.Pages.Administration.Templates.CreateModel
+@{
+    ViewData["Title"] = "Create template";
+}
+<link rel="stylesheet" href="~/css/dmo-admin-templates.css" asp-append-version="true" />
+
+<div asp-validation-summary="All" class="msg err"></div>
+
+<form method="post">
+    <label class="label">Name</label>
+    <input asp-for="CreateName" class="field" autocomplete="off" />
+
+    <fieldset>
+        <legend>Module composition (presentation order)</legend>
+        @if (Model.AvailableModules.Count == 0)
+        {
+            <p class="empty">No Modules are available in this build; a Template with an empty composition can be created.</p>
+        }
+        else
+        {
+            <table>
+                <thead>
+                    <tr><th>Select</th><th>Module</th><th>Destination</th><th>Order</th></tr>
+                </thead>
+                <tbody>
+                @for (var index = 0; index < Model.AvailableModules.Count; index++)
+                {
+                    var definition = Model.AvailableModules[index];
+                    <tr>
+                        <td><input type="checkbox" name="SelectedModuleIds" value="@definition.Id.Value" /></td>
+                        <td>@definition.DisplayName (@definition.Id.Value)</td>
+                        <td>@(definition.DestinationId ?? "—")</td>
+                        <td><input type="number" class="field order" name="ModuleOrder[@definition.Id.Value]" value="@(index + 1)" min="1" /></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </fieldset>
+
+    <label class="label">Landing destination (optional)</label>
+    <select asp-for="CreateLandingDestinationId" class="field">
+        <option value="">No landing</option>
+        @foreach (var option in Model.LandingOptions)
+        {
+            <option value="@option">@option</option>
+        }
+    </select>
+
+    <div class="row actions-inline">
+        <button type="submit">Create template</button>
+        <a asp-page="List">Cancel</a>
+    </div>
+</form>
