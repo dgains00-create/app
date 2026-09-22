@@ -692,6 +692,24 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   identity string appears in any shared contract type or fixture.
 - **Downstream dependents:** P2-T04 (Tool orchestration is B/C/E shared), P2-T05 (MeasurementRows
   in Peso/Pegamentos), P2-T06/P2-T07 (DecisionBar actions).
+- **STATUS: CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW.** The formal implementation
+  contract is `plans/contracts/P2-T03_TOOLPICKER_ROWS_DECISIONBAR_CONTRACT.md`; authoring response
+  `dev/responses/P2_T03_CONTRACT_AUTHORING_RESPONSE.md`. The contract pins all four components to
+  the binding DMO fixed desktop layout policy (canonical 1366 × 768; no breakpoint reflow, no card
+  conversion, no required-control hiding, no action relocation, keyboard-reachable local scrolling),
+  defines the exact per-component boundaries with carriers, states and deterministic
+  unit-testable interaction models (`ToolPickerInteraction`, `MeasurementRowsInteraction`,
+  `DecisionBarInteraction`), reuses the accepted P2-T01/P2-T02 primitives without modification
+  (`CommonState`/`_CommonStateRegion`, `RecordStatusPresentation`/`_RecordStatus`, `StatusTone`,
+  `SharedActionPresentation`, `dmo-focus.js`, the additive-CSS/token pattern), keeps the opaque
+  carrier keys opaque (no `tool_id`/`jobon_id`/`cm_id`/`mf_id`/`bq_id` declaration anywhere),
+  defines no backend/persistence/route/authorization/Supabase seam, protects the P2-T04+ boundary,
+  and records a **complete** test-to-acceptance matrix (52 acceptance criteria ↔ 99 tests,
+  bidirectional coverage) plus 6 CONTRACT QUESTIONS, all NON-BLOCKING with pinned defaults.
+  **Not implemented and not self-accepted:** P2-T03 implementation is unauthorized until the
+  Architect reviews the committed contract and returns `PLAN ACCEPT`, disposing Q1–Q6. No
+  application code was changed by the authoring task; `CurrentBuildAvailable` is still `[]`;
+  P2-T04 has not started.
 
 ### P2-T09 — Secondary navigation + current-destination wiring
 
