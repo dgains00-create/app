@@ -10,6 +10,7 @@ using DMO.Web.Auth;
 using DMO.Web.Authorization;
 using DMO.Web.Endpoints;
 using DMO.Web.Frontend.Shared;
+using DMO.Web.Navigation;
 using DMO.Web.Startup;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Options;
@@ -64,6 +65,13 @@ try
     builder.Services.AddScoped<IAccountResolver, AccountResolver>();
     builder.Services.AddScoped<ISessionAuthentication, SessionAuthentication>();
     builder.Services.AddScoped<ICurrentAccountContext, CurrentAccountContext>();
+
+    // ---- P1-T07 navigation + USER shell ------------------------------------------------
+    // Login orchestration (shared by POST /auth/login and the /Login page) and runtime USER
+    // landing resolution (consumed by the root router, the /Login dispatch and the no-access
+    // flow). Both compose the accepted A2 projection; no second navigation architecture.
+    builder.Services.AddScoped<SessionLoginService>();
+    builder.Services.AddScoped<UserLandingService>();
 
     // ---- P1-T04 server-side Module gate ---------------------------------------------
     // Authorization policies are a thin ASP.NET projection of the canonical Module ids:

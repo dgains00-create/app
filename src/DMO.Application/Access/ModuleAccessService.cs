@@ -35,7 +35,7 @@ public sealed class ModuleAccessService : IModuleAccessService
         CancellationToken cancellationToken)
     {
         var outcome = await _resolver.ResolveAccessAsync(resolution, cancellationToken);
-        return outcome is AccessOutcome.Granted(var effectiveModules) &&
+        return outcome is AccessOutcome.Granted(_, var effectiveModules) &&
                effectiveModules.Any(module => module.Id == requiredModule);
     }
 }

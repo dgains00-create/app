@@ -1,0 +1,21 @@
+@page
+@model DMO.Web.Pages.Administration.IndexModel
+@{
+    ViewData["Title"] = "Administração";
+}
+<link rel="stylesheet" href="~/css/dmo-user-shell.css" asp-append-version="true" />
+
+<nav class="dmo-admin-destinations" aria-label="Destinos de administração">
+    <a class="dmo-admin-destination" asp-page="/Administration/Users/List">
+        <strong>Utilizadores</strong>
+        <span>Contas de utilizador do sistema</span>
+    </a>
+    <a class="dmo-admin-destination" asp-page="/Administration/Templates/List">
+        <strong>Modelos de acesso</strong>
+        <span>Templates e módulos atribuídos</span>
+    </a>
+</nav>
+
+<form method="post" action="/auth/logout" class="dmo-no-access-logout">
+    <button type="submit" class="dmo-button">Terminar sessão</button>
+</form>

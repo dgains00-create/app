@@ -24,7 +24,7 @@ namespace DMO.Application.Access;
 ///       Unknown          → Denied(UnknownModule)       // entire resolution denied; STOP
 ///       KnownUnavailable → Denied(UnavailableModule)   // entire resolution denied; STOP
 ///       Available(def)   → effective.Add(def)          // persisted order preserved
-///     → Granted(effective)  // ONLY when every entry is valid AND available
+///     → Granted(template.LandingDestinationId, effective)  // ONLY when every entry is valid AND available
 /// </code>
 /// <para>
 /// No repository besides the two P1-T03 contracts is used; no new query is introduced. The
@@ -128,7 +128,9 @@ public sealed class AccessResolver : IAccessResolver
             }
         }
 
-        // Full Template composition interpreted and valid → Granted (persisted order).
-        return new AccessOutcome.Granted(effective);
+        // Full Template composition interpreted and valid → Granted (persisted order). The
+        // Template's persisted landing destination id is carried through as the routing fact
+        // (the Template is already loaded above; no new query, no new repository).
+        return new AccessOutcome.Granted(template.LandingDestinationId, effective);
     }
 }

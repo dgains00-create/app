@@ -261,6 +261,63 @@ public sealed class AccessResolverTests
         Assert.Empty(granted.EffectiveModules);
     }
 
+    // ---- P1-T07 additive fact: Granted carries the persisted Template landing destination id.
+
+    [Fact]
+    public async Task Granted_CarriesPersistedTemplateLandingDestinationId()
+    {
+        var templateId = Guid.NewGuid();
+        var templates = new FakeTemplateRepository();
+        templates.Seed(Template(templateId, landing: "controlo"));
+        var modules = new FakeTemplateModuleRepository();
+        modules.Seed(templateId, "controlo-create");
+
+        var outcome = await Resolver(templates, modules).ResolveAccessAsync(
+            new AccountResolution.User(User(templateId)), CancellationToken.None);
+
+        // The landing id is the persisted Template fact carried through the existing read —
+        // it is a routing fact with no authorization meaning of its own.
+        var granted = Assert.IsType<AccessOutcome.Granted>(outcome);
+        Assert.Equal("controlo", granted.LandingDestinationId);
+        Assert.Equal(
+            new[] { ModuleCatalog.ControloCreate },
+            granted.EffectiveModules.Select(module => module.Id).ToArray());
+    }
+
+    [Fact]
+    public async Task Granted_NullLanding_WhenTemplateHasNoLanding()
+    {
+        var templateId = Guid.NewGuid();
+        var templates = new FakeTemplateRepository();
+        templates.Seed(Template(templateId, landing: null));
+        var modules = new FakeTemplateModuleRepository();
+        modules.Seed(templateId, "controlo-create");
+
+        var outcome = await Resolver(templates, modules).ResolveAccessAsync(
+            new AccountResolution.User(User(templateId)), CancellationToken.None);
+
+        var granted = Assert.IsType<AccessOutcome.Granted>(outcome);
+        Assert.Null(granted.LandingDestinationId);
+    }
+
+    [Fact]
+    public async Task Denied_EntireResolution_CarriesNoLandingFact()
+    {
+        // A denied resolution (here: unknown persisted Module) is whole-resolution denial;
+        // no landing fact survives it.
+        var templateId = Guid.NewGuid();
+        var templates = new FakeTemplateRepository();
+        templates.Seed(Template(templateId, landing: "controlo"));
+        var modules = new FakeTemplateModuleRepository();
+        modules.Seed(templateId, "controlo-create", "nao-existe");
+
+        var outcome = await Resolver(templates, modules).ResolveAccessAsync(
+            new AccountResolution.User(User(templateId)), CancellationToken.None);
+
+        var denied = Assert.IsType<AccessOutcome.Denied>(outcome);
+        Assert.Equal(AccessDenialReason.UnknownModule, denied.Reason);
+    }
+
     private static UserAccount User(Guid? templateId, string role = "Job") => new(
         Guid.NewGuid(),
         CompanyNumber: "2661",
@@ -271,8 +328,8 @@ public sealed class AccessResolverTests
         TemplateId: templateId,
         Version: 1);
 
-    private static Template Template(Guid templateId, string name = "Template") =>
-        new(templateId, name, LandingDestinationId: null, Version: 1);
+    private static Template Template(Guid templateId, string name = "Template", string? landing = null) =>
+        new(templateId, name, LandingDestinationId: landing, Version: 1);
 
     private static IAccessResolver Resolver(
         FakeTemplateRepository templates,

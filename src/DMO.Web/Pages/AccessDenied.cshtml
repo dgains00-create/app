@@ -1,0 +1,18 @@
+@page
+@model AccessDeniedModel
+@{
+    ViewData["Title"] = "Acesso negado";
+}
+<link rel="stylesheet" href="~/css/dmo-user-shell.css" asp-append-version="true" />
+
+<section class="dmo-no-access" aria-labelledby="no-access-title">
+    <h2 id="no-access-title">Sem acesso operacional configurado</h2>
+    <p>
+        Não tem atualmente acesso operacional. Se considera que isto é um erro, contacte a
+        administração.
+    </p>
+</section>
+
+<form method="post" action="/auth/logout" class="dmo-no-access-logout">
+    <button type="submit" class="dmo-button">Terminar sessão</button>
+</form>

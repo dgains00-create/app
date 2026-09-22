@@ -54,10 +54,17 @@ public abstract record AccessOutcome
     }
 
     /// <summary>The resolution succeeded with a fully valid effective Module set.</summary>
+    /// <param name="LandingDestinationId">
+    /// The nullable landing destination id persisted on the Template (P1-T06 fact /
+    /// ACCESS_MODEL §3). It is a routing fact carried from the existing Template read; it
+    /// never grants anything and is not permission authority (P1-T07 accepted contract).
+    /// </param>
     /// <param name="EffectiveModules">
     /// The effective Module definitions, in deterministic persisted presentation order.
     /// </param>
-    public sealed record Granted(IReadOnlyList<ModuleDefinition> EffectiveModules) : AccessOutcome;
+    public sealed record Granted(
+        string? LandingDestinationId,
+        IReadOnlyList<ModuleDefinition> EffectiveModules) : AccessOutcome;
 
     /// <summary>The resolution was denied for <paramref name="Reason"/>; nothing is granted.</summary>
     /// <param name="Reason">The denial reason.</param>

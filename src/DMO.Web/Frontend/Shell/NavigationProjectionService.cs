@@ -38,7 +38,7 @@ public sealed class NavigationProjectionService
         // operational destination. USER access resolution is never invoked for it.
         if (current is not CurrentAccount.User(var account))
         {
-            return new NavigationPresentation([], false);
+            return new NavigationPresentation([], false, null);
         }
 
         var outcome = await _access.ResolveUserAccessAsync(
@@ -46,10 +46,11 @@ public sealed class NavigationProjectionService
             cancellationToken);
 
         // A denied resolution fails closed: no destination is advertised and the failure is
-        // surfaced so the shell can render its fail-closed status.
-        if (outcome is not AccessOutcome.Granted(var effectiveModules))
+        // surfaced so the shell can render its fail-closed status. No landing fact survives a
+        // denied resolution.
+        if (outcome is not AccessOutcome.Granted(var landingDestinationId, var effectiveModules))
         {
-            return new NavigationPresentation([], true);
+            return new NavigationPresentation([], true, null);
         }
 
         // Effective access is intersected with the published build registry. Contextual-only
@@ -64,7 +65,9 @@ public sealed class NavigationProjectionService
             .Cast<PrimaryDestinationPresentation>()
             .ToArray();
 
-        return new NavigationPresentation(live, false);
+        // The persisted landing destination id is propagated as an additive routing fact; the
+        // projection algorithm (filtering, grouping, order, labels) is unchanged.
+        return new NavigationPresentation(live, false, landingDestinationId);
     }
 
     private PrimaryDestinationPresentation? CreateDestination(

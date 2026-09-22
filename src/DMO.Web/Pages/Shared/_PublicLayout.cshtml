@@ -1,0 +1,27 @@
+@{
+    // P1-T07 minimal public layout for unauthenticated surfaces (/Login). It intentionally
+    // does not include the operational A2 shell (no identity, no navigation, no shell data);
+    // the operational shell never handles unauthenticated users.
+}
+<!doctype html>
+<html lang="pt">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] · DMO</title>
+    <link rel="stylesheet" href="~/css/dmo-tokens.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dmo-user-shell.css" asp-append-version="true" />
+</head>
+<body>
+    <a class="dmo-skip-link" href="#dmo-main">Saltar para o conteúdo</a>
+    <header class="dmo-public-header">
+        <a class="dmo-public-brand" href="/" aria-label="DMO — início">
+            <span class="dmo-public-brand-mark" aria-hidden="true">D</span>
+            <span class="dmo-public-brand-name"><strong>DMO</strong><small>Operações industriais</small></span>
+        </a>
+    </header>
+    <main id="dmo-main" tabindex="-1" class="dmo-public-main">
+        @RenderBody()
+    </main>
+</body>
+</html>

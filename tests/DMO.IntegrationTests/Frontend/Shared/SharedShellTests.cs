@@ -27,6 +27,9 @@ public sealed class SharedShellTests
     [Fact]
     public async Task Shell_RendersIdentityRegionsAndPublishedNavigationProjection()
     {
+        // P1-T07 re-target (§28.2): "/" is now the account-aware router, so the real Razor
+        // shell-rendering surface for a granted USER is the no-access page render (the
+        // AccessDenied page renders the operational shared shell for an active USER).
         var jobOnView = Definition(ModuleCatalog.JobOnView, "Job On View", "job-on", "Job On");
         var jobOnCreate = Definition(ModuleCatalog.JobOnCreate, "Job On Create", "job-on", "Job On");
         var ferramentas = Definition(ModuleCatalog.Ferramentas, "Ferramentas", null, "Ferramentas", contextual: true);
@@ -40,10 +43,10 @@ public sealed class SharedShellTests
             new Dictionary<string, string> { ["job-on"] = "/implemented/job-on" });
         using var client = factory.CreateClient();
 
-        var response = await client.GetAsync("/");
+        var response = await client.GetAsync("/AccessDenied");
         var html = Decode(await response.Content.ReadAsStringAsync());
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Contains("Maria Operadora", html, StringComparison.Ordinal);
         Assert.Contains("1042", html, StringComparison.Ordinal);
         Assert.Contains("Turno A", html, StringComparison.Ordinal);
@@ -53,14 +56,14 @@ public sealed class SharedShellTests
         Assert.DoesNotContain(OperationalEmptyState, html, StringComparison.Ordinal);
         Assert.DoesNotContain(ProvisionalContractMarker, html, StringComparison.Ordinal);
         Assert.Contains("dmo-page-heading", html, StringComparison.Ordinal);
-        Assert.Contains("dmo-production-slot", html, StringComparison.Ordinal);
-        Assert.Contains("dmo-work-surface", html, StringComparison.Ordinal);
+        Assert.Contains("dmo-no-access", html, StringComparison.Ordinal);
         Assert.Contains("role=\"status\"", html, StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task Shell_NoLiveDestinations_RendersOperationalEmptyState()
     {
+        // P1-T07 re-target (§28.2): rendered through the USER no-access shell surface.
         using var baseFactory = new DmoWebApplicationFactory();
         using var factory = ConfigureFactory(
             baseFactory,
@@ -71,10 +74,10 @@ public sealed class SharedShellTests
             new Dictionary<string, string>());
         using var client = factory.CreateClient();
 
-        var response = await client.GetAsync("/");
+        var response = await client.GetAsync("/AccessDenied");
         var html = Decode(await response.Content.ReadAsStringAsync());
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Contains(OperationalEmptyState, html, StringComparison.Ordinal);
         Assert.Contains("Maria Operadora", html, StringComparison.Ordinal);
         Assert.Contains("dmo-nav-empty", html, StringComparison.Ordinal);
@@ -86,26 +89,39 @@ public sealed class SharedShellTests
     [Fact]
     public async Task Shell_ProductionOutput_DoesNotContainProvisionalContractMarker()
     {
+        // P1-T07 re-target (§28.2): production rendered output is checked on the USER
+        // no-access shell surface and the ADMIN administration landing.
         using var baseFactory = new DmoWebApplicationFactory();
-        using var factory = ConfigureFactory(
+        using var userFactory = ConfigureFactory(
             baseFactory,
             new CurrentAccount.User(new UserAccount(
                 Guid.NewGuid(), "1042", "Maria Operadora", "maria@example.test", "Turno A", true, Guid.NewGuid(), 1)),
             available: [],
             Granted(),
             new Dictionary<string, string>());
-        using var client = factory.CreateClient();
+        using var userClient = userFactory.CreateClient();
+        using var adminFactory = ConfigureFactory(
+            baseFactory,
+            new CurrentAccount.Admin(new AdminAccount(Guid.NewGuid(), "Ana Administradora", "admin@example.test", true)),
+            available: [],
+            Granted(),
+            new Dictionary<string, string>());
+        using var adminClient = adminFactory.CreateClient();
 
-        var html = Decode(await (await client.GetAsync("/")).Content.ReadAsStringAsync());
+        var userHtml = Decode(await (await userClient.GetAsync("/AccessDenied")).Content.ReadAsStringAsync());
+        var adminHtml = Decode(await (await adminClient.GetAsync("/Administration")).Content.ReadAsStringAsync());
 
-        Assert.DoesNotContain(ProvisionalContractMarker, html, StringComparison.Ordinal);
-        Assert.DoesNotContain("PROVISIONAL", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("dmo-contract-label", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("is-provisional", html, StringComparison.Ordinal);
-        // No fixture destination label is advertised as a normal shell destination.
-        Assert.DoesNotContain("Reparação Interna", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("Boquilhas", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("Armazém", html, StringComparison.Ordinal);
+        foreach (var html in new[] { userHtml, adminHtml })
+        {
+            Assert.DoesNotContain(ProvisionalContractMarker, html, StringComparison.Ordinal);
+            Assert.DoesNotContain("PROVISIONAL", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("dmo-contract-label", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("is-provisional", html, StringComparison.Ordinal);
+            // No fixture destination label is advertised as a normal shell destination.
+            Assert.DoesNotContain("Reparação Interna", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("Boquilhas", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("Armazém", html, StringComparison.Ordinal);
+        }
 
         // The production runtime source carries no fixture symbol either.
         var runtime = string.Join('\n', Directory.EnumerateFiles(
@@ -121,6 +137,7 @@ public sealed class SharedShellTests
     [Fact]
     public async Task Shell_DeniedAccess_RendersFailClosedStatusWithoutFakeDestinations()
     {
+        // P1-T07 re-target (§28.2): rendered through the USER no-access shell surface.
         using var baseFactory = new DmoWebApplicationFactory();
         using var factory = ConfigureFactory(
             baseFactory,
@@ -131,10 +148,10 @@ public sealed class SharedShellTests
             new Dictionary<string, string>());
         using var client = factory.CreateClient();
 
-        var response = await client.GetAsync("/");
+        var response = await client.GetAsync("/AccessDenied");
         var html = Decode(await response.Content.ReadAsStringAsync());
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         // The fail-closed status is emitted through a Razor model expression, so Razor
         // HTML-encodes its accents; assertions use the decoded rendered text.
         Assert.Contains(FailClosedStatus, html, StringComparison.Ordinal);
@@ -153,7 +170,8 @@ public sealed class SharedShellTests
     public async Task Shell_Admin_RendersNoOperationalDestinationLinksOrFixtures()
     {
         // A real definition and a route exist, so an ADMIN shell that wrongly projected
-        // operational destinations would render a link.
+        // operational destinations would render a link. P1-T07 re-target (§28.2): the ADMIN
+        // shell-rendering surface is the /Administration landing page.
         var jobOnView = Definition(ModuleCatalog.JobOnView, "Job On View", "job-on", "Job On");
         using var baseFactory = new DmoWebApplicationFactory();
         using var factory = ConfigureFactory(
@@ -165,7 +183,7 @@ public sealed class SharedShellTests
             new Dictionary<string, string> { ["job-on"] = "/implemented/job-on" });
         using var client = factory.CreateClient();
 
-        var response = await client.GetAsync("/");
+        var response = await client.GetAsync("/Administration");
         var html = Decode(await response.Content.ReadAsStringAsync());
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -179,18 +197,6 @@ public sealed class SharedShellTests
         Assert.DoesNotContain("dmo-contract-label", html, StringComparison.Ordinal);
         // ADMIN is not an access failure.
         Assert.DoesNotContain(FailClosedStatus, html, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task Shell_RejectsUnauthenticatedRequest()
-    {
-        using var baseFactory = new DmoWebApplicationFactory();
-        using var factory = ConfigureFactory(baseFactory, new CurrentAccount.None(), [], Granted(), new Dictionary<string, string>());
-        using var client = factory.CreateClient(new() { AllowAutoRedirect = false });
-
-        var response = await client.GetAsync("/");
-
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
@@ -256,7 +262,10 @@ public sealed class SharedShellTests
     }
 
     private static AccessOutcome Granted(params ModuleDefinition[] modules) =>
-        new AccessOutcome.Granted(modules);
+        new AccessOutcome.Granted(null, modules);
+
+    private static AccessOutcome GrantedWithLanding(string? landing, params ModuleDefinition[] modules) =>
+        new AccessOutcome.Granted(landing, modules);
 
     private static string FindRepositoryRoot()
     {
@@ -308,7 +317,7 @@ public sealed class SharedShellTests
         public FixedAccessService(AccessOutcome outcome) => _outcome = outcome;
         public Task<AccessOutcome> ResolveUserAccessAsync(AccountResolution resolution, CancellationToken cancellationToken) => Task.FromResult(_outcome);
         public Task<bool> HasModuleAsync(AccountResolution resolution, ModuleId requiredModule, CancellationToken cancellationToken) =>
-            Task.FromResult(_outcome is AccessOutcome.Granted(var modules) && modules.Any(module => module.Id == requiredModule));
+            Task.FromResult(_outcome is AccessOutcome.Granted(_, var modules) && modules.Any(module => module.Id == requiredModule));
     }
 
     private sealed class DictionaryRouteRegistry : IDestinationRouteRegistry

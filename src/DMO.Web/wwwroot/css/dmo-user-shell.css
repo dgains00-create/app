@@ -1,0 +1,157 @@
+/* P1-T07 user-shell styles: public login surface, no-access content and the ADMIN landing.
+   Token-driven; no shared shell (dmo-shell.css) dependency — the operational shell never
+   handles unauthenticated users. */
+
+.dmo-public-header {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  min-height: 3.5rem;
+  display: flex;
+  align-items: center;
+  padding: .45rem 1.25rem;
+  background: var(--dmo-surface);
+  border-bottom: 1px solid var(--dmo-line-strong);
+}
+
+.dmo-public-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  color: var(--dmo-ink);
+  text-decoration: none;
+}
+
+.dmo-public-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  color: white;
+  background: var(--dmo-ink);
+  font-weight: 800;
+}
+
+.dmo-public-brand-name {
+  display: grid;
+  line-height: 1.05;
+}
+
+.dmo-public-brand-name small {
+  margin-top: .2rem;
+  color: var(--dmo-muted);
+  font-size: .68rem;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.dmo-public-main {
+  width: min(100%, 30rem);
+  margin: 3rem auto;
+  padding: 0 1.25rem;
+}
+
+.dmo-public-panel,
+.dmo-no-access {
+  padding: 1.5rem 1.5rem 1.75rem;
+  background: var(--dmo-surface);
+  border: 1px solid var(--dmo-line);
+  border-radius: var(--dmo-radius);
+}
+
+.dmo-public-panel h1,
+.dmo-no-access h2 {
+  margin: .2rem 0 .6rem;
+  line-height: 1.15;
+  font-size: 1.35rem;
+}
+
+.dmo-public-hint,
+.dmo-no-access p {
+  margin: 0 0 1rem;
+  color: var(--dmo-muted);
+  font-size: .86rem;
+}
+
+.dmo-form-error {
+  margin: 0 0 1rem;
+  padding: .55rem .7rem;
+  border: 1px solid var(--dmo-danger);
+  background: color-mix(in srgb, var(--dmo-danger) 8%, var(--dmo-surface));
+  color: var(--dmo-danger);
+  font-size: .84rem;
+}
+
+.dmo-login-form {
+  display: grid;
+  gap: .45rem;
+}
+
+.dmo-login-form label {
+  margin-top: .35rem;
+  font-size: .82rem;
+  font-weight: 650;
+}
+
+.dmo-login-form input {
+  height: var(--dmo-control-height);
+  padding: .3rem .55rem;
+  border: 1px solid var(--dmo-line-strong);
+  border-radius: var(--dmo-radius);
+  background: var(--dmo-surface);
+  color: var(--dmo-ink);
+  font: inherit;
+  font-size: .9rem;
+}
+
+.dmo-button {
+  justify-self: start;
+  min-height: var(--dmo-control-height);
+  margin-top: 1rem;
+  padding: .35rem 1rem;
+  border: 0;
+  border-radius: var(--dmo-radius);
+  background: var(--dmo-accent);
+  color: white;
+  font: inherit;
+  font-weight: 700;
+  font-size: .84rem;
+  cursor: pointer;
+}
+
+.dmo-button:hover {
+  background: var(--dmo-accent-dark);
+}
+
+.dmo-no-access {
+  border-left: 4px solid var(--dmo-warning);
+}
+
+.dmo-no-access-logout {
+  margin-top: 1rem;
+}
+
+.dmo-admin-destinations {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: .75rem;
+}
+
+.dmo-admin-destination {
+  display: grid;
+  gap: .2rem;
+  padding: 1rem;
+  border: 1px solid var(--dmo-line);
+  border-radius: var(--dmo-radius);
+  background: var(--dmo-surface);
+  text-decoration: none;
+}
+
+.dmo-admin-destination:hover {
+  border-color: var(--dmo-accent);
+}
+
+.dmo-admin-destination span {
+  color: var(--dmo-muted);
+  font-size: .8rem;
+}

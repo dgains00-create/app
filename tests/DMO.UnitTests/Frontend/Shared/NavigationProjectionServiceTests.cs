@@ -191,6 +191,79 @@ public sealed class NavigationProjectionServiceTests
         Assert.Equal(firstDestination.GrantedModuleIds, secondDestination.GrantedModuleIds);
     }
 
+    // ---- P1-T07 additive propagation: the persisted landing destination id is carried as a
+    // routing fact; the projection algorithm itself is unchanged.
+
+    [Fact]
+    public async Task Project_GrantedUser_PropagatesPersistedLandingDestinationId()
+    {
+        var jobOn = Definition(ModuleCatalog.JobOnView, "Job On View", "job-on", "Job On");
+        var service = CreateService(
+            [jobOn],
+            new FixedAccessService(GrantedWithLanding("job-on", jobOn)),
+            new Dictionary<string, string> { ["job-on"] = "/implemented/job-on" });
+
+        var result = await service.ProjectAsync(User("Operador"), CancellationToken.None);
+
+        Assert.False(result.AccessResolutionFailed);
+        Assert.Equal("job-on", result.LandingDestinationId);
+
+        // The live projection is exactly the pre-existing behavior.
+        var destination = Assert.Single(result.LiveDestinations);
+        Assert.Equal("job-on", destination.DestinationId);
+        Assert.Equal("/implemented/job-on", destination.Href);
+        Assert.Equal(new[] { ModuleCatalog.JobOnView }, destination.GrantedModuleIds);
+    }
+
+    [Fact]
+    public async Task Project_GrantedUser_NullLanding_PropagatesNull()
+    {
+        var jobOn = Definition(ModuleCatalog.JobOnView, "Job On View", "job-on", "Job On");
+        var service = CreateService(
+            [jobOn],
+            new FixedAccessService(GrantedWithLanding(null, jobOn)),
+            new Dictionary<string, string> { ["job-on"] = "/implemented/job-on" });
+
+        var result = await service.ProjectAsync(User("Operador"), CancellationToken.None);
+
+        Assert.Null(result.LandingDestinationId);
+        Assert.Single(result.LiveDestinations);
+    }
+
+    [Fact]
+    public async Task Project_DeniedUser_PropagatesNoLandingFact()
+    {
+        var jobOn = Definition(ModuleCatalog.JobOnView, "Job On View", "job-on", "Job On");
+        var service = CreateService(
+            [jobOn],
+            new FixedAccessService(new AccessOutcome.Denied(AccessDenialReason.NoTemplate)),
+            new Dictionary<string, string> { ["job-on"] = "/implemented/job-on" });
+
+        var result = await service.ProjectAsync(User("Operador"), CancellationToken.None);
+
+        Assert.True(result.AccessResolutionFailed);
+        Assert.Empty(result.LiveDestinations);
+        Assert.Null(result.LandingDestinationId);
+    }
+
+    [Fact]
+    public async Task Project_Admin_PropagatesNoLandingFact()
+    {
+        var jobOn = Definition(ModuleCatalog.JobOnView, "Job On View", "job-on", "Job On");
+        var access = new FixedAccessService(GrantedWithLanding("job-on", jobOn), failsWhenInvoked: true);
+        var service = CreateService(
+            [jobOn],
+            access,
+            new Dictionary<string, string> { ["job-on"] = "/implemented/job-on" });
+
+        var result = await service.ProjectAsync(Admin(), CancellationToken.None);
+
+        Assert.False(result.AccessResolutionFailed);
+        Assert.Empty(result.LiveDestinations);
+        Assert.Null(result.LandingDestinationId);
+        Assert.Equal(0, access.ResolveCallCount);
+    }
+
     private static NavigationProjectionService CreateService(
         IReadOnlyList<ModuleDefinition> available,
         FixedAccessService access,
@@ -198,7 +271,10 @@ public sealed class NavigationProjectionServiceTests
         new(access, ModuleRegistry.Create(available), new DictionaryRouteRegistry(routes ?? new Dictionary<string, string>()));
 
     private static AccessOutcome Granted(params ModuleDefinition[] modules) =>
-        new AccessOutcome.Granted(modules);
+        new AccessOutcome.Granted(null, modules);
+
+    private static AccessOutcome GrantedWithLanding(string? landing, params ModuleDefinition[] modules) =>
+        new AccessOutcome.Granted(landing, modules);
 
     private static CurrentAccount User(string roleLabel) => new CurrentAccount.User(
         new UserAccount(Guid.NewGuid(), "1042", "Maria Operadora", "maria@example.test", roleLabel, true, Guid.NewGuid(), 1));
@@ -241,7 +317,7 @@ public sealed class NavigationProjectionServiceTests
         public Task<bool> HasModuleAsync(AccountResolution resolution, ModuleId requiredModule, CancellationToken cancellationToken)
         {
             ThrowWhenInvocationIsForbidden();
-            return Task.FromResult(_outcome is AccessOutcome.Granted(var modules) && modules.Any(module => module.Id == requiredModule));
+            return Task.FromResult(_outcome is AccessOutcome.Granted(_, var modules) && modules.Any(module => module.Id == requiredModule));
         }
 
         private void ThrowWhenInvocationIsForbidden()

@@ -3,21 +3,7 @@
 @{
     ViewData["Title"] = "Área operacional";
 }
-
-<section class="dmo-production-slot" aria-labelledby="production-context-title">
-    <div>
-        <span class="dmo-eyebrow">Contexto de produção</span>
-        <h2 id="production-context-title">Nenhuma produção selecionada</h2>
-    </div>
-    <p>Este espaço recebe contexto fornecido pelos futuros módulos, sem fazer pesquisa ou inferência.</p>
-</section>
-
-<section class="dmo-work-surface" aria-labelledby="work-surface-title">
-    <div class="dmo-section-heading">
-        <div>
-            <span class="dmo-eyebrow">A2 · Fundação partilhada</span>
-            <h2 id="work-surface-title">Superfície de trabalho</h2>
-        </div>
-    </div>
-    <p>Os destinos operacionais ficam disponíveis quando o respetivo módulo, rota e autorização forem publicados.</p>
-</section>
+@* P1-T07: "/" is an account-aware routing surface — every GET path redirects (/Login,
+   /Administration, a real registered landing route, or /AccessDenied). This page never
+   renders: the A2 placeholder content was superseded by the accepted P1-T07 root contract
+   (request §13); no shell UI lives here. *@
