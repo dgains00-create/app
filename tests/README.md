@@ -107,6 +107,13 @@ authority by itself.
 dotnet test DMO.slnx
 ```
 
+For local development and explicitly opted-in live verification, the application and the
+integration-test assembly load the repository-root `.env` before .NET configuration/test
+discovery. Existing process environment variables take precedence. The file remains ignored by
+Git and must use the normal .NET environment names (`Database__ConnectionString`,
+`Supabase__ProjectUrl`, `Supabase__PublishableKey`) plus the live-test gate/credential names
+documented below. No value is logged or committed.
+
 `DMO.IntegrationTests/DatabaseConnectivityTests.cs` requires
 `DMO_TEST_POSTGRES_CONNECTION` to be set to a **disposable** PostgreSQL database; it is
 skipped otherwise, so it can never silently target a development or production database.

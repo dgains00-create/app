@@ -5,6 +5,7 @@ using DMO.Application.Session;
 using DMO.Application.TemplateAdministration;
 using DMO.Application.UserAdministration;
 using DMO.Infrastructure;
+using DMO.Infrastructure.Configuration;
 using DMO.Infrastructure.Database;
 using DMO.Web.Auth;
 using DMO.Web.Authorization;
@@ -14,6 +15,11 @@ using DMO.Web.Navigation;
 using DMO.Web.Startup;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Options;
+
+// Local development uses the repository-root .env when present. Load it before the default
+// .NET configuration pipeline is built so the application and integration tests consume the
+// same process-level keys. Explicit process variables retain precedence.
+LocalEnvironmentFile.LoadFromRepositoryRoot();
 
 var builder = WebApplication.CreateBuilder(args);
 
