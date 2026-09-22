@@ -37,6 +37,9 @@ ficha. This is the first operational slice and the first real domain model in `D
 - `dmo-master` `BETA_VERSION.md` §2–§5 — minimum Beta Tool fields, simplified Job On identity,
   duplication rules.
 - `dmo-beta-master/implementation/BETA_INTEGRATION_SEAMS.md` — Workstream B seam.
+- `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §4 — **settled machine autonomy**: the
+  operational machines `B1`,`B2`,`B3`,`C1`,`C2`,`C3` are independent; no "Linha B"/"Linha C"
+  grouping and no shared machine assignment exists.
 - Repo pattern: `docs/CREATION_AND_ASSOCIATION_LOGIC.md` (real-then-enriched identities).
 
 ## 3. Current implementation starting point
@@ -69,6 +72,17 @@ ficha. This is the first operational slice and the first real domain model in `D
 8. **Ferramentas Light contextual Tool ficha** — search/list/detail/create; **no top-level
    destination**.
 
+### Machine context note (settled)
+
+Where a machine appears as known production context, it is **consumed**, not duplicated
+(`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §4). The operational machines
+`B1`,`B2`,`B3`,`C1`,`C2`,`C3` are **independent**: they are never modelled as "Linha B"/"Linha C"
+and no grouping or cascade rule exists between them.
+
+This workstream does **not** model repairers or the machine-to-repairer assignment — that
+operational configuration belongs to `Controlo_Create → Definições` (P2-T05) and is consumed by
+Boquilhas (P2-T07). No `machine_id` scheme and no machine registry is fixed here.
+
 ## 5. Authority blocker B1 — required contract before execution
 
 Per `dmo-beta-master/WORKFLOW.md`, the concrete backend/interface contract must be authored and
@@ -90,6 +104,8 @@ Do **not** invent schema beyond what the authored contract fixes.
 - Full Ferramentas change-request/approve lifecycle, technical-condition and utilisation
   dossier.
 - Controlo calculations, Boquilhas movement ownership, Armazém.
+- Repairers, machine-to-repairer assignment and any machine/line grouping (owned by
+  Controlo_Create → Definições).
 - Any `production_id`, `job_on_revision_id`, or `tool.jobons[]` reverse array.
 - Any fake `cm_id`/`jobon_id`.
 - No `CurrentBuildAvailable` change and no route registration (P2-T10 does that).

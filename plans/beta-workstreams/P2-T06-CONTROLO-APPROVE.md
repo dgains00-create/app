@@ -23,6 +23,10 @@ decision/audit history.
 
 ## 2. Authority
 
+- `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §2 — **settled: Controlo_Approve is
+  restricted to Aprovar + Histórico de Pesos and owns no operational setting.** Definições,
+  repairers, the PDF directory configuration, email lists, email templates and every other
+  operational setting belong to `Controlo_Create → Definições`.
 - `dmo-beta-master/modules/CONTROLO_APPROVE.md` (full) — included scope and acceptance.
 - `dmo-beta-master/architecture/RECORD_LIFECYCLES.md` §4 — approval/rejection/reopen on the
   same `peso_id`; warnings never auto-reject.
@@ -45,6 +49,9 @@ already exist and are tested
 
 ## 4. Scope
 
+**Settled scope — exactly two responsibilities:** **Aprovar** and **Histórico de Pesos**
+(`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §2).
+
 1. Pending/review list with filters over backend-reported reviewable facts.
 2. Open the **exact submitted** `peso_id` (no approval copy).
 3. Read measurements/results/warnings/production context.
@@ -57,8 +64,27 @@ already exist and are tested
 8. Attributed audit/history.
 9. Explicit confirmed `Enviar para produção` only where the published contract allows it.
 
+### 4.1 Settings are excluded (settled)
+
+This module owns **no** settings surface. Do **not** create, add or reach:
+
+- Definições;
+- the repairer register, repairer administration or per-machine repairer assignments;
+- the PDF/document directory configuration;
+- email recipient lists;
+- email templates;
+- any other operational setting.
+
+All of the above belong to `Controlo_Create → Definições` and are gated by the Controlo_Create
+policy. If the delivered frontend prototype shows a Definições entry under Controlo_Approve, that
+presentation detail is **SUPERSEDED** (`…DELTA.md` §12 row V1) and must not be implemented.
+
+**Histórico de Pesos** in this scope is HISTÓRICO (local) — history inside this module. It is not
+HISTÓRICO GLOBAL (`historia`), which stays DEFERRED BY DESIGN.
+
 ## 5. Explicit non-scope
 
+- **Operational settings of any kind** (owned by Controlo_Create → Definições).
 - Editing submitted measurement facts without a reopen.
 - Approval-copy Peso; redefining formulas or Comparação pairing.
 - Forking or copying C's Peso renderer.
@@ -71,7 +97,8 @@ already exist and are tested
 ```text
 src/DMO.Application/ControloApprove/              (use cases + repository contracts)
 src/DMO.Infrastructure/Persistence/ + Migrations/ (decision/audit persistence, NEW migration)
-src/DMO.Web/Pages/Controlo/Approve/               (review mode reusing C's read model)
+src/DMO.Web/Pages/Controlo/Approve/               (review mode reusing C's read model;
+                                                   NO settings surface)
 src/DMO.Web/Endpoints/
 tests/DMO.UnitTests/  tests/DMO.IntegrationTests/
 ```
@@ -80,7 +107,8 @@ tests/DMO.UnitTests/  tests/DMO.IntegrationTests/
 
 `ModuleAuthorizationPolicies.PolicyName(ModuleCatalog.ControloApprove)` on every Approve
 route/action. Create does not grant Approve and vice versa; the shared `controlo` destination
-never merges the grants.
+never merges the grants. A `controlo-approve`-only caller is denied on every Controlo_Create
+→ Definições route/action.
 
 ## 8. Backend / persistence requirements
 
@@ -94,10 +122,15 @@ See master plan §11 P2-T06: warnings never decide; submitted facts read-only un
 reopen; approve/reject/reopen mutate the same record; actor/time from backend facts; Create vs
 Approve denial on the shared destination; review mode reuses the C read model.
 
+Additionally (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §2): the Approve surface
+contains no settings surface; a `controlo-approve`-only caller cannot reach Controlo_Create
+→ Definições; the module owns no repairer, directory, email-list or email-template responsibility.
+
 ## 10. Acceptance criteria
 
 Every bullet in `modules/CONTROLO_APPROVE.md` "Acceptance criteria"; no approval copy; no forked
-renderer; direct route/action denial is server-side.
+renderer; direct route/action denial is server-side; the Approve scope is exactly
+**Aprovar + Histórico de Pesos** with no operational settings; `CurrentBuildAvailable` unchanged.
 
 ## 11. Completion evidence
 

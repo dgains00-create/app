@@ -135,6 +135,26 @@ Future navigation presentation groups granted, available definitions by stable `
 
 A must not create permission enums, roles, profiles, job-title variants, access stores, Template resolution, or route authorization. Fixtures may simulate destinations only in frontend tests/demos and never register/grant a production Module.
 
+### `Controlo_Create → Definições` is a surface, not a destination
+
+Settled functional authority: `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §1.
+
+- The operational settings consumed by the Controlo / Peso / Boquilhas workflows — the repairer
+  register, the per-machine repairer assignments, the PDF/document base directory, the email
+  recipient lists and the email templates — belong to **Controlo_Create → Definições**.
+- `Definições` is reached **inside** the Controlo Create working area. It gains **no**
+  destination, **no** route registration, **no** `ModuleCatalog` entry and **no** new policy; it
+  is gated by the Controlo_Create module policy only.
+- `Controlo_Approve` is restricted to **Aprovar** and **Histórico de Pesos** and owns **no**
+  operational setting. Any prototype presenting `Definições` under Controlo_Approve is a
+  **SUPERSEDED** presentation detail (§7.2 of the delta).
+- Frontend must not hardcode recipient addresses, must not invent repairer fields beyond name,
+  and must not model the machines as "Linha B"/"Linha C" — `B1`, `B2`, `B3`, `C1`, `C2`, `C3`
+  each hold an **independent** assignment (delta §3.3, §4, §8.4).
+- The **Boquilhas machine sidebar** that depended on Job On operational context is **removed**
+  from current visual authority (delta §11): no simulated Job On machine/reference state inside
+  Boquilhas.
+
 ## 6. `ProductionContextStrip`
 
 ### Purpose, owner, and consumers

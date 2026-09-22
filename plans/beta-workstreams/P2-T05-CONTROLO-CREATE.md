@@ -21,6 +21,10 @@ publish the canonical read-only Peso read model that Controlo Approve consumes.
 
 ## 2. Authority
 
+- `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` — **settled functional authority for
+  this handoff's settings scope**: Controlo_Create owns `Definições` (repairer register,
+  per-machine repairer assignments, PDF/document base directory, email lists, email templates);
+  Controlo_Approve owns none of it (§1, §2, §3, §4, §7, §8, §10).
 - `dmo-beta-master/modules/CONTROLO_CREATE.md` (full) — included scope, pending association,
   calculation ownership, measurement rows, comparison, Pegamentos, Folha/Resumo, acceptance.
 - `dmo-beta-master/architecture/RECORD_LIFECYCLES.md` §4–8 — Peso status vocabulary
@@ -72,9 +76,33 @@ shell/components from P2-T01…P2-T03.
    be absent.
 6. **Folha** (`controlo_sheet_id -> jobon_id`) and **Resumo**
    (`resumo_id -> jobon_id + applicable contexts`) as **distinct** persisted records.
-7. **Submit** transitions the same `peso_id` into reviewable state with backend truth for
+7. **`Controlo_Create → Definições`** — the operational settings owned by this module
+   (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §1, §3, §4, §7, §8, §10):
+   - **Repairer register.** Required data is **name only**. Do **not** invent address, email,
+     phone, supplier code, tax data or contact person as required or as functional fields. The
+     user must be able to add a repairer, edit a repairer name, and select an existing repairer
+     for a machine assignment. An active/inactive lifecycle is an **implementation concern only**
+     and must not expand the user-facing model beyond add / edit name / select.
+   - **Per-machine repairer assignment.** `B1`, `B2`, `B3`, `C1`, `C2`, `C3` each hold their
+     **own independent** assignment. There is **no** grouping rule — no shared B or C repairer and
+     no "Linha B"/"Linha C" model. Changing one machine must not change any other, and each
+     assignment can be changed independently here.
+   - **PDF/document base directory.** Configure the base directory, change it, and verify/check
+     whether it is accessible. Operation configuration only: do not change the
+     `<reference>/<production-number>/` structure, the document file names or any availability
+     state (P2-T08 owns generation).
+   - **Email recipient lists.** Create/edit a named list, associate recipients with it, and
+     select/use lists for document sending rules. Recipient addresses must **never** be hardcoded
+     in application code.
+   - **Email templates.** Subject, body, and the applicable document type/context where needed.
+     Templates should support contextual values already known by the application (reference,
+     production, machine, date). **Do not invent the placeholder syntax** — no accepted syntax
+     exists in this repository (§10.4).
+   - `Definições` is reached **inside** the Controlo Create workflow. It is **not** a new
+     destination, **not** a new Module, and **not** a new global Admin surface.
+8. **Submit** transitions the same `peso_id` into reviewable state with backend truth for
    state/attribution. Create never approves its own record.
-8. **Publish the canonical read-only Peso sheet/read model** for P2-T06.
+9. **Publish the canonical read-only Peso sheet/read model** for P2-T06.
 
 ## 5. Authority blocker B2 — required contract before execution
 
@@ -83,13 +111,26 @@ The authored, reviewed contract must fix: the Controlo schema and keys (`peso_id
 the calculate/persist/submit/read query shapes; transactional boundaries; the read-model shape
 and its versioning; and the endpoint/route names with their module policies.
 
+It must **also** fix the `Definições` surfaces settled in
+`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md`: the repairer register schema/key, the
+per-machine assignment representation (one independent assignment per machine, no grouping), the
+document base-directory setting and its accessibility check, the named email list + recipient
+representation, and the email template representation. It must **not** invent repairer fields
+beyond name, a machine grouping rule, a placeholder syntax, or exact email routing rules.
+
 ## 6. Explicit non-scope
 
 - Approval/rejection/reopen decisions (P2-T06).
+- **Any settings surface under Controlo_Approve** — Approve is Aprovar + Histórico de Pesos only
+  (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §2).
+- A new global Admin module for these settings; moving them into the existing ADMIN-only
+  Administration surfaces; registering `Definições` as a destination (§1.4).
+- Repairer fields beyond name; a grouping of machines into a line/group assignment (§3.3, §4.2).
 - Automatic previous-Peso selection; same-machine-only restriction.
 - Duplicate Tool registry; independent production identity.
 - Frontend-owned formulas or persistence; approval-copy Peso.
-- Document generation or PDF bytes (P2-T08).
+- Document generation or PDF bytes (P2-T08); the exact email routing rules (§9.4); the email
+  template placeholder syntax (§10.4).
 - Any snapshot engine beyond what each record's own historical output requires.
 - No `CurrentBuildAvailable` change and no route registration.
 
@@ -97,9 +138,10 @@ and its versioning; and the endpoint/route names with their module policies.
 
 ```text
 src/DMO.Domain/                                   (Controlo value objects)
-src/DMO.Application/ControloCreate/               (use cases + repository contracts)
+src/DMO.Application/ControloCreate/               (use cases + repository contracts,
+                                                   including the Definições settings contracts)
 src/DMO.Infrastructure/Persistence/ + Migrations/ (Controlo schema, NEW migration)
-src/DMO.Web/Pages/Controlo/                       (Create-side surfaces)
+src/DMO.Web/Pages/Controlo/                       (Create-side surfaces + Definições area)
 src/DMO.Web/Frontend/Controlo/                    (shared Peso sheet read model)
 src/DMO.Web/Endpoints/
 tests/DMO.UnitTests/  tests/DMO.IntegrationTests/
@@ -108,7 +150,9 @@ tests/DMO.UnitTests/  tests/DMO.IntegrationTests/
 ## 8. Access requirements
 
 `ModuleAuthorizationPolicies.PolicyName(ModuleCatalog.ControloCreate)` on every Create
-route/action. The shared `controlo` destination keeps Create and Approve gates independent.
+route/action **and on every `Definições` route/action**. The shared `controlo` destination keeps
+Create and Approve gates independent, so a caller holding only `controlo-approve` receives the
+documented denial on `Definições` and on every settings action.
 
 ## 9. Backend / persistence requirements
 
@@ -122,11 +166,22 @@ See master plan §11 P2-T05: formulas, water range, individual results visible, 
 stale rebuild, no auto-selection, pending association, distinct Folha/Resumo, same `peso_id`
 through the lifecycle, Create cannot approve.
 
+Additionally, for `Definições` (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md`):
+add/edit-name/select a repairer with name as the only required data; each of
+`B1`,`B2`,`B3`,`C1`,`C2`,`C3` holds an independent assignment and changing one leaves the other
+five unchanged; the document base directory can be configured, changed and checked; a named email
+list can be created/edited with recipients associated and selected for a sending rule; an email
+template carries subject/body/document context; no hardcoded recipient address exists in
+application code; `Definições` is denied to a `controlo-approve`-only caller and is not a
+registered destination.
+
 ## 11. Acceptance criteria
 
 Every bullet in `modules/CONTROLO_CREATE.md` "Acceptance criteria"; one `peso_id` from draft to
 submit; previous Peso never automatic; stale Comparação requires rebuild; Folha and Resumo stay
-distinct records; warnings never approve/reject.
+distinct records; warnings never approve/reject; the `Definições` settings exist under the
+Controlo_Create gate and nowhere else; no repairer field beyond name is required; no machine
+grouping rule exists; `CurrentBuildAvailable` unchanged.
 
 ## 12. Completion evidence
 

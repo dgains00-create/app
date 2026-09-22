@@ -17,6 +17,20 @@ Authority order used throughout:
 4. Current `diogo-o/DMO-MODULAR` @ `main` — implementation state and integration seams.
 5. `diogo-o/workbench` / `diogo-o/dmo-work` — historical planning/execution evidence only.
 
+### Repository-recorded settled functional authority (authority-relative position 4.1)
+
+`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` records the settled functional decisions
+for **Controlo settings ownership, the repairer register, per-machine repairer assignments,
+automatic Boquilhas repairer resolution, historical repairer preservation, the PDF/document
+directory setting, email lists, email routing and email templates**, plus the removal of the
+Boquilhas machine sidebar from current visual authority.
+
+It sits alongside position 4 (current implementation + repository-recorded decisions). Where it
+and an existing **repository** authority file disagreed, the settled decision in that delta wins
+for that area, and the existing files were updated in the same change. It does not override
+`dmo-beta-master` or `dmo-master` outside its own area, it closes no authority blocker (see §4),
+and it changes no code, schema, route, authorization or availability.
+
 > **Environment note.** This planning run was produced in an environment without a runnable
 > .NET SDK. **No build or test was executed and no build/test success is claimed.** All test
 > requirements in this document are *specifications to be executed later*.
@@ -412,9 +426,9 @@ and they must not be resolved by invention.
 | Ref | Nature | What is absent | Blocking workstream | Required artefact |
 |---|---|---|---|---|
 | B1 | Backend/interface contract | Concrete Tool/Job On/CM/MF/BQ query + mutation contract and physical schema have not been published as an accepted contract | P2-T04+ (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T04 per Beta `WORKFLOW.md` |
-| B2 | Backend/interface contract | Concrete Peso/Pegamentos/Folha/Resumo calculate/persist/submit/read contract | P2-T05/P2-T06 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T05 |
-| B3 | Backend/interface contract | Concrete Boquilhas aggregate/movement/edit-audit/close-reopen contract and canonical `repairer_id` directory source | P2-T07 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T07 |
-| B4 | Backend/interface contract | Document generation contract + directory/filesystem capability (`Infrastructure/Files`, `Infrastructure/Pdf` do not exist) | P2-T08 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T08 |
+| B2 | Backend/interface contract | Concrete Peso/Pegamentos/Folha/Resumo calculate/persist/submit/read contract; **extended** to cover the Controlo_Create → Definições surfaces (repairer register, per-machine assignments, document base directory, email lists, email templates) settled in `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` | P2-T05/P2-T06 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T05 |
+| B3 | Backend/interface contract | Concrete Boquilhas aggregate/movement/edit-audit/close-reopen contract and `repairer_id` schema/query shape. The canonical `repairer_id` **directory source is now settled** (Controlo_Create → Definições), as are machine-assignment autonomy and historical repairer preservation (`…DELTA.md` §3.6, §4, §5, §6); the physical schema/query/endpoint contract is still absent | P2-T07 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T07 |
+| B4 | Backend/interface contract | Document generation contract + directory/filesystem capability (`Infrastructure/Files`, `Infrastructure/Pdf` do not exist); **extended** to cover the operator-configured base directory (configure/change/verify accessibility) and sending through configured email lists/templates (`…DELTA.md` §7, §8, §9) | P2-T08 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T08 |
 
 These do **not** block P2-T01, P2-T02, P2-T03 (shared frontend primitives), whose authority is
 the already-accepted A1 freeze plus `dmo-beta-master/contracts/SHARED_FRONTEND.md` and
@@ -792,6 +806,12 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   - one shared Tool search/select/create orchestration returning a canonical `tool_id` and
     restoring origin state;
   - Ferramentas Light contextual Tool ficha: **no top-level destination**.
+- **Machine context note (settled — `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md`
+  §4):** where a machine appears as known production context, it is **consumed**, not duplicated.
+  The operational machines `B1`, `B2`, `B3`, `C1`, `C2`, `C3` are **independent**; they are never
+  modelled as "Linha B"/"Linha C" and no grouping rule exists between them. This workstream does
+  **not** model repairers or machine-to-repairer assignment — that configuration belongs to
+  Controlo_Create → Definições (P2-T05). No `machine_id` scheme is fixed here.
 - **Explicit non-scope:** full Job On lifecycle/revisions/print orchestration; full Ferramentas
   change-request/approve lifecycle and technical-condition/utilisation dossier; Controlo
   calculations; Boquilhas movement ownership; Armazém; any `production_id` / `job_on_revision_id`
@@ -857,27 +877,46 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
     contexts`) as **distinct** persisted records;
   - submit transitions the same `peso_id` into reviewable state with backend truth for
     state/attribution; Create never approves its own record;
+  - **`Controlo_Create → Definições` — operational settings owned by this module**
+    (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §1, §3, §4, §7, §8, §10):
+    the **repairer register** (name is the required data; no address/email/phone/supplier
+    code/tax data/contact person; add / edit name / select only); the **per-machine repairer
+    assignment** for `B1`, `B2`, `B3`, `C1`, `C2`, `C3`, each independent, with **no** grouping
+    rule; the **PDF/document base directory** (configure, change, verify accessibility); the
+    **email recipient lists** (named list + recipients; never hardcoded in code); and the
+    **email templates** (subject/body/applicable document type or context, with contextual values
+    already known to the application). Definições is reached inside Controlo_Create, is gated by
+    the Controlo_Create policy, and is **not** a new destination;
   - publish the canonical **read-only Peso sheet/read model** for P2-T06.
-- **Explicit non-scope:** approval/rejection/reopen decisions (P2-T06); automatic previous-Peso
-  selection; same-machine-only restriction; duplicate Tool registry; independent production
-  identity; frontend-owned formulas or persistence; approval-copy Peso; document generation
-  (P2-T08); PDF bytes.
+- **Explicit non-scope:** approval/rejection/reopen decisions (P2-T06); settings under
+  Controlo_Approve (there are none — `…DELTA.md` §2); a new global Admin module for settings
+  (`…DELTA.md` §1.4); automatic previous-Peso selection; same-machine-only restriction; duplicate
+  Tool registry; independent production identity; frontend-owned formulas or persistence;
+  approval-copy Peso; document generation (P2-T08); PDF bytes; exact email routing rules beyond
+  using known context (`…DELTA.md` §9.4); email-template placeholder syntax (`…DELTA.md` §10.4).
 - **Expected files/projects:** `src/DMO.Domain` (Controlo value objects),
-  `src/DMO.Application/ControloCreate/` (+ repository contracts),
-  `src/DMO.Infrastructure/Persistence/` + one migration owning Controlo schema,
-  `src/DMO.Web/Pages/Controlo/` (Create-side), `src/DMO.Web/Endpoints/`,
-  `src/DMO.Web/Frontend/Controlo/` (shared Peso sheet read model), tests in both projects.
+  `src/DMO.Application/ControloCreate/` (+ repository contracts, including the settings surfaces'
+  contracts), `src/DMO.Infrastructure/Persistence/` + one migration owning Controlo schema,
+  `src/DMO.Web/Pages/Controlo/` (Create-side, including the Definições area),
+  `src/DMO.Web/Endpoints/`, `src/DMO.Web/Frontend/Controlo/` (shared Peso sheet read model),
+  tests in both projects.
 - **Access requirements:** `ModuleAuthorizationPolicies.PolicyName(ModuleCatalog.ControloCreate)`
-  on every Create route/action; the shared `controlo` destination keeps Create and Approve gates
-  independent.
+  on every Create route/action **and on every Definições route/action**; the shared `controlo`
+  destination keeps Create and Approve gates independent, so an Approve-only holder cannot reach
+  Definições.
 - **Persistence requirements:** `peso_id`, `pegamentos_id`, `controlo_sheet_id`, `resumo_id`
   with the relations above; explicit `previous_peso_id` relation; no snapshot engine beyond what
   each record's own historical output requires; no second Job On/Peso process authority
-  (processo is consumed through `cm_id -> tool_id`).
+  (processo is consumed through `cm_id -> tool_id`). For Definições: persisted repairer register,
+  one **independent** repairer assignment per machine, the configured document base directory,
+  named email lists with their recipients, and email templates. No physical key or table design is
+  fixed by this plan — the authored B2 contract fixes it.
 - **Required tests:** see §11 (P2-T05 row).
 - **Acceptance criteria:** every bullet in `modules/CONTROLO_CREATE.md` "Acceptance criteria";
   same `peso_id` from draft to submit; previous Peso never automatic; stale Comparação requires
-  rebuild; Folha and Resumo remain distinct records; warnings never approve/reject.
+  rebuild; Folha and Resumo remain distinct records; warnings never approve/reject; the
+  Controlo_Create → Definições settings exist under the Controlo_Create gate and nowhere else
+  (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §1, §2).
 - **Completion evidence:** committed implementation + tests + published Peso read-model contract
   consumed by P2-T06.
 - **Downstream dependents:** P2-T06, P2-T08, P2-T10.
@@ -893,17 +932,25 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   (`NoProfilesRegressionTests.SiblingModule_SameDestination_DoesNotSatisfyGate`).
 - **Dependencies:** **P2-T05 (strictly)** — D consumes C's submitted Peso read model and must not
   fork the renderer. Authority blocker B2.
-- **Precise scope:** pending/review list with filters over backend-reported reviewable facts;
-  open the exact submitted `peso_id`; read measurements/results/warnings/production context;
-  read the persisted explicit Comparação relation and enough current/previous context to
-  understand it without heuristic reconstruction; per-CM human decisions (`Manter` /
-  `Colocar de parte`) where required; Folha decision/review on the exact persisted
-  `controlo_sheet_id`; approve; reject with note where required; reopen on the same record
-  preserving decision/attribution history; attributed audit/history; explicit confirmed
-  `Enviar para produção` only where the published contract allows it.
+- **Precise scope (settled — reduced to exactly two responsibilities):**
+  `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §2 fixes the Approve surface to
+  **Aprovar** and **Histórico de Pesos**. Concretely: pending/review list with filters over
+  backend-reported reviewable facts; open the exact submitted `peso_id`; read
+  measurements/results/warnings/production context; read the persisted explicit Comparação
+  relation and enough current/previous context to understand it without heuristic reconstruction;
+  per-CM human decisions (`Manter` / `Colocar de parte`) where required; Folha decision/review on
+  the exact persisted `controlo_sheet_id`; approve; reject with note where required; reopen on the
+  same record preserving decision/attribution history; attributed audit/history; explicit
+  confirmed `Enviar para produção` only where the published contract allows it.
+- **Settings explicitly out of scope (settled):** Controlo_Approve owns **no** Definições and
+  **no** operational setting. It must not contain or reach the repairer register / repairers, the
+  per-machine repairer assignments, the PDF/document directory configuration, the email lists, the
+  email templates or any other operational setting; all of those belong to
+  `Controlo_Create → Definições`. No replacement settings surface may be created here.
 - **Explicit non-scope:** editing submitted measurement facts without reopen; approval-copy
   Peso; redefining formulas or Comparação pairing; forking/copying C's Peso renderer; Job
-  On/Ferramentas/Boquilhas ownership; automatic decisions from warnings.
+  On/Ferramentas/Boquilhas ownership; automatic decisions from warnings; operational settings
+  (owned by Controlo_Create).
 - **Expected files/projects:** `src/DMO.Application/ControloApprove/` (+ repository contracts),
   `src/DMO.Infrastructure/Persistence/` (decision/audit persistence, migration owned by this
   slice), `src/DMO.Web/Pages/Controlo/Approve/` (review mode reusing C's read-model
@@ -918,7 +965,9 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
 - **Acceptance criteria:** every bullet in `modules/CONTROLO_APPROVE.md` "Acceptance criteria";
   submitted facts are read-only until an authorized reopen; approve/reject/reopen mutate the
   same record; warnings never decide; actor/time come from backend facts; direct route/action
-  denial is server-side.
+  denial is server-side; the Approve surface contains **no** settings surface, and a
+  Controlo_Approve-only holder cannot reach Controlo_Create → Definições
+  (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §2).
 - **Completion evidence:** committed implementation + tests + explicit statement that C's
   renderer was reused, not copied.
 - **Downstream dependents:** P2-T08, P2-T10.
@@ -950,9 +999,28 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   reopen actor/time/reason; failed close leaves the active state unchanged; canonical
   `repairer_id` stored on external Saída with historical retention; production-line contextual
   panel reading (not owning) production context.
+- **Repairer resolution (settled — `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md`
+  §3, §4, §5, §6):**
+  - when a registration/movement is associated with a machine, the repairer is **resolved
+    automatically** from that machine's current assignment (`machine → current repairer
+    assignment → repairer resolved`); the operator should not normally have to re-select the
+    repairer when the machine is already known;
+  - the machines are `B1`, `B2`, `B3`, `C1`, `C2`, `C3`, each with its **own independent**
+    assignment — **no** shared B/C repairer and **no** "Linha B"/"Linha C" grouping;
+  - the repairer used at the time of the movement is **historically preserved**: a later
+    assignment change must **never** rewrite an earlier Boquilhas record;
+  - Boquilhas **consumes** the repairer register and does **not** administer it — the register
+    lives in `Controlo_Create → Definições`.
+- **Removed from current visual authority (settled — `…DELTA.md` §11):** the Boquilhas
+  **machine/sidebar** concept that depends on Job On operational context is **removed** from the
+  current frontend authority. Do not simulate Job On machine/reference state inside Boquilhas. If
+  future Job On integration justifies such context, it may be reintroduced later from real
+  backend authority. The settled **production-line contextual panel reading (not owning)
+  production context** is a different thing and is unchanged.
 - **Explicit non-scope:** mandatory Boquilhas PDF; internal Boquilhas settings/Admin tab;
-  repairer directory administration; Job On planning ownership; Armazém stock/location;
-  per-piece BQ identity; obsolete legacy movement types.
+  repairer directory administration (**the register is owned by Controlo_Create → Definições, not
+  by Boquilhas**); any machine/reference sidebar simulating Job On context; Job On planning
+  ownership; Armazém stock/location; per-piece BQ identity; obsolete legacy movement types.
 - **Expected files/projects:** `src/DMO.Domain` (movement/aggregate primitives),
   `src/DMO.Application/Boquilhas/` (+ repository contracts),
   `src/DMO.Infrastructure/Persistence/` + one migration owning Boquilhas schema,
@@ -967,7 +1035,10 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   movement selector exposes only the four types; `Editar` is not a type; edit adds audit without
   a second movement; both flows work without fake identities; excess Entrada recorded; negative
   saldo non-blocking; business date ⊥ recorded timestamp; close/reopen retains the same
-  `boquilhas_id` and full history; no mandatory PDF or settings tab.
+  `boquilhas_id` and full history; no mandatory PDF or settings tab; the repairer is resolved
+  automatically from the machine's current independent assignment; a later assignment change does
+  not alter an earlier record's repairer; no machine sidebar is present
+  (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §4, §5, §6, §11).
 - **Completion evidence:** committed implementation + tests + confirmation that no replacement
   aggregate is created by close/reopen.
 - **Downstream dependents:** P2-T08, P2-T10.
@@ -982,8 +1053,8 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
 - **Current implementation starting point:** nothing. `DMO.Domain` has no types; there is no
   Files or Pdf project (`Infrastructure/Files`, `Infrastructure/Pdf` are recorded as "not yet
   implemented" in `docs/SKELETON_RATIONALIZATION_P1-T01.md`).
-- **Dependencies:** P2-T05 (Peso), P2-T06 (approved/decision state), P2-T07 (Boquilhas where a
-  file state applies). Authority blocker B4.
+- **Dependencies:** P2-T05 (Peso **and the Definições settings it owns**), P2-T06
+  (approved/decision state), P2-T07 (Boquilhas where a file state applies). Authority blocker B4.
 - **Precise scope:** structured owning record remains the only truth; deterministic
   `Peso_<reference>_<line>.pdf`, `Pegamentos_<reference>_<line>.pdf`,
   `Resume_<reference>_<line>.pdf`; directory `<reference>/<production-number>/`; filename/path
@@ -994,9 +1065,28 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   output (e.g. Pegamentos) is not a generic error; lookup failure is not an empty result;
   `file:///` paths are never printed into a PDF; no document metadata table is introduced merely
   for symmetry; official/frozen outputs are not silently regenerated.
+- **Configured base directory and email sending (settled —
+  `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §7, §8, §9, §10):**
+  - the **base** of the directory convention is operator-configurable through
+    **`Controlo_Create → Definições`** — configure the base directory, change it, and
+    verify/check whether it is accessible. It is not a global Admin setting and it is not
+    configured in Controlo_Approve. The naming convention, the
+    `<reference>/<production-number>/` structure and every availability state are unchanged;
+  - document sending uses the **configured email lists** and **email templates** owned by
+    Controlo_Create → Definições. Recipient addresses are **never hardcoded in application code**;
+  - the email workflow should use **known production context where possible** (`Peso PDF →
+    known production/machine context → appropriate configured list → template → attachment →
+    preview → send`) and must avoid forcing the operator to re-select context or recipients that
+    configuration already determines;
+  - **do not invent** exact automatic routing rules beyond that intent, and **no** email-template
+    placeholder syntax is fixed (none exists in this repository today).
 - **Explicit non-scope:** inventing new Job On document identities (the three official Job On
   outputs belong to the global Job On contract and are not required by Beta Job On Light);
-  a mandatory Pegamentos file; introducing a document table/identity just for symmetry.
+  a mandatory Pegamentos file; introducing a document table/identity just for symmetry; the
+  settings surfaces themselves (owned and implemented by P2-T05 under Controlo_Create →
+  Definições — P2-T08 only **consumes** the configured directory and the configured email
+  lists/templates); email transport/account provisioning; fixing the placeholder syntax or the
+  exact context→list routing rule.
 - **Expected files/projects:** `src/DMO.Domain` (document-state value objects if required),
   `src/DMO.Application/Documents/` (+ generation/availability contracts),
   `src/DMO.Infrastructure` file/pdf adapters (new area, not a new project unless an
@@ -1007,7 +1097,11 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
 - **Persistence requirements:** owning-record state plus, only where an immutable output is
   genuinely required, persisted metadata; no artificial document identity.
 - **Required tests:** see §11 (P2-T08 row).
-- **Acceptance criteria:** the ten `contracts/DOCUMENTS_AND_FILES.md` §8 conditions.
+- **Acceptance criteria:** the ten `contracts/DOCUMENTS_AND_FILES.md` §8 conditions; the base
+  directory is resolved from the operator-configured Controlo_Create → Definições setting rather
+  than a hardcoded constant; document sending uses the configured email list and template with no
+  hardcoded recipient address in application code
+  (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §7, §8, §9).
 - **Completion evidence:** committed implementation + tests + a rendered/parsed check that no
   filesystem path appears in output and that the three availability distinctions hold.
 - **Downstream dependents:** P2-T10.
@@ -1068,8 +1162,12 @@ UI do not acquire duplicate domain models. Authority:
 | Resumo | `resumo_id` | Controlo | persisted record for one `jobon_id` context | record is authority even when the PDF is absent | Controlo, documents | record ≠ its PDF | **No projection-of-Folha** |
 | Boquilhas aggregate | `boquilhas_id` | Boquilhas | active → close (immutable snapshot) → archived → optional reopen | movements are append-only facts; balance derived | Boquilhas, documents, HISTÓRICO GLOBAL (later) | close snapshot + reopen actor/time/reason; movements never rewritten | production-linked via `bq_id`; standalone via direct `tool_id`; **no fake Job On**, **no per-piece identity** |
 | Movement | `movement_id` | Boquilhas | append-only; `Editar` is an action producing audit, not a new movement | business date (editable) ⊥ recorded timestamp (immutable) | Boquilhas, HISTÓRICO GLOBAL (later) | before/after audit + actor + system timestamp | **no second balance authority** |
-| Repairer | `repairer_id` | canonical repairer vocabulary | selected per external Saída | historical movements retain their repairer | Boquilhas | not rewritten when the directory/default changes | **not administered by Boquilhas** |
-| Document output | derived (no identity) | owning record's workflow | availability state, not a domain lifecycle | frozen output corresponds to a frozen record state | Controlo, Boquilhas | rendered from preserved historical context | **filename/path is never an identity; no document table for symmetry** |
+| Repairer | `repairer_id` | **Controlo_Create → Definições** (canonical repairer register) | simple register (name is the required data); selected/consumed per machine assignment and per external Saída | current assignment resolves automatically for new Boquilhas registrations; historical records retain the value actually used | Controlo Create, Boquilhas | **not rewritten when the machine's current assignment changes** | **not administered by Boquilhas**; **not owned by Controlo_Approve**; repairer register owned by Controlo_Create → Definições (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §3) |
+| Machine repairer assignment | per machine (`B1`,`B2`,`B3`,`C1`,`C2`,`C3`) | Controlo_Create → Definições (operational configuration) | one **independent** current assignment per machine | changing one machine never changes another | Controlo Create, Boquilhas (resolution) | never rewrites historical Boquilhas records | **no grouping rule** — no "Linha B"/"Linha C", no shared B/C assignment (`…DELTA.md` §4) |
+| Operational settings (Definições) | n/a (configuration, not a domain identity) | **Controlo_Create** | repairer register, machine repairer assignments, PDF/document base directory, email lists, email templates | configuration is current-state; the facts it feeds are preserved on the records that used them | Controlo Create (owner), Boquilhas (consumes repairer resolution), P2-T08 (consumes directory/email config) | historical records preserve what they used | **not owned by Controlo_Approve**; **no new global Admin module**; not a new destination (`…DELTA.md` §1, §2, §7, §8, §10) |
+| Email list | n/a (named configuration list) | Controlo_Create → Definições | named list with associated recipients | used by document sending | Controlo Create, P2-T08 sending | not a document identity | **recipient addresses are never hardcoded in application code** (`…DELTA.md` §8) |
+| Email template | n/a (configuration) | Controlo_Create → Definições | subject + body + applicable document type/context | supports contextual values already known (reference/production/machine/date) | Controlo Create, P2-T08 sending | not a document identity | **no placeholder syntax is fixed by this authority** (`…DELTA.md` §10.4) |
+| Document output | derived (no identity) | owning record's workflow | availability state, not a domain lifecycle | frozen output corresponds to a frozen record state | Controlo, Boquilhas | rendered from preserved historical context | **filename/path is never an identity; no document table for symmetry**; the base directory is operator-configurable in Controlo_Create → Definições (`…DELTA.md` §7) |
 
 **Cross-cutting rules established by this map.**
 1. `templates`/`template_modules` model **access** only; they are never reused as operational
@@ -1082,6 +1180,19 @@ UI do not acquire duplicate domain models. Authority:
 5. `src/DMO.Application/Access/ModuleCatalog.cs` is the reusable identity/catalog mechanism.
    Operational modules **consume** it (for gates and availability); they must not build a
    parallel registry.
+6. **Controlo settings ownership (settled).** The operational configuration consumed by the
+   Controlo / Peso / Boquilhas workflows — repairer register, per-machine repairer assignments,
+   PDF/document base directory, email lists and email templates — belongs to
+   **Controlo_Create → Definições**. `Controlo_Approve` is restricted to **Aprovar** and
+   **Histórico de Pesos** and owns none of it. This creates **no** new module, **no** new
+   destination and **no** new global Admin requirement. Definições is gated by the Controlo_Create
+   module policy. See `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §1, §2, §7, §8, §10.
+7. **Machine autonomy (settled).** `B1`, `B2`, `B3`, `C1`, `C2`, `C3` are independent operational
+   machines, each with its **own** repairer assignment. No shared B or C repairer, no "Linha B" /
+   "Linha C" model, and no cascade between machines. Boquilhas resolves the repairer automatically
+   from the machine's current assignment, and the repairer actually used is **historically
+   preserved** — a later assignment change must never rewrite an earlier record. See
+   `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §4, §5, §6.
 
 ---
 
@@ -1096,6 +1207,7 @@ Never ahead of the surface.
 |---|---|---|---|---|
 | Job On | `job-on-view`, `job-on-create` (share `job-on`) | `/jobon` (or the accepted contract path) | P2-T04 complete | P2-T10 (per destination) |
 | Controlo | `controlo-create`, `controlo-approve` (share `controlo`) | `/controlo` | P2-T05 for Create; P2-T06 adds Approve actions on the same destination | P2-T10 |
+| Controlo_Create → Definições | **not a Module; not a destination** — a surface inside the Controlo Create destination, gated by `controlo-create` | reached inside `/controlo` | P2-T05 (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §1) | n/a — never registered separately |
 | Boquilhas | `boquilhas` | `/boquilhas` | P2-T07 complete | P2-T10 |
 | Ferramentas | `ferramentas`, `ferramentas-approve` | **no top-level route, ever** | never top-level; contextual entry inside Job On/Controlo/Boquilhas | n/a |
 | HISTÓRICO GLOBAL | `historia` (technical identity; do not rename in code) | **no route in this Beta** | never in this Beta (DEFERRED BY DESIGN — §3.1) | n/a |
@@ -1173,6 +1285,16 @@ Legend: **U** = unit, **I** = integration/host, **UI** = rendered/component or b
 - **I:** same `peso_id` from draft to submitted; pending association `peso_id -> tool_id` supported with no fake Job On/`cm_id`; later explicit association clears the direct anchor; Folha and Resumo persist as distinct records; Pegamentos may legitimately be absent.
 - **UI:** dense Peso/Pegamentos/Folha/Resumo screens render supplied state; a missing required Tool context blocks that sheet with an actionable correction message and preserves draft state.
 - **R:** Create cannot approve its own record; access tests unchanged; the shared Peso read model is published for P2-T06.
+- **U (settings, `…DELTA.md` §1, §3, §4, §7, §8, §10):** a repairer can be added, its name edited
+  and an existing repairer selected; no address/email/phone/supplier code/tax data/contact person
+  is required or invented; each of `B1`,`B2`,`B3`,`C1`,`C2`,`C3` holds its **own** assignment and
+  changing one leaves the other five unchanged (no B/C grouping); the document base directory can
+  be configured, changed and checked; a named email list can be created/edited with recipients
+  associated and selected for a sending rule; an email template carries subject/body/document
+  context and no hardcoded recipient address exists anywhere in application code.
+- **I (settings):** Definições is reachable **only** under the Controlo_Create gate — a caller
+  holding only `controlo-approve` is denied on the Definições route/action, and the Approve
+  surface exposes no settings surface.
 
 ### P2-T06 — Controlo Approve
 - **U:** warnings never trigger an automatic decision; per-CM decisions are explicit human facts.
@@ -1180,19 +1302,36 @@ Legend: **U** = unit, **I** = integration/host, **UI** = rendered/component or b
 - **I (access):** a Create-granted user without Approve is denied Approve actions on the shared `controlo` destination, and vice versa.
 - **UI:** review mode reuses Create's read model (renderer contract test) — no forked renderer.
 - **R:** all P2-T05 tests still pass; no approval-copy Peso is created.
+- **R (scope, `…DELTA.md` §2):** the Approve surface is exactly Aprovar + Histórico de Pesos; it
+  contains no Definições, no repairer administration, no PDF-directory setting, no email list and
+  no email template; a `controlo-approve`-only caller cannot reach Controlo_Create → Definições.
 
 ### P2-T07 — Boquilhas
 - **U:** exactly the four movement types are writable (`Início`, `Saída`, `Entrada`, `Irreparável`); `Editar` is not a movement type; Saída does not exceed available and Irreparável does not exceed in-repair; excess Entrada is recorded, not clamped; negative saldo remains visible and non-blocking; `% utilização` is never derived from movements; `business_date` is editable while `recorded_at` is immutable.
 - **I:** editing a movement preserves before/after audit without creating a second quantity event and without double balance effect; the production-linked flow resolves/reuses `bq_id`; the standalone flow works with **no** fake Job On/`bq_id`; close/reopen retains the same `boquilhas_id` and full history; a failed close leaves the active state unchanged; the close snapshot is immutable; reopen records actor/time/reason; an external Saída stores the canonical `repairer_id` and it is not rewritten when the directory/default changes.
 - **I:** balance is derivable from movement facts alone (no second mutable balance authority).
-- **UI:** History filters/select/open; the movement selector shows only the four types; no mandatory PDF action and no internal settings tab.
+- **UI:** History filters/select/open; the movement selector shows only the four types; no mandatory PDF action and no internal settings tab; **no machine/reference sidebar** is rendered
+  (`…DELTA.md` §11).
+- **U/I (repairer resolution, `…DELTA.md` §4, §5, §6):** when a registration/movement is
+  associated with a machine, the repairer is resolved automatically from that machine's current
+  assignment and the operator is not forced to re-select it; `B1`,`B2`,`B3`,`C1`,`C2`,`C3` resolve
+  independently (changing one assignment changes no other machine's resolution); a repairer
+  assignment change **never** rewrites an earlier Boquilhas record — the repairer used at the time
+  of the movement is preserved; Boquilhas cannot administer the repairer register.
 - **R:** access tests unchanged; `CurrentBuildAvailable` untouched here.
 
 ### P2-T08 — documents / PDF
 - **U:** the three availability distinctions hold (`file-missing` is not `not-generated`; `lookup-failed` is not empty; a missing optional Pegamentos is not an error); a filename is never used as an identity.
 - **I:** the directory is `<reference>/<production-number>/`; filenames are `Peso_<reference>_<line>.pdf`, `Pegamentos_<reference>_<line>.pdf`, `Resume_<reference>_<line>.pdf`; a frozen official output is not silently regenerated from newer mutable facts; historical rendering uses preserved context after the source Tool changes.
 - **I:** generated output contains no local filesystem path.
-- **UI:** availability rendering distinguishes all supplied states; actions are enabled only when the operation can complete.
+- **I (configured base directory and sending, `…DELTA.md` §7, §8, §9):** the directory base is
+  resolved from the operator-configured Controlo_Create → Definições setting and follows a change
+  to it, including a change made while documents already exist under the previous base; an
+  inaccessible directory is distinguishable from a missing file and from an empty result; the
+  document file name and the `<reference>/<production-number>/` structure are unchanged; the
+  sending path selects a configured email list and template and no application code path contains
+  a hardcoded recipient address.
+- **UI:** availability rendering distinguishes all supplied states; actions are enabled only when the operation can complete; the sending surface shows a preview before send where the contract requires it.
 - **R:** owning-record access gates still decide document access; no artificial document identity/table appears.
 
 ### P2-T10 — final integration
@@ -1322,6 +1461,17 @@ Investigated during this planning run and determined **not** to require implemen
 | 9.12 Controlo Approve | MISSING | READY FOR IMPLEMENTATION | P2-T06 |
 | 9.13 Boquilhas | MISSING | READY FOR IMPLEMENTATION | P2-T07 |
 | 9.14 Boquilhas repairer | MISSING | READY FOR IMPLEMENTATION | P2-T07 |
+| **delta §1** Controlo_Create owns Definições | SETTLED (new authority) | RECORDED — `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` | P2-T05 |
+| **delta §2** Controlo_Approve reduced to Aprovar + Histórico de Pesos | SETTLED (scope reduction) | RECORDED | P2-T06 |
+| **delta §3** repairer register (name only; owner = Controlo_Create → Definições) | SETTLED (new authority; closes the B3 directory-source half) | RECORDED | P2-T05 (register), P2-T07 (consumption) |
+| **delta §4** per-machine independent repairer assignments (B1/B2/B3/C1/C2/C3) | SETTLED (new authority) | RECORDED | P2-T05 (configuration), P2-T07 (consumption) |
+| **delta §5** automatic Boquilhas repairer resolution from machine | SETTLED (new authority) | RECORDED | P2-T07 |
+| **delta §6** historical repairer preservation | SETTLED (new authority) | RECORDED | P2-T07 |
+| **delta §7** PDF/document base directory setting | SETTLED (new authority) | RECORDED | P2-T05 (setting), P2-T08 (consumption) |
+| **delta §8** email recipient lists | SETTLED (new authority) | RECORDED | P2-T05 (setting), P2-T08 (consumption) |
+| **delta §9** email routing from known production context | SETTLED (intent only; no invented rules) | RECORDED | P2-T08 |
+| **delta §10** email templates | SETTLED (no placeholder syntax fixed) | RECORDED | P2-T05 (setting), P2-T08 (consumption) |
+| **delta §11** Boquilhas machine sidebar removed from current authority | SETTLED (visual authority) | RECORDED | P2-T07 |
 | 9.15 documents/PDF | MISSING | READY FOR IMPLEMENTATION | P2-T08 |
 | 9.16 Module availability registrations | MISSING | READY FOR IMPLEMENTATION | P2-T10 |
 | 9.17 real destination routes | MISSING | READY FOR IMPLEMENTATION | P2-T10 |

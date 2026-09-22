@@ -9,11 +9,18 @@ Authority blocker: **B3** — an authored, reviewed `PLAN ACCEPT` contract must 
 ## Binding fixed desktop layout
 
 This handoff inherits the master plan's **DMO FIXED DESKTOP LAYOUT POLICY**. Boquilhas
-operational tables, filters, movement actions, balance/status information, side panel and
-History surface are designed first at **1366 × 768** with compact density and stable locations.
-Larger desktops preserve that composition. Smaller windows use page or local scrolling; tables
-do not become cards, required columns stay visible, the side panel does not move below content
-and actions do not move because of width. Mobile/tablet variants are out of scope.
+operational tables, filters, movement actions, balance/status information and History surface are
+designed first at **1366 × 768** with compact density and stable locations. Larger desktops
+preserve that composition. Smaller windows use page or local scrolling; tables do not become
+cards, required columns stay visible and actions do not move because of width. Mobile/tablet
+variants are out of scope.
+
+> **Scope note.** The **machine/sidebar** concept is **removed from current visual authority**
+> (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §11): it depended on a Job On
+> operational context that does not exist in the current surface. Implement **no** side panel
+> that simulates Job On machine/reference state. The layout policy above still governs every
+> surface that remains (tables, filters, actions, balance/status, History, and the read-only
+> production-line contextual panel).
 
 ## 1. Purpose
 
@@ -22,6 +29,13 @@ movements, movement editing with audit, derived balance, close/reopen and Histor
 
 ## 2. Authority
 
+- `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §3, §4, §5, §6, §11 — **settled
+  authority for the repairer model in this handoff**: the repairer register is owned by
+  `Controlo_Create → Definições` (name is the only required data); `B1`,`B2`,`B3`,`C1`,`C2`,`C3`
+  each hold an **independent** repairer assignment with no grouping rule; Boquilhas resolves the
+  repairer **automatically** from the machine's current assignment; the repairer actually used is
+  **historically preserved**; and the Job-On-dependent machine sidebar is **removed** from current
+  visual authority.
 - `dmo-beta-master/modules/BOQUILHAS.md` (full) — identity, flows, movement vocabulary, edit
   audit, balance, business date, close/reopen, repairer, history, acceptance.
 - `dmo-beta-master/architecture/RECORD_LIFECYCLES.md` §9 — Boquilhas lifecycle.
@@ -64,6 +78,21 @@ P2-T01…P2-T03.
     actor/time/reason; a failed close leaves the active state unchanged.
 12. Canonical **`repairer_id`** stored on external Saída with historical retention.
 13. Production-line contextual panel **reading** (not owning) production context.
+14. **Automatic repairer resolution** (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md`
+    §4, §5, §6): when a registration/movement is associated with a machine, the repairer is
+    resolved from that machine's **current** assignment —
+    `machine → current repairer assignment → repairer resolved`. The operator should not normally
+    have to manually choose the repairer when the machine is already known. `B1`,`B2`,`B3`,`C1`,
+    `C2`,`C3` resolve **independently**; there is no shared B/C repairer and no "Linha B"/"Linha C"
+    model. The repairer used at the time of the movement is **historically preserved**: changing a
+    machine's assignment later must **never** rewrite an earlier Boquilhas record. Boquilhas
+    **consumes** the register and does not administer it.
+15. **Removed from current visual authority:** the Boquilhas **machine/sidebar** concept that
+    depends on Job On operational context is removed from the current frontend authority
+    (`…DELTA.md` §11). Do **not** simulate Job On machine/reference state inside Boquilhas. If
+    future Job On integration justifies such context, it may be reintroduced later from real
+    backend authority. The production-line contextual panel (item 13) is a different, read-only
+    reading of real supplied context and is unchanged.
 
 ## 5. Authority blocker B3 — required contract before execution
 
@@ -72,10 +101,23 @@ The authored, reviewed contract must fix: the aggregate/movement schema and keys
 representation; the close/reopen representation; the History filter/query shapes; transactional
 boundaries; and the endpoint/route names with their module policy.
 
+It must **also** fix — consistently with `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md`:
+the `repairer_id` schema shape; how the machine's current assignment is read for automatic
+resolution; and the mechanism by which the repairer used at the time of the movement is
+**historically preserved** (choose the pattern the existing architecture already establishes for
+retained historical facts — minimum relation, minimum snapshot; do **not** invent a new
+mechanism, and do **not** prescribe one in this handoff). It must **not** invent repairer fields
+beyond name, a machine grouping rule, or a locally simulated Job On machine state.
+
+The directory source half of B3 is **settled** by the delta (§3.6): the register lives in
+`Controlo_Create → Definições`. The physical contract remains open.
+
 ## 6. Explicit non-scope
 
 - Mandatory Boquilhas PDF; internal Boquilhas settings/Admin tab.
-- Repairer directory administration.
+- **Repairer directory administration** — the register is owned by `Controlo_Create → Definições`;
+  Boquilhas only selects/consumes a repairer.
+- **Any machine/reference sidebar simulating Job On context** (`…DELTA.md` §11).
 - Job On planning ownership; Armazém stock/location; per-piece BQ identity.
 - Obsolete legacy movement types.
 - No `CurrentBuildAvailable` change and no route registration.
@@ -100,6 +142,9 @@ availability remains a projection only.
 
 Per B3. Aggregate + movements + edit/audit history + close snapshot + reopen record;
 `repairer_id` relation; no reverse-ID arrays; movement facts are the sole balance authority.
+The repairer actually used must remain readable on the historical record after the machine's
+current assignment changes; the machine assignments themselves are **read** from the
+Controlo_Create → Definições configuration and are not owned here.
 
 ## 10. Required tests
 
@@ -109,10 +154,19 @@ constraints; excess Entrada recorded; negative saldo non-blocking; `% utilizaç�
 identities; close/reopen same id with full history; failed close no-op; repairer historical
 retention.
 
+Additionally (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §4, §5, §6, §11): a
+registration/movement associated with a machine resolves the repairer automatically and does not
+force re-selection; the six machines resolve independently and changing one assignment changes no
+other machine's resolution; a later assignment change leaves an earlier record's repairer
+unchanged; Boquilhas cannot administer the repairer register; no machine/reference sidebar is
+rendered.
+
 ## 11. Acceptance criteria
 
 Every bullet in `modules/BOQUILHAS.md` "Acceptance criteria"; the movement selector exposes only
-the four types; no mandatory PDF; no settings tab; no replacement aggregate on close/reopen.
+the four types; no mandatory PDF; no settings tab; no replacement aggregate on close/reopen;
+automatic repairer resolution from the machine's current independent assignment; historical
+repairer preservation; no machine sidebar; `CurrentBuildAvailable` unchanged.
 
 ## 12. Completion evidence
 
