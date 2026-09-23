@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Text.RegularExpressions;
 using DMO.Infrastructure.Persistence;
 using DMO.IntegrationTests.ControloCreate;
@@ -13,17 +13,17 @@ using Npgsql;
 namespace DMO.IntegrationTests.Persistence;
 
 /// <summary>
-/// P2-T05 post-closure correction — env-gated integration test — Migration 005
+/// P2-T05 post-closure correction â€” env-gated integration test â€” Migration 005
 /// (<c>GlassDensitySettings</c>, the FIFTH migration overall per Architect review observation
 /// N-1): the single new table, its constraints/PK, the two provenance-backed initial rows
-/// (NNPB 2.4027 / PS 2.4231 at version 1 — the sibling-settings seed convention per observation
+/// (NNPB 2.4027 / PS 2.4231 at version 1 â€” the sibling-settings seed convention per observation
 /// N-2), the exact <c>Down</c> behaviour and the no-drift re-apply, against a disposable
 /// PostgreSQL database.
 /// </summary>
 /// <remarks>
-/// Authority: correction contract §5.1/§5.2 (table + seeds), §5.6 (migration contract: one
+/// Authority: correction contract Â§5.1/Â§5.2 (table + seeds), Â§5.6 (migration contract: one
 /// additive migration after <c>20260923045054_ControloCreateDomain</c>, Down drops only the new
-/// table, re-apply no-op) and §5.7 rows I/DB. Every row is <c>[SkippableFact]</c> behind
+/// table, re-apply no-op) and Â§5.7 rows I/DB. Every row is <c>[SkippableFact]</c> behind
 /// <see cref="PersistenceTestDatabase.SkipIfNotConfigured"/>, reported as environment-gated
 /// skipped when no disposable database is configured.</remarks>
 [Collection(PersistenceDatabaseCollection.Name)]
@@ -44,21 +44,24 @@ public sealed class Migration005GlassDensitySettingsTests
         "20260922232349_ToolJobOnDomainCore",
         "20260923045054_ControloCreateDomain",
         "20260923122429_GlassDensitySettings",
+        "20260923171223_ControloApproveDomain",
     ];
 
-    /// <summary>The complete public product-table register after all five migrations.</summary>
+    /// <summary>The complete public product-table register after all SIX migrations (disclosed P2-T06
+    /// extension: the one review-decision table joins the closed 20-table state).</summary>
     private static readonly string[] PublicProductTables =
     [
         "admin_accounts", "bq_contexts", "cm_contexts", "email_list_recipients", "email_lists",
         "email_templates", "glass_density_settings", "job_ons", "machine_repairer_assignments",
         "mf_contexts", "pdf_directory_settings", "peso_measurement_rows", "pesos", "repairers",
-        "template_modules", "templates", "tool_machines", "tools", "users",
+        "template_modules", "templates", "tool_machines", "tools", "users", "peso_review_decisions",
     ];
 
     /// <summary>
-    /// GD-M1 — applying all five migrations to a reset schema leaves exactly the five contracted
-    /// migrations in <c>__EFMigrationsHistory</c> and exactly the 20 public product tables; the
-    /// correction adds exactly ONE table to the closed 19-table state.
+    /// GD-M1 â€” applying all five migrations to a reset schema leaves exactly the six contracted
+    /// migrations in <c>__EFMigrationsHistory</c> and exactly the 21 public product tables; the
+    /// correction adds exactly ONE table to the closed 19-table state and P2-T06 adds exactly ONE
+    /// decision table to the closed 20-table state.
     /// </summary>
     [SkippableFact]
     public async Task GD_M1_ExactlyOneNewTableAndTheFifthMigrationAreApplied()
@@ -79,12 +82,12 @@ public sealed class Migration005GlassDensitySettingsTests
             "SELECT table_name FROM information_schema.tables " +
             "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"));
 
-        Assert.Equal(20, tables.Count); // 19 closed tables + exactly one correction table
+        Assert.Equal(21, tables.Count); // 20 closed tables + exactly one correction table + exactly one decision table
         Assert.Equal(Sorted([.. PublicProductTables, MigrationHistoryTable]), tables);
     }
 
     /// <summary>
-    /// GD-M2 — the migration source creates exactly the one table and its <c>Down</c> drops only
+    /// GD-M2 â€” the migration source creates exactly the one table and its <c>Down</c> drops only
     /// that table (the closed 8-table migration 004 source is untouched byte-wise at the DDL
     /// level: it still creates exactly its eight tables).
     /// </summary>
@@ -117,7 +120,7 @@ public sealed class Migration005GlassDensitySettingsTests
     }
 
     /// <summary>
-    /// GD-M3 — the physical table is exactly the contracted shape: PK <c>processo</c>, the two
+    /// GD-M3 â€” the physical table is exactly the contracted shape: PK <c>processo</c>, the two
     /// named CHECKs (<c>processo IN ('NNPB','PS')</c>, <c>density_g_cm3 &gt; 0</c>),
     /// <c>numeric(18,4)</c> precision/scale, version default 1 and <c>now()</c> timestamps; no
     /// extra index exists beyond the PK (the PK covers the only query shapes).
@@ -177,8 +180,8 @@ public sealed class Migration005GlassDensitySettingsTests
     }
 
     /// <summary>
-    /// GD-M4 — the migration seeds exactly TWO initial rows with the provenance-backed
-    /// authoritative values at the sibling-settings version 1: NNPB → 2.4027, PS → 2.4231 —
+    /// GD-M4 â€” the migration seeds exactly TWO initial rows with the provenance-backed
+    /// authoritative values at the sibling-settings version 1: NNPB â†’ 2.4027, PS â†’ 2.4231 â€”
     /// exact <c>numeric(18,4)</c> values, nothing else, no generic catalog.
     /// </summary>
     [SkippableFact]
@@ -206,7 +209,7 @@ public sealed class Migration005GlassDensitySettingsTests
     }
 
     /// <summary>
-    /// GD-M5 — the CHECKs are enforced: a non-canonical processo and a non-positive density are
+    /// GD-M5 â€” the CHECKs are enforced: a non-canonical processo and a non-positive density are
     /// rejected by the database itself (defense in depth behind the validator).
     /// </summary>
     [SkippableFact]
@@ -231,7 +234,7 @@ public sealed class Migration005GlassDensitySettingsTests
     }
 
     /// <summary>
-    /// GD-M6 — schema-level frozen-history posture: no Peso column changed and no per-tool
+    /// GD-M6 â€” schema-level frozen-history posture: no Peso column changed and no per-tool
     /// density column exists anywhere; <c>Down</c> removes ONLY the correction table on a real
     /// database, restoring the closed 19-table state; re-applying is a complete no-op.
     /// </summary>
@@ -254,7 +257,7 @@ public sealed class Migration005GlassDensitySettingsTests
             context,
             "SELECT table_name FROM information_schema.tables " +
             "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"));
-        Assert.Equal(19, tables.Count);
+        Assert.Equal(20, tables.Count);
         Assert.DoesNotContain(CorrectionTable, tables);
 
         // Re-apply: the correction migration runs again and restores the exact two-row state.
@@ -273,7 +276,7 @@ public sealed class Migration005GlassDensitySettingsTests
         // A further re-run applies nothing.
         await PersistenceTestDatabase.ApplyMigrationsAsync(context);
         Assert.Empty(await context.Database.GetPendingMigrationsAsync());
-        Assert.Equal(5, (await context.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(6, (await context.Database.GetAppliedMigrationsAsync()).Count());
     }
 
     private static async Task ExecuteAsync(DmoDbContext context, string sql)

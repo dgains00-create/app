@@ -60,6 +60,38 @@ internal sealed class P2T05TestComposition :
 
     public bool FailPesoCreate { get; set; }
 
+    /// <summary>All seeded Peso ids (test-owned arrangement; P2-T06 review-store reads).</summary>
+    internal IReadOnlyList<Guid> SeededPesoIds() => _pesos.Keys.ToList();
+
+    /// <summary>
+    /// Applies the contracted P2-T06 decision transition on the stored Peso row (same-row status
+    /// transition + version bump; reopen restores the pendente draft handoff). Arrangement for the
+    /// P2-T06 HTTP tests, mirroring <c>PesoReviewRepository.ApplyTransition</c>.
+    /// </summary>
+    internal void ApplyDecisionTransition(Guid pesoId, PesoReviewDecisionKind decision)
+    {
+        if (!_pesos.TryGetValue(pesoId, out var peso))
+        {
+            return;
+        }
+
+        var (status, submittedAt, submittedBy) = decision switch
+        {
+            PesoReviewDecisionKind.Aprovado => (PesoStatus.Aprovado, peso.SubmittedAt, peso.SubmittedByUserId),
+            PesoReviewDecisionKind.NaoAprovado => (PesoStatus.NaoAprovado, peso.SubmittedAt, peso.SubmittedByUserId),
+            _ => (PesoStatus.Pendente, (DateTimeOffset?)null, (Guid?)null),
+        };
+
+        _pesos[pesoId] = peso with
+        {
+            Status = status,
+            SubmittedAt = submittedAt,
+            SubmittedByUserId = submittedBy,
+            Version = peso.Version + 1,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        };
+    }
+
     /// <summary>
     /// Creates the composition with the glass-density store seeded with the provenance-backed
     /// bootstrap values (NNPB 2.4027 / PS 2.4231 g/cm³, version 1 — the sibling-settings

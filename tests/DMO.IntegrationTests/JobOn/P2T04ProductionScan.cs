@@ -518,6 +518,9 @@ internal static class P2T04ProductionScan
         // ---- P2-T05 (disclosed): the new Controlo test surface -----------------------------
         "tests/DMO.UnitTests/ControloCreate/",
         "tests/DMO.IntegrationTests/ControloCreate/",
+        // ---- P2-T06 (disclosed): the new Controlo Approve test surface --------------------
+        "tests/DMO.UnitTests/ControloApprove/",
+        "tests/DMO.IntegrationTests/ControloApprove/",
     ];
 
     /// <summary>
@@ -531,6 +534,18 @@ internal static class P2T04ProductionScan
     [
         "tests/DMO.IntegrationTests/MigrationRunnerTests.cs",
         "tests/DMO.IntegrationTests/DatabaseConnectivityTests.cs",
+        // ---- P2-T06 (disclosed): the pre-existing test files this phase extended ----------
+        // The modelled-table/migration inventory rows necessarily grow by the one decision table
+        // and the sixth migration; the Tool DbSet-restriction inventory discloses the one review
+        // entity join; the P2-T05 access row discloses the now-existing approve surface; the
+        // P2-T05 test store gains the P2-T06 arrangement surface. All are additive disclosures of
+        // the same pins — never weakenings (each change is documented in-file).
+        "tests/DMO.UnitTests/Tools/ToolRestrictionTests.cs",
+        "tests/DMO.IntegrationTests/ControloCreate/ControloCreateAccessTests.cs",
+        "tests/DMO.IntegrationTests/ControloCreate/P2T05TestStore.cs",
+        "tests/DMO.IntegrationTests/Persistence/Migration003ToolJobOnDomainCoreTests.cs",
+        "tests/DMO.IntegrationTests/Persistence/Migration004ControloCreateDomainTests.cs",
+        "tests/DMO.IntegrationTests/Persistence/Migration005GlassDensitySettingsTests.cs",
     ];
 
     /// <summary>The new P2-T04 env-gated persistence test files (contract §20.9/§20.10).</summary>
@@ -555,6 +570,9 @@ internal static class P2T04ProductionScan
         // persistence tests of the correction slice ---------------------------------------
         "Migration005GlassDensitySettingsTests.cs",
         "GlassDensitySettingsRepositoryIntegrationTests.cs",
+        // ---- P2-T06 (disclosed): the new env-gated Controlo Approve persistence tests ---------
+        "Migration006ControloApproveDomainTests.cs",
+        "PesoReviewRepositoryIntegrationTests.cs",
     ];
 
     /// <summary>Returns whether a repository-relative test path belongs to the new P2-T04 surface.</summary>

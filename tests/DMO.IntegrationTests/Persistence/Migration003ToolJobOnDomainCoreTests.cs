@@ -14,46 +14,46 @@ using Npgsql;
 namespace DMO.IntegrationTests.Persistence;
 
 /// <summary>
-/// P2-T04 env-gated integration test — Migration 003 (<c>ToolJobOnDomainCore</c>): the physical
+/// P2-T04 env-gated integration test â€” Migration 003 (<c>ToolJobOnDomainCore</c>): the physical
 /// schema, the contracted keys/constraints/indexes and the migration behaviour against a
 /// disposable PostgreSQL database.
 /// </summary>
 /// <remarks>
-/// Authority: P2-T04 contract §3 (physical schema), §4 (keys, constraints, indexes), §16 (migration
-/// contract), §19 (PostgreSQL/Supabase compatibility) and §20.9 (rows MIG1–MIG12). Every DB-class
+/// Authority: P2-T04 contract Â§3 (physical schema), Â§4 (keys, constraints, indexes), Â§16 (migration
+/// contract), Â§19 (PostgreSQL/Supabase compatibility) and Â§20.9 (rows MIG1â€“MIG12). Every DB-class
 /// row is <c>[SkippableFact]</c> behind <see cref="PersistenceTestDatabase.SkipIfNotConfigured"/>
 /// and is reported as environment-gated skipped when no disposable database is configured
-/// (§20.10).
+/// (Â§20.10).
 /// </remarks>
 [Collection(PersistenceDatabaseCollection.Name)]
 public sealed class Migration003ToolJobOnDomainCoreTests
 {
-    /// <summary>The migration the P2-T04 migration is applied on top of (§20.9 row MIG8).</summary>
+    /// <summary>The migration the P2-T04 migration is applied on top of (Â§20.9 row MIG8).</summary>
     private const string PreviousMigrationId = "20260922001757_TemplateModuleComposition";
 
-    /// <summary>The EF migration class name of the P2-T04 migration (§16.1).</summary>
+    /// <summary>The EF migration class name of the P2-T04 migration (Â§16.1).</summary>
     private const string ToolJobOnMigrationName = "ToolJobOnDomainCore";
 
     /// <summary>
-    /// The EF migration class name of the P2-T05 migration (P2-T05 contract §25.1) — disclosed
+    /// The EF migration class name of the P2-T05 migration (P2-T05 contract Â§25.1) â€” disclosed
     /// extension: the P2-T05 migration now applies on top of this one.
     /// </summary>
     private const string ControloCreateMigrationName = "ControloCreateDomain";
 
-    /// <summary>The glass-density correction migration 005 (post-closure correction §5.6).</summary>
+    /// <summary>The glass-density correction migration 005 (post-closure correction Â§5.6).</summary>
     private const string CorrectionMigrationName = "GlassDensitySettings";
 
     /// <summary>The four foundation tables of migrations 001/002.</summary>
     private static readonly string[] FoundationTables =
         ["admin_accounts", "templates", "template_modules", "users"];
 
-    /// <summary>The six contracted domain-core tables of migration 003 (§3, §16.2).</summary>
+    /// <summary>The six contracted domain-core tables of migration 003 (Â§3, Â§16.2).</summary>
     private static readonly string[] DomainCoreTables =
         ["bq_contexts", "cm_contexts", "job_ons", "mf_contexts", "tool_machines", "tools"];
 
     /// <summary>
     /// The eight contracted Controlo tables of migration 004 (disclosed P2-T05 extension, P2-T05
-    /// contract §16/§25).
+    /// contract Â§16/Â§25).
     /// </summary>
     private static readonly string[] ControloTables =
     [
@@ -65,19 +65,22 @@ public sealed class Migration003ToolJobOnDomainCoreTests
     /// <summary>The single approved table of the post-closure glass-density correction (migration 005).</summary>
     private const string GlassDensitySettingsTable = "glass_density_settings";
 
+    /// <summary>The single P2-T06 table of migration 006 (disclosed extension, P2-T06 contract §25).</summary>
+    private const string PesoReviewDecisionsTable = "peso_review_decisions";
+
     /// <summary>EF's own migration bookkeeping table (never a product table).</summary>
     private const string MigrationHistoryTable = "__EFMigrationsHistory";
 
-    /// <summary>Tables that must never appear (contract §17, AC-99, AC-104; P2-T05 removed
+    /// <summary>Tables that must never appear (contract Â§17, AC-99, AC-104; P2-T05 removed
     /// <c>repairers</c> from the forbidden list because the accepted P2-T05 contract creates the
-    /// canonical repairer register — disclosed extension).</summary>
+    /// canonical repairer register â€” disclosed extension).</summary>
     private static readonly string[] ForbiddenTables =
     [
         "machines", "machine_registry", "tool_references", "documents", "settings",
         "permissions", "capabilities", "roles", "admin_audit_events",
     ];
 
-    /// <summary>The 44 contracted columns of the six tables (§3.1–§3.4).</summary>
+    /// <summary>The 44 contracted columns of the six tables (Â§3.1â€“Â§3.4).</summary>
     private static readonly ColumnContract[] ContractedColumns =
     [
         new("tools", "tool_id", "uuid", "NO", "gen_random_uuid()"),
@@ -131,7 +134,7 @@ public sealed class Migration003ToolJobOnDomainCoreTests
         new("bq_contexts", "updated_at", "timestamp with time zone", "NO", "now()"),
     ];
 
-    /// <summary>The 18 contracted CHECK constraints (§4.4).</summary>
+    /// <summary>The 18 contracted CHECK constraints (Â§4.4).</summary>
     private static readonly (string Table, string Name)[] ContractedChecks =
     [
         ("tools", "tools_type_check"),
@@ -154,7 +157,7 @@ public sealed class Migration003ToolJobOnDomainCoreTests
         ("bq_contexts", "bq_contexts_tool_lot_required_check"),
     ];
 
-    /// <summary>The six contracted unique keys (§4.2).</summary>
+    /// <summary>The six contracted unique keys (Â§4.2).</summary>
     private static readonly IndexContract[] ContractedUniqueKeys =
     [
         new("tools", "tools_type_reference_lot_key", true, "tool_type,reference,lot"),
@@ -166,7 +169,7 @@ public sealed class Migration003ToolJobOnDomainCoreTests
     ];
 
     /// <summary>
-    /// The complete contracted index register of the six tables (§4.5): the twelve contracted
+    /// The complete contracted index register of the six tables (Â§4.5): the twelve contracted
     /// indexes plus the six primary-key indexes. No other index is contracted.
     /// </summary>
     private static readonly IndexContract[] ContractedIndexes =
@@ -186,7 +189,7 @@ public sealed class Migration003ToolJobOnDomainCoreTests
         new("bq_contexts", "PK_bq_contexts", true, "bq_id"),
     ];
 
-    /// <summary>The eight contracted foreign keys, every one ON DELETE RESTRICT (§4.3).</summary>
+    /// <summary>The eight contracted foreign keys, every one ON DELETE RESTRICT (Â§4.3).</summary>
     private static readonly ForeignKeyContract[] ContractedForeignKeys =
     [
         new("FK_tool_machines_tools_tool_id", "tool_machines", "tool_id", "tools", "tool_id"),
@@ -218,10 +221,11 @@ public sealed class Migration003ToolJobOnDomainCoreTests
 
         // Disclosed P2-T05 extension: the shared schema now also holds the eight contracted
         // Controlo tables (migration 004); the post-closure glass-density correction adds
-        // exactly the one approved settings table (migration 005). The P2-T04 rows keep
+        // exactly the one approved settings table (migration 005); the P2-T06 Controlo Approve
+        // migration 006 adds exactly the one review-decision table. The P2-T04 rows keep
         // pinning the complete set.
         Assert.Equal(
-            Sorted([.. FoundationTables, .. DomainCoreTables, .. ControloTables, GlassDensitySettingsTable, MigrationHistoryTable]),
+            Sorted([.. FoundationTables, .. DomainCoreTables, .. ControloTables, GlassDensitySettingsTable, PesoReviewDecisionsTable, MigrationHistoryTable]),
             tables);
 
         foreach (var forbidden in ForbiddenTables)
@@ -374,7 +378,7 @@ public sealed class Migration003ToolJobOnDomainCoreTests
             var actual = Assert.Single(parsed, row => row.Name == expected.Name);
 
             Assert.Equal(expected.Table, actual.Table);
-            Assert.Equal("r", actual.DeleteType); // RESTRICT — no foreign key of this schema cascades.
+            Assert.Equal("r", actual.DeleteType); // RESTRICT â€” no foreign key of this schema cascades.
             Assert.Contains(
                 $"FOREIGN KEY ({expected.Column}) REFERENCES " +
                 $"{expected.PrincipalTable}({expected.PrincipalColumn}) ON DELETE RESTRICT",
@@ -403,7 +407,7 @@ public sealed class Migration003ToolJobOnDomainCoreTests
     }
 
     /// <summary>
-    /// MIG7 (AC-103): applying the migration twice is a no-op — no error, no pending migration and
+    /// MIG7 (AC-103): applying the migration twice is a no-op â€” no error, no pending migration and
     /// no schema change of any of the ten tables.
     /// </summary>
     [SkippableFact]
@@ -558,7 +562,7 @@ public sealed class Migration003ToolJobOnDomainCoreTests
         // Exactly five migrations exist: 001, 002, the P2-T04 migration, the P2-T05 Controlo
         // migration (disclosed extension) and the glass-density correction migration 005
         // (post-closure correction; Architect review observation N-1).
-        Assert.Equal(5, migrationFiles.Count);
+        Assert.Equal(6, migrationFiles.Count);
         var toolJobOnMigrations = migrationFiles
             .Where(name => name.EndsWith($"_{ToolJobOnMigrationName}.cs", StringComparison.Ordinal))
             .ToList();
@@ -569,11 +573,11 @@ public sealed class Migration003ToolJobOnDomainCoreTests
             name.EndsWith($"_{ToolJobOnMigrationName}.Designer.cs", StringComparison.Ordinal));
         Assert.Equal("20260922232349_ToolJobOnDomainCore.Designer.cs", designerFile);
 
-        // The pair shares one timestamp prefix (one migration, one owner — §16.1).
+        // The pair shares one timestamp prefix (one migration, one owner â€” Â§16.1).
         var stamp = migrationFile[..migrationFile.IndexOf('_')];
         Assert.StartsWith(stamp, designerFile, StringComparison.Ordinal);
 
-        // The single P2-T05 migration pair exists on top of this one (P2-T05 contract §25.1).
+        // The single P2-T05 migration pair exists on top of this one (P2-T05 contract Â§25.1).
         var controloMigrations = migrationFiles
             .Where(name => name.EndsWith($"_{ControloCreateMigrationName}.cs", StringComparison.Ordinal))
             .ToList();
@@ -589,7 +593,7 @@ public sealed class Migration003ToolJobOnDomainCoreTests
         // migration's OWN designer is a frozen historical artifact of its generation time and
         // still records the ten tables it shipped with.
         var expectedTables = Sorted([.. FoundationTables, .. DomainCoreTables, .. ControloTables]);
-        var expectedSnapshotTables = Sorted([.. FoundationTables, .. DomainCoreTables, .. ControloTables, GlassDensitySettingsTable]);
+        var expectedSnapshotTables = Sorted([.. FoundationTables, .. DomainCoreTables, .. ControloTables, GlassDensitySettingsTable, PesoReviewDecisionsTable]);
         var expectedP2T04DesignerTables = Sorted([.. FoundationTables, .. DomainCoreTables]);
 
         var snapshot = await File.ReadAllTextAsync(Path.Combine(migrationsDirectory, "DmoDbContextModelSnapshot.cs"));
@@ -617,12 +621,15 @@ public sealed class Migration003ToolJobOnDomainCoreTests
         var latest = context.Database.GetMigrations().Last();
         // Disclosed P2-T05 extension: the latest migration is now the Controlo domain migration;
         // the post-closure correction adds the glass-density migration 005 on top (Architect
-        // review observation N-1: the correction migration is the FIFTH overall).
+        // review observation N-1: the correction migration is the FIFTH overall); P2-T06 adds
+        // the Controlo Approve migration 006 on top (disclosed extension).
         var latestIsControlo = latest.EndsWith(ControloCreateMigrationName, StringComparison.Ordinal);
         var latestIsCorrection = latest.EndsWith(CorrectionMigrationName, StringComparison.Ordinal);
+        var latestIsP2T06 = latest.EndsWith("ControloApproveDomain", StringComparison.Ordinal);
         Assert.True(
-            latestIsControlo || latestIsCorrection,
-            $"The latest migration must be the Controlo domain or the glass-density correction, was {latest}.");
+            latestIsControlo || latestIsCorrection || latestIsP2T06,
+            $"The latest migration must be the Controlo domain, the glass-density correction or the " +
+            $"P2-T06 Controlo Approve domain, was {latest}.");
 
         try
         {
@@ -712,7 +719,7 @@ public sealed class Migration003ToolJobOnDomainCoreTests
         Assert.DoesNotContain("HasData", source, StringComparison.Ordinal);
         Assert.DoesNotContain("insert", source, StringComparison.OrdinalIgnoreCase);
 
-        // Down is exactly the contracted six table drops — no schema reset, no other statement.
+        // Down is exactly the contracted six table drops â€” no schema reset, no other statement.
         var down = source[downStart..];
         var dropped = Regex.Matches(down, "name: \"(?<name>[a-z_]+)\"")
             .Select(match => match.Groups["name"].Value)
@@ -722,7 +729,7 @@ public sealed class Migration003ToolJobOnDomainCoreTests
         Assert.DoesNotContain("migrationBuilder.Sql(", down, StringComparison.Ordinal);
     }
 
-    /// <summary>The eighteen violating-row cases, one per contracted CHECK constraint (§4.4).</summary>
+    /// <summary>The eighteen violating-row cases, one per contracted CHECK constraint (Â§4.4).</summary>
     private static IEnumerable<(string ConstraintName, string Sql)> ViolationCases(
         string token,
         Guid cmToolId,
@@ -911,7 +918,7 @@ public sealed class Migration003ToolJobOnDomainCoreTests
         return migrations[index - 1];
     }
 
-    /// <summary>Extracts the <c>ToTable("…")</c> table names of a model snapshot or designer file.</summary>
+    /// <summary>Extracts the <c>ToTable("â€¦")</c> table names of a model snapshot or designer file.</summary>
     private static IReadOnlyList<string> TablesOf(string source) =>
         Regex.Matches(source, "ToTable\\(\"(?<name>[a-z_]+)\"")
             .Select(match => match.Groups["name"].Value)
@@ -981,21 +988,21 @@ public sealed class Migration003ToolJobOnDomainCoreTests
         return results;
     }
 
-    /// <summary>One contracted column of §3.</summary>
+    /// <summary>One contracted column of Â§3.</summary>
     private sealed record ColumnContract(string Table, string Column, string DataType, string Nullable, string? Default)
     {
         /// <summary>The normalized catalog rendering of this column.</summary>
         public string Render() => $"{Table}|{Column}|{DataType}|{Nullable}|{Default ?? string.Empty}";
     }
 
-    /// <summary>One contracted index of §4.5 (its column list normalized without spaces).</summary>
+    /// <summary>One contracted index of Â§4.5 (its column list normalized without spaces).</summary>
     private sealed record IndexContract(string Table, string Name, bool Unique, string Columns)
     {
         /// <summary>The normalized catalog rendering of this index.</summary>
         public string Render() => $"{Table}|{Name}|{Unique}|{Columns}";
     }
 
-    /// <summary>One contracted foreign key of §4.3.</summary>
+    /// <summary>One contracted foreign key of Â§4.3.</summary>
     private sealed record ForeignKeyContract(
         string Name,
         string Table,

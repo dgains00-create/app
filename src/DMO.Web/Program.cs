@@ -1,5 +1,6 @@
 using DMO.Application.Accounts;
 using DMO.Application.Authentication;
+using DMO.Application.ControloApprove;
 using DMO.Application.ControloCreate;
 using DMO.Application.JobOn;
 using DMO.Application.Migrations;
@@ -148,6 +149,14 @@ try
     builder.Services.AddSingleton<IControloCalculationConfiguration, ConfigurationCalculationConfiguration>();
     builder.Services.AddSingleton<IPdfDirectoryProbe, ServerHostPdfDirectoryProbe>();
 
+    // ---- P2-T06 Controlo Approve: Aprovar + Histórico de Pesos -------------------------------
+    // The review/decision service over the SAME persisted peso_id (composing the shared P2-T05
+    // read, the review repository and the backend actor). No policy, no availability entry, no
+    // destination route and no second registry is added here: every P2-T06 route is server-gated
+    // by the accepted `controlo-approve` policy and stays denied to every caller until P2-T10
+    // registers availability (contract §13.3).
+    builder.Services.AddScoped<IControloApproveService, ControloApproveService>();
+
     // One ADMIN-only policy (dmo.administration) + scoped handler; deliberately outside the
     // Module policy namespace. Administration is ADMIN-account functionality, not a Module.
     builder.Services.AddAdministrationAuthorization();
@@ -200,5 +209,6 @@ app.MapJobOnEndpoints();
 app.MapFerramentasEndpoints();
 app.MapControloCreateEndpoints();
 app.MapControloDefinicoesEndpoints();
+app.MapControloApproveEndpoints();
 
 return await StartupCommands.RunHostAsync(app);

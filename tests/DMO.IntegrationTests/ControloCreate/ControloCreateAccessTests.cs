@@ -163,11 +163,13 @@ public sealed class ControloCreateAccessTests
     }
 
     /// <summary>
-    /// AUT4 (contract §26.4) — proves AC-G4: with ONLY the create surface granted, NO
-    /// <c>controlo-approve</c> surface exists — no route pattern under <c>/controlo/approve</c>,
-    /// no P2-T05 route metadata carrying the approve policy, and a direct GET of
-    /// <c>/controlo/approve</c> is a route-level 404 (a nonexistent surface is never served, never
-    /// denied-with-data and never redirected into the create surface).
+    /// AUT4 (contract §26.4) — proves AC-G4: with ONLY the create surface granted, the
+    /// <c>controlo-approve</c> surface exists as a SEPARATE sibling (P2-T06 disclosed extension:
+    /// the P2-T06 implementation added the approve surface, so the P2-T05-time "no approve route
+    /// exists" posture is superseded by the sibling-non-satisfaction rule) — no route pattern
+    /// under <c>/controlo/approve</c> is ever served to a create-only holder, no P2-T05 route
+    /// metadata carries the approve policy, and a direct GET of <c>/controlo/approve</c> is a
+    /// server-side 403 — never served-as-create, never redirected into the create surface.
     /// </summary>
     [Fact]
     public async Task AUT4_CreateOnlyHolderHasNoApproveSurfaceAtAll()
@@ -182,8 +184,8 @@ public sealed class ControloCreateAccessTests
             .OfType<RouteEndpoint>()
             .ToArray();
 
-        // No route of any kind owns the approve pattern.
-        Assert.DoesNotContain(
+        // The approve surface EXISTS now (P2-T06 disclosed extension) and is never a create route.
+        Assert.Contains(
             endpoints,
             endpoint => NormalizePath(endpoint.RoutePattern.RawText ?? string.Empty)
                 .StartsWith("/controlo/approve", StringComparison.Ordinal));
@@ -204,10 +206,10 @@ public sealed class ControloCreateAccessTests
             Assert.All(authorizeData, data => Assert.Equal(CreatePolicy, data.Policy));
         }
 
-        // The direct route is absent: 404, never a served approve surface.
+        // The direct route is denied server-side for a create-only holder: 403, never served.
         using var client = factory.CreateClient();
         using var approve = await P2T05TestHost.GetAsync(client, "/controlo/approve");
-        Assert.Equal(HttpStatusCode.NotFound, approve.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, approve.StatusCode);
     }
 
     // ---- inventory helpers -------------------------------------------------------------

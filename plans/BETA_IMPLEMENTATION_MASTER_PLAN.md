@@ -1062,30 +1062,31 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   renderer was reused, not copied.
 - **Downstream dependents:** P2-T08, P2-T10.
 
-- **CONTRACT STATUS: AUTHORED — AWAITING ARCHITECT PLAN REVIEW.** The D-side contract is
-  `plans/contracts/P2-T06_CONTROLO_APPROVE_CONTRACT.md` (status
-  **P2-T06 CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW**). It fixes — over the accepted,
-  CLOSED P2-T05 state — the reviewable circuit (the fixed predicate `submitted_at IS NOT NULL
-  AND status = 'pendente'`; the pending list is a query, not a queue table), approve/reject/
-  reopen on the **same `peso_id`** with backend attribution, the append-only decision trail
-  (who/when/`pesos.version` approved per the Peso Identity Rule), the reopen mapping (status
-  `pendente` + cleared handoff so the closed Create routes work again; never `aprovado` without
-  a NEW approval; "material edit" defined), the read-only review composed from the **exact**
-  shared `PesoSheetReadModel` (renderer-parity contract test; no fork/copy/second renderer), the
-  local Histórico de Pesos (filters, selection/open, trail; HISTÓRICO GLOBAL boundary), exactly
-  ONE new decision table (`peso_review_decisions`) + the deferred pending-list index
-  `IX_pesos_reviewable` in ONE new additive migration (006), exactly 9 routes (2 pages + 7
-  endpoints) all gated `dmo.module.controlo-approve` (Create/Approve grants fully independent).
-  Authority questions: **0 BLOCKING, 0 REQUIRES OWNER DECISION, 10 NON-BLOCKING with pinned
-  defaults** — Q-SEND (`Enviar para produção`: initiation-only affordance on approved Pesos,
-  unavailable-with-reason until P2-T08's contract, zero send persistence), Q-REOPEN
-  (reopen → `pendente`), Q-NOTE (reason required for reject/reopen), Q-FOLHA / Q-PERCM / Q-COMP
-  (carrier deferrals — Comparação/Folha remain NOT AUTHORIZED handoff remainder; no invented
-  tables/routes), Q-RENDER (parity-test reuse of the shared read model), Q-WARN, Q-PAGE,
-  Q-DECISIONS. `ModuleRegistrations.CurrentBuildAvailable` is still `[]`, no route is
-  registered, no application code was changed by the authoring task. The contract is **not
-  self-accepted**: it awaits the Architect PLAN review per `dmo-beta-master/WORKFLOW.md` step 6.
-  P2-T06 is NOT started; P2-T07 / P2-T08 / P2-T10 remain NOT AUTHORIZED.
+- **IMPLEMENTATION STATUS: IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT
+  IMPLEMENTATION REVIEW.** P2-T06 was authorized by the Architect PLAN review
+  (`947c5f7cb18b9e78dc6d4bf3a6477314e1514492`, dmo-work — **PLAN ACCEPT**, blocking findings
+  NONE) and is implemented against the accepted contract `dd0e16390e46d49c811d1597de674dcc68023813`
+  (evidence in `dev/responses/P2_T06_IMPLEMENTATION_RESPONSE.md`): the decision core over the
+  **same persisted `peso_id`** (approve/reject/reopen with backend attribution, version guard and
+  atomic transitions), the append-only decision trail (`peso_review_decisions` —
+  who/when/`pesos.version`, prior status, reason; immutable after COMMIT), the reopen mapping
+  (`pendente` + cleared submitted handoff so the CLOSED Create edit/submit routes work again;
+  never `aprovado` without a NEW approval), the pending/review list and the local Histórico de
+  Pesos (backend-applied filters; selection/open arbitration; HISTÓRICO GLOBAL boundary), the
+  read-only review composed from the **exact** shared `PesoSheetReadModel` (renderer-parity
+  contract test; no fork/copy/second renderer), exactly ONE new table + the deferred additive
+  index `IX_pesos_reviewable` in ONE new additive migration (006 — ControloApproveDomain), the
+  exact 9-route matrix (2 pages + 7 endpoints) all gated `dmo.module.controlo-approve`
+  (Create/Approve grants fully independent), the Q-SEND initiation-only `Enviar para produção`
+  affordance (visible only on approved Pesos, unavailable-with-reason until P2-T08 owns
+  execution; zero send persistence) and the per-CM/Folha/Comparação carrier deferrals (vocabulary
+  pinned in `PerCmDecisionVocabulary`; **no** invented table/route/type). Test totals:
+  **605 unit / 568 integration green** (2 pre-existing live-Supabase skips) over the full
+  solution, including the 61-AC/67-row matrix, the migration/schema evidence on a disposable
+  PostgreSQL and the D2/K5 conflict-reload behavioral harness.
+  `ModuleRegistrations.CurrentBuildAvailable` remains **`[]`** and no destination route is
+  registered: P2-T10 owns availability/navigation registration. P2-T06 is **not** closed;
+  P2-T07 / P2-T08 / P2-T10 remain **NOT AUTHORIZED**.
 
 ### P2-T07 — Boquilhas
 
@@ -1573,7 +1574,7 @@ Investigated during this planning run and determined **not** to require implemen
 | 9.9 Pegamentos | MISSING | READY FOR IMPLEMENTATION | P2-T05 |
 | 9.10 Folha + Resumo | MISSING | READY FOR IMPLEMENTATION | P2-T05 |
 | 9.11 shared Peso read model | MISSING | READY FOR IMPLEMENTATION | P2-T05 publishes, P2-T06 consumes |
-| 9.12 Controlo Approve | MISSING | READY FOR IMPLEMENTATION | P2-T06 — **CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW** (`plans/contracts/P2-T06_CONTROLO_APPROVE_CONTRACT.md`; 61 AC / 67 matrix rows; 0 BLOCKING / 0 OWNER / 10 NON-BLOCKING; no implementation; `CurrentBuildAvailable` `[]`) |
+| 9.12 Controlo Approve | MISSING | READY FOR IMPLEMENTATION | P2-T06 — **IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW** (contract `plans/contracts/P2-T06_CONTROLO_APPROVE_CONTRACT.md` @ `dd0e163…`; PLAN ACCEPT `947c5f7…`; response `dev/responses/P2_T06_IMPLEMENTATION_RESPONSE.md`; 61 AC / 67 matrix rows; 605 unit / 568 integration green; migration 006 + one table + one additive index; `CurrentBuildAvailable` `[]`) |
 | 9.13 Boquilhas | MISSING | READY FOR IMPLEMENTATION | P2-T07 |
 | 9.14 Boquilhas repairer | MISSING | READY FOR IMPLEMENTATION | P2-T07 |
 | **delta §1** Controlo_Create owns Definições | SETTLED (new authority) | RECORDED — `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` | P2-T05 |

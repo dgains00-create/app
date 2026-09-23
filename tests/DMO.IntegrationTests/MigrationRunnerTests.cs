@@ -8,11 +8,11 @@ using Microsoft.Extensions.DependencyInjection;
 namespace DMO.IntegrationTests;
 
 /// <summary>
-/// P1-T01/P1-T03 test — the migration mechanism works and Phase 1 models exactly the
+/// P1-T01/P1-T03 test â€” the migration mechanism works and Phase 1 models exactly the
 /// persistence-foundation schema.
 /// </summary>
 /// <remarks>
-/// PROPOSED — NOT EXECUTED. Awaiting Architect review before first execution.
+/// PROPOSED â€” NOT EXECUTED. Awaiting Architect review before first execution.
 /// See <c>docs/PROPOSED_TESTS_P1-T01.md</c> for the full test protocol record.
 /// </remarks>
 public sealed class MigrationRunnerTests
@@ -30,15 +30,15 @@ public sealed class MigrationRunnerTests
         // P1-T03 assertion: the context models exactly the four persistence-foundation
         // tables (Migration 001 + 002). No other Phase 1 table is implied.
         //
-        // P2-T04 (disclosed extension, contract §3 and §16.5): the accepted contract requires the
+        // P2-T04 (disclosed extension, contract Â§3 and Â§16.5): the accepted contract requires the
         // six domain-core tables to be mapped by the SAME single DbContext, discovered through
         // ApplyConfigurationsFromAssembly, so the exact modelled set necessarily grows by exactly
-        // those six tables. P2-T05 (disclosed extension, P2-T05 contract §16/§25): the accepted
+        // those six tables. P2-T05 (disclosed extension, P2-T05 contract Â§16/Â§25): the accepted
         // Controlo contract requires the eight Controlo tables to be mapped by the same single
         // DbContext, so the exact modelled set grows by exactly those eight tables. Post-closure
-        // glass-density correction (contract §5.1): the one approved settings table is mapped by
+        // glass-density correction (contract Â§5.1): the one approved settings table is mapped by
         // the same single DbContext, growing the modelled set by exactly one table. The assertion
-        // is not weakened — it still pins the complete modelled table set, and the forbidden-table
+        // is not weakened â€” it still pins the complete modelled table set, and the forbidden-table
         // non-effect below is unchanged.
         var modelled = context.Model.GetEntityTypes()
             .Select(e => e.GetTableName())
@@ -50,7 +50,7 @@ public sealed class MigrationRunnerTests
             {
                 "admin_accounts", "bq_contexts", "cm_contexts", "email_list_recipients", "email_lists",
                 "email_templates", "glass_density_settings", "job_ons", "machine_repairer_assignments",
-                "mf_contexts", "pdf_directory_settings", "peso_measurement_rows", "pesos", "repairers",
+                "mf_contexts", "pdf_directory_settings", "peso_measurement_rows", "peso_review_decisions", "pesos", "repairers",
                 "template_modules", "templates", "tool_machines", "tools", "users",
             },
             modelled);
@@ -97,8 +97,8 @@ public sealed class MigrationRunnerTests
 
         // Action + assertion: the runner refuses loudly instead of targeting a default database.
         //
-        // The WHOLE attempted migration-path operation is inside the asserted delegate —
-        // creating the scope, resolving IMigrationRunner and calling ListPendingAsync — because
+        // The WHOLE attempted migration-path operation is inside the asserted delegate â€”
+        // creating the scope, resolving IMigrationRunner and calling ListPendingAsync â€” because
         // database configuration is validated when the persistence services are resolved, not
         // only when the runner method executes. The accepted contract is "attempting the
         // migration path with no database configuration raises DatabaseConfigurationException";

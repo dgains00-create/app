@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace DMO.IntegrationTests;
 
 /// <summary>
-/// P1-T01 + P1-T03 connectivity test — the migration mechanism against a real PostgreSQL
+/// P1-T01 + P1-T03 connectivity test â€” the migration mechanism against a real PostgreSQL
 /// database: it applies Migration 001 then Migration 002 (in order, in one run), creates the
 /// four Phase-1 tables and nothing else, and a second run applies nothing (idempotent).
 /// </summary>
@@ -34,13 +34,13 @@ public sealed class DatabaseConnectivityTests
         Environment.GetEnvironmentVariable(ConnectionEnvironmentVariable);
 
     /// <summary>
-    /// P2-T04 (disclosed extension, contract §3/§16): the migration run applies EVERY pending
-    /// migration — now 001, 002 and the P2-T04 domain-core migration — and the schema is exactly the
+    /// P2-T04 (disclosed extension, contract Â§3/Â§16): the migration run applies EVERY pending
+    /// migration â€” now 001, 002 and the P2-T04 domain-core migration â€” and the schema is exactly the
     /// four foundation tables plus the six contracted domain-core tables, nothing more. P2-T05
-    /// (disclosed extension, P2-T05 contract §25): the run applies ALL four migrations (001, 002,
+    /// (disclosed extension, P2-T05 contract Â§25): the run applies ALL four migrations (001, 002,
     /// ToolJobOnDomainCore, ControloCreateDomain) and the schema is exactly the 10 product tables
     /// plus the eight contracted Controlo tables. Post-closure glass-density correction
-    /// (contract §5.6, Architect observation N-1): the run applies ALL FIVE migrations and the
+    /// (contract Â§5.6, Architect observation N-1): the run applies ALL FIVE migrations and the
     /// schema is exactly those 19 tables plus the one approved correction table. The idempotency
     /// evidence is unchanged.
     /// </summary>
@@ -70,7 +70,7 @@ public sealed class DatabaseConnectivityTests
 
         // Assertions: the five migrations, in generation order (001, 002, P2-T04 domain core,
         // P2-T05 Controlo domain, glass-density correction).
-        Assert.Equal(5, first.AppliedCount);
+        Assert.Equal(6, first.AppliedCount);
         Assert.Equal(
             new[]
             {
@@ -79,11 +79,12 @@ public sealed class DatabaseConnectivityTests
                 "20260922232349_ToolJobOnDomainCore",
                 "20260923045054_ControloCreateDomain",
                 "20260923122429_GlassDensitySettings",
+                "20260923171223_ControloApproveDomain",
             },
             first.AppliedMigrations);
 
         // The schema is exactly the nineteen product tables plus the one approved correction
-        // table — nothing more.
+        // table â€” nothing more.
         var tables = await ReadPublicTablesAsync(context);
         Assert.Equal(
             new[]
@@ -91,8 +92,8 @@ public sealed class DatabaseConnectivityTests
                 "__EFMigrationsHistory", "admin_accounts", "bq_contexts", "cm_contexts",
                 "email_list_recipients", "email_lists", "email_templates", "glass_density_settings",
                 "job_ons", "machine_repairer_assignments", "mf_contexts", "pdf_directory_settings",
-                "peso_measurement_rows", "pesos", "repairers", "template_modules", "templates",
-                "tool_machines", "tools", "users",
+                "peso_measurement_rows", "peso_review_decisions", "pesos", "repairers",
+                "template_modules", "templates", "tool_machines", "tools", "users",
             },
             tables);
 

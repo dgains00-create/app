@@ -319,6 +319,22 @@ internal static class P2T05ProductionScan
         "src/DMO.Web/Endpoints/Controlo",
         "src/DMO.Web/wwwroot/css/dmo-controlo.css",
         "src/DMO.Web/wwwroot/js/dmo-controlo.js",
+        // ---- P2-T06 (disclosed extension, P2-T06 contract Appendix B): the Controlo Approve
+        // surface consumes the same Peso identity/read model by contract, so its OWN paths are an
+        // accepted extension of the P2-T05 owned surface (the P2-T06 paths are themselves pinned by
+        // the P2-T06 boundary rows).
+        "src/DMO.Application/ControloApprove/",
+        "src/DMO.Application/Repositories/IPesoReview",
+        "src/DMO.Application/Persistence/PesoReviewPersistenceException.cs",
+        "src/DMO.Infrastructure/Persistence/PesoReview",
+        "src/DMO.Infrastructure/Persistence/Entities/PesoReviewDecisionEntity.cs",
+        "src/DMO.Infrastructure/Persistence/EntityConfigurations/PesoReviewDecisionEntityConfiguration.cs",
+        "src/DMO.Infrastructure/Persistence/EntityConfigurations/PesoReviewableIndexConfiguration.cs",
+        "src/DMO.Infrastructure/Migrations/20260923171223_ControloApproveDomain",
+        "src/DMO.Web/Pages/Controlo/Approve/",
+        "src/DMO.Web/Endpoints/ControloApproveEndpoints.cs",
+        "src/DMO.Web/wwwroot/css/dmo-controlo-approve.css",
+        "src/DMO.Web/wwwroot/js/dmo-controlo-approve.js",
     ];
 
     /// <summary>
@@ -334,6 +350,9 @@ internal static class P2T05ProductionScan
         "src/DMO.Application/JobOn/IJobOnService.cs",
         "src/DMO.Application/JobOn/JobOnService.cs",
         "src/DMO.Application/JobOn/JobOnModels.cs",
+        "src/DMO.Domain/Controlo/PesoReviewDecisionId.cs",
+        "src/DMO.Domain/Controlo/PesoReviewDecisionKind.cs",
+        "src/DMO.Domain/Controlo/PesoReviewDecision.cs",
     ];
 
     /// <summary>The P2-T05 vocabulary fragments of the changed-path allow-list row (BND9; the

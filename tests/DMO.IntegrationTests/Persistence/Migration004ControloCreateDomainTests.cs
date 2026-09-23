@@ -12,13 +12,13 @@ using Npgsql;
 namespace DMO.IntegrationTests.Persistence;
 
 /// <summary>
-/// P2-T05 env-gated integration test — Migration 004 (<c>ControloCreateDomain</c>): the physical
+/// P2-T05 env-gated integration test â€” Migration 004 (<c>ControloCreateDomain</c>): the physical
 /// schema, the contracted keys/constraints/indexes and the migration behaviour against a
 /// disposable PostgreSQL database.
 /// </summary>
 /// <remarks>
-/// Authority: P2-T05 contract §16 (physical schema), §17 (keys, constraints, indexes), §25
-/// (migration contract) and §30 rows MIG-X1–MIG-X10 / AC-Y7 / AC-P1 / AC-F8. Every DB-class row is
+/// Authority: P2-T05 contract Â§16 (physical schema), Â§17 (keys, constraints, indexes), Â§25
+/// (migration contract) and Â§30 rows MIG-X1â€“MIG-X10 / AC-Y7 / AC-P1 / AC-F8. Every DB-class row is
 /// <c>[SkippableFact]</c> behind <see cref="PersistenceTestDatabase.SkipIfNotConfigured"/> and is
 /// reported as environment-gated skipped when no disposable database is configured.
 /// </remarks>
@@ -28,25 +28,26 @@ public sealed class Migration004ControloCreateDomainTests
     /// <summary>EF's own migration bookkeeping table (never a product table).</summary>
     private const string MigrationHistoryTable = "__EFMigrationsHistory";
 
-    /// <summary>The eight contracted Controlo tables of migration 004 (§16, §25.2).</summary>
+    /// <summary>The eight contracted Controlo tables of migration 004 (Â§16, Â§25.2).</summary>
     private static readonly string[] ControlTables =
     [
         "email_list_recipients", "email_lists", "email_templates", "machine_repairer_assignments",
         "pdf_directory_settings", "peso_measurement_rows", "pesos", "repairers",
     ];
 
-    /// <summary>The complete public product-table register after all five migrations (order-insensitive;
-    /// the post-closure correction adds exactly the one approved table).</summary>
+    /// <summary>The complete public product-table register after all SIX migrations (order-insensitive;
+    /// the post-closure correction adds exactly the one approved table; P2-T06 adds exactly the one
+    /// review-decision table).</summary>
     private static readonly string[] PublicProductTables =
     [
         "admin_accounts", "bq_contexts", "cm_contexts", "email_list_recipients", "email_lists",
         "email_templates", "glass_density_settings", "job_ons", "machine_repairer_assignments",
         "mf_contexts", "pdf_directory_settings", "peso_measurement_rows", "pesos", "repairers",
-        "template_modules", "templates", "tool_machines", "tools", "users",
+        "template_modules", "templates", "tool_machines", "tools", "users", "peso_review_decisions",
     ];
 
-    /// <summary>The five migrations, in generation order (§25.1; the correction migration 005 is
-    /// the FIFTH overall — Architect review observation N-1).</summary>
+    /// <summary>The six migrations, in generation order (Â§25.1; the correction migration 005 is
+    /// the FIFTH overall â€” Architect review observation N-1).</summary>
     private static readonly string[] AllMigrationIds =
     [
         "20260922001736_AccountAndTemplateFoundation",
@@ -54,9 +55,10 @@ public sealed class Migration004ControloCreateDomainTests
         "20260922232349_ToolJobOnDomainCore",
         "20260923045054_ControloCreateDomain",
         "20260923122429_GlassDensitySettings",
+        "20260923171223_ControloApproveDomain",
     ];
 
-    /// <summary>The 22 contracted CHECK constraints of the eight tables (§17.1).</summary>
+    /// <summary>The 22 contracted CHECK constraints of the eight tables (Â§17.1).</summary>
     private static readonly (string Table, string Name)[] ContractedChecks =
     [
         ("pesos", "pesos_anchor_check"),
@@ -85,7 +87,7 @@ public sealed class Migration004ControloCreateDomainTests
 
     /// <summary>
     /// The seven contracted foreign keys of the eight tables, every one <c>ON DELETE RESTRICT</c>
-    /// (§17.2, AC-P1).
+    /// (Â§17.2, AC-P1).
     /// </summary>
     private static readonly string[] ContractedForeignKeys =
     [
@@ -98,7 +100,7 @@ public sealed class Migration004ControloCreateDomainTests
         "FK_email_list_recipients_email_lists_email_list_id",
     ];
 
-    /// <summary>The six contracted unique keys of the eight tables (§4.2-equivalent register).</summary>
+    /// <summary>The six contracted unique keys of the eight tables (Â§4.2-equivalent register).</summary>
     private static readonly string[] ContractedUniqueKeys =
     [
         "email_list_recipients_list_address_key",
@@ -125,12 +127,13 @@ public sealed class Migration004ControloCreateDomainTests
     ];
 
     /// <summary>
-    /// MIG-X1: applying all migrations to a reset schema leaves exactly the five contracted
-    /// migrations in <c>__EFMigrationsHistory</c> and exactly the 20 public product tables (the
-    /// post-closure correction adds exactly the one approved table to the closed 19-table state).
+    /// MIG-X1: applying all migrations to a reset schema leaves exactly the six contracted
+    /// migrations in <c>__EFMigrationsHistory</c> and exactly the 21 public product tables (the
+    /// post-closure correction adds exactly the one approved table to the closed 19-table state;
+    /// P2-T06 adds exactly the one review-decision table to the closed 20-table state).
     /// </summary>
     [SkippableFact]
-    public async Task MIG_X1_ApplyingAllMigrationsLeavesFiveMigrationsAndTheTwentyPublicTables()
+    public async Task MIG_X1_ApplyingAllMigrationsLeavesSixMigrationsAndTheTwentyOnePublicTables()
     {
         PersistenceTestDatabase.SkipIfNotConfigured();
 
@@ -148,7 +151,7 @@ public sealed class Migration004ControloCreateDomainTests
             "SELECT table_name FROM information_schema.tables " +
             "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"));
 
-        Assert.Equal(20, tables.Count);
+        Assert.Equal(21, tables.Count);
         Assert.Equal(Sorted([.. PublicProductTables, MigrationHistoryTable]), tables);
     }
 
@@ -188,7 +191,10 @@ public sealed class Migration004ControloCreateDomainTests
                 ? table => Regex.IsMatch(table, @"\bmachines\b", RegexOptions.IgnoreCase)
                 : table => table.Contains(fragment, StringComparison.OrdinalIgnoreCase);
 
-            Assert.DoesNotContain(tables, table => matches(table));
+            // Disclosed P2-T06 extension: the single AUTHORIZED decision table
+            // (peso_review_decisions, P2-T06 contract §6) is the one explicit exception to the
+            // P2-T05-time "no decision table" boundary — everything else stays forbidden.
+            Assert.DoesNotContain(tables, table => table != "peso_review_decisions" && matches(table));
         }
     }
 
@@ -218,7 +224,7 @@ public sealed class Migration004ControloCreateDomainTests
     }
 
     /// <summary>
-    /// MIG-X4 (AC-P1, §17.2): the seven foreign keys of the eight Controlo tables exist with the
+    /// MIG-X4 (AC-P1, Â§17.2): the seven foreign keys of the eight Controlo tables exist with the
     /// contracted names and every one is <c>ON DELETE RESTRICT</c> (<c>confdeltype = 'r'</c>).
     /// </summary>
     [SkippableFact]
@@ -244,7 +250,7 @@ public sealed class Migration004ControloCreateDomainTests
         foreach (var row in rows)
         {
             var parts = row.Split('|', 2);
-            Assert.Equal("r", parts[1]); // RESTRICT — no foreign key of this schema cascades.
+            Assert.Equal("r", parts[1]); // RESTRICT â€” no foreign key of this schema cascades.
         }
     }
 
@@ -291,7 +297,7 @@ public sealed class Migration004ControloCreateDomainTests
     }
 
     /// <summary>
-    /// MIG-X7 (SET10/AC-F8): the eight Controlo tables carry no per-user dimension column — the
+    /// MIG-X7 (SET10/AC-F8): the eight Controlo tables carry no per-user dimension column â€” the
     /// only columns mentioning <c>user</c> are the two <c>pesos</c> actor columns.
     /// </summary>
     [SkippableFact]
@@ -343,7 +349,7 @@ public sealed class Migration004ControloCreateDomainTests
 
     /// <summary>
     /// MIG-X9: after applying all migrations to a reset schema, every CONTROL migration table
-    /// (migration 004's eight) is empty — migration 004 seeds no rows. The post-closure
+    /// (migration 004's eight) is empty â€” migration 004 seeds no rows. The post-closure
     /// correction's exactly two provenance-backed initial rows are the documented exception,
     /// proven by <c>Migration005GlassDensitySettingsTests</c>.
     /// </summary>
@@ -365,7 +371,7 @@ public sealed class Migration004ControloCreateDomainTests
 
     /// <summary>
     /// MIG-X10: re-running the migration mechanism over an already-updated schema applies zero
-    /// migrations — the application is a complete no-op.
+    /// migrations â€” the application is a complete no-op.
     /// </summary>
     [SkippableFact]
     public async Task MIG_X10_ReRunningApplyPendingAppliesZeroMigrations()
@@ -375,13 +381,13 @@ public sealed class Migration004ControloCreateDomainTests
         await using var context = PersistenceTestDatabase.CreateContext();
         await PersistenceTestDatabase.ApplyMigrationsAsync(context);
 
-        Assert.Equal(5, (await context.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(6, (await context.Database.GetAppliedMigrationsAsync()).Count());
 
         // The second application is a complete no-op: it must not throw and leaves nothing pending.
         await PersistenceTestDatabase.ApplyMigrationsAsync(context);
 
         Assert.Empty(await context.Database.GetPendingMigrationsAsync());
-        Assert.Equal(5, (await context.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(6, (await context.Database.GetAppliedMigrationsAsync()).Count());
     }
 
     private static IReadOnlyList<string> Sorted(IReadOnlyList<string> values) =>

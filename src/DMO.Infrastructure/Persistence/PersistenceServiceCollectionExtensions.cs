@@ -59,6 +59,12 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<IPesoContextRead, DmoPesoContextRead>();
         services.AddScoped<IJobOnDependencyProbe, PesoJobOnDependencyProbe>();
 
+        // ---- P2-T06 Controlo Approve: the review decision core --------------------------------
+        // Additive registrations only (P2-T06 contract §8/§9): the review repository (pending/
+        // history queries + the atomic decision write). The application service is registered in
+        // DMO.Web/Program.cs with the shared read composition.
+        services.AddScoped<IPesoReviewRepository, PesoReviewRepository>();
+
         return services;
     }
 }

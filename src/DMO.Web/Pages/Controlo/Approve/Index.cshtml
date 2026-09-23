@@ -1,0 +1,211 @@
+@page "/controlo/approve"
+@model DMO.Web.Pages.Controlo.Approve.ApproveIndexModel
+@using DMO.Web.Frontend.Shared.Contracts
+@{
+    ViewData["Title"] = "Aprovar";
+}
+<partial name="~/Pages/Shared/Components/_SharedComponentAssets.cshtml" />
+<link rel="stylesheet" href="~/css/dmo-controlo-approve.css" asp-append-version="true" />
+<script src="~/js/dmo-controlo-approve.js" defer></script>
+
+@*
+    P2-T06 Aprovar surface (contract §21.1 regions R1–R5, §15, §16, §19, §23).
+
+    Fixed desktop composition at the binding 1366 × 768 viewport (§21): R1–R5 keep their structural
+    order at every desktop width; smaller windows scroll; the wide results table uses local
+    keyboard-reachable overflow. No breakpoint variant, no card conversion, no required-column
+    hiding and no action relocation exists anywhere in this surface (AC-L1/L2).
+
+    Every fact rendered is a REAL backend fact: the pending rows come from the reviewable predicate
+    query (R2), the review sheet renders the EXACT shared P2-T05 PesoSheetReadModel facts with the
+    same labels/order/≤ 2-dp normalization as the Create read-only view (RD2 parity hooks
+    data-dmo-strip-*/data-dmo-field-*/data-dmo-result-*/data-dmo-summary-*) and the decision trail
+    renders only supplied events (AuditTrail — actor/time are never synthesized from the session).
+    The mutating actions post to the accepted minimal-API routes through the page-owned adapter
+    (dmo-controlo-approve.js); backend validation is authoritative and a stale version enters the
+    accepted conflict presentation with the explicit reload recovery (D2).
+*@
+<section class="dmo-controlo-approve" data-dmo-approve-surface="index" data-dmo-approve-root="true">
+    @* ---- R1 — Filters (backend-applied; never client-side filtering of a fetched set) ----- *@
+    <div class="dmo-approve__region" data-dmo-approve-region="filters" aria-label="Filtros">
+        <form class="dmo-approve__filters" method="get" action="/controlo/approve" data-dmo-approve-filters="true">
+            <label class="dmo-approve__label" for="dmo-approve-reference">Referência</label>
+            <input class="dmo-approve__input" id="dmo-approve-reference" name="reference" type="text"
+                   value="@Model.Reference" data-dmo-filter-reference="true" />
+            <label class="dmo-approve__label" for="dmo-approve-production">Produção</label>
+            <input class="dmo-approve__input" id="dmo-approve-production" name="productionNumber" type="text"
+                   value="@Model.ProductionNumber" data-dmo-filter-production="true" />
+            <label class="dmo-approve__label" for="dmo-approve-machine">Máquina</label>
+            <input class="dmo-approve__input" id="dmo-approve-machine" name="machine" type="text"
+                   value="@Model.Machine" data-dmo-filter-machine="true" />
+            <label class="dmo-approve__label" for="dmo-approve-processo">Processo</label>
+            <input class="dmo-approve__input" id="dmo-approve-processo" name="processo" type="text"
+                   value="@Model.Processo" data-dmo-filter-processo="true" />
+            <label class="dmo-approve__label" for="dmo-approve-tool">Ferramenta</label>
+            <input class="dmo-approve__input" id="dmo-approve-tool" name="toolReference" type="text"
+                   value="@Model.ToolReference" data-dmo-filter-tool="true" />
+            <button class="dmo-approve__button" type="submit" data-dmo-approve-filter-submit="true">Filtrar</button>
+        </form>
+
+        @if (Model.ValidationErrors.Count > 0)
+        {
+            <ul class="dmo-approve__errors" role="alert" data-dmo-approve-errors="true">
+                @foreach (var error in Model.ValidationErrors)
+                {
+                    <li data-dmo-approve-error="@error">@error</li>
+                }
+            </ul>
+        }
+    </div>
+
+    @* ---- R2 — Pending/review table (selection + open arbitration; actions outside the table) *@
+    <div class="dmo-approve__region" data-dmo-approve-region="pending" aria-label="Pesos para aprovação">
+        @if (Model.Pending is { } pending)
+        {
+            <div class="dmo-approve__route-map" data-dmo-open-route-map="true" hidden>
+                @foreach (var route in Model.OpenRoutes)
+                {
+                    <span data-dmo-open-route="@route.Key" data-dmo-open-href="@route.Href"></span>
+                }
+            </div>
+            <partial name="~/Pages/Shared/Components/_DenseDataTable.cshtml" model="pending" />
+        }
+        else if (Model.ValidationErrors.Count == 0)
+        {
+            @* The pending list is a QUERY over the reviewable predicate, never a queue table. *@
+            <p class="dmo-approve__pending-empty" data-dmo-pending-empty="true">Sem Pesos para aprovação.</p>
+        }
+    </div>
+
+    @if (Model.Sheet is { } sheet)
+    {
+        @* ---- R3 — Exact-record review sheet (the SHARED PesoSheetReadModel, read-only) ----- *@
+        <div class="dmo-approve__region" data-dmo-approve-region="review" aria-label="Revisão do Peso"
+             data-dmo-peso-id="@sheet.Peso.PesoId" data-dmo-review-status="@sheet.Peso.Status">
+
+            @* Production context strip (traversal facts; identical hooks to the Create strip) *@
+            <div class="dmo-approve__strip" data-dmo-controlo-strip="true" aria-label="Contexto da produção">
+                @if (sheet.Peso.Production is { } production)
+                {
+                    <dl class="dmo-approve__strip-facts">
+                        <div class="dmo-approve__strip-fact"><dt>Referência</dt><dd data-dmo-strip-reference="true">@production.Reference</dd></div>
+                        <div class="dmo-approve__strip-fact"><dt>Produção</dt><dd data-dmo-strip-production="true">@production.ProductionNumber</dd></div>
+                        <div class="dmo-approve__strip-fact"><dt>Máquina</dt><dd data-dmo-strip-machine="true">@production.Machine</dd></div>
+                    </dl>
+                }
+                else
+                {
+                    <p class="dmo-approve__strip-empty" data-dmo-strip-empty="true">Job On por associar — Peso ancorado à ferramenta CM selecionada.</p>
+                }
+            </div>
+
+            @* CM / pending context (frozen triple or pending Tool — separate facts) *@
+            @if (sheet.Peso.Context is { } context)
+            {
+                <div class="dmo-approve__cm-context" data-dmo-cm-context="true">
+                    <dl class="dmo-approve__frozen-triple" data-dmo-frozen-triple="true">
+                        <div class="dmo-approve__strip-fact"><dt>Ferramenta CM (fixada)</dt><dd>@context.FrozenToolReference — lote @context.FrozenToolLot</dd></div>
+                    </dl>
+                </div>
+            }
+            else if (sheet.Peso.Pending is { } pendingContext)
+            {
+                <div class="dmo-approve__pending-context" data-dmo-pending-context="true">
+                    <strong>Job On por associar</strong>
+                    <span data-dmo-pending-tool-reference="true">Ferramenta: @pendingContext.Tool.Reference — lote @pendingContext.Tool.Lot</span>
+                </div>
+            }
+
+            @* The exact submitted facts (same labels/order/≤ 2-dp normalization as Create; RD2) *@
+            <dl class="dmo-approve__facts">
+                <div class="dmo-approve__fact"><dt>Temperatura da água (°C)</dt><dd data-dmo-field-temperature="true">@sheet.Peso.WaterTemperature.ToString("0.0")</dd></div>
+                <div class="dmo-approve__fact"><dt>Volume Marisa/BQ (cm³)</dt><dd data-dmo-field-marisa="true">@(sheet.Peso.VolumeMarisaBq?.ToString("0.####") ?? "—")</dd></div>
+                <div class="dmo-approve__fact"><dt>Volume Punção/PU (cm³)</dt><dd data-dmo-field-puncao="true">@(sheet.Peso.VolumePuncaoPu?.ToString("0.####") ?? "—")</dd></div>
+                <div class="dmo-approve__fact"><dt>Fim da produção anterior (SAP)</dt><dd data-dmo-field-sap-end="true">@(sheet.Peso.PreviousProductionEndReference ?? "—")</dd></div>
+                <div class="dmo-approve__fact"><dt>Peso médio anterior (SAP)</dt><dd data-dmo-field-sap-weight="true">@(sheet.Peso.PreviousAverageWeightReference ?? "—")</dd></div>
+                <div class="dmo-approve__fact"><dt>Submetido em</dt><dd data-dmo-submitted-at="true">@(sheet.Peso.SubmittedAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")</dd></div>
+            </dl>
+
+            @* Frozen per-row results (individual results first-class; never recomputed) *@
+            <div class="dmo-approve__results-scroll" role="region" tabindex="0" aria-label="Resultados por leitura">
+                <table class="dmo-approve__results-table" data-dmo-results-table="true">
+                    <thead>
+                        <tr>
+                            <th>Leitura</th>
+                            <th>Peso em água (g)</th>
+                            <th>Capacidade (cm³)</th>
+                            <th>Peso do vidro (g)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in sheet.Peso.Rows)
+                        {
+                            <tr data-dmo-result-row="@row.RowPosition">
+                                <td>@row.RowPosition</td>
+                                <td>@row.WaterWeightG.ToString("0.##")</td>
+                                <td data-dmo-result-capacity="@row.RowPosition">@row.CapacityCm3.ToString("0.##")</td>
+                                <td data-dmo-result-glass="@row.RowPosition">@row.GlassWeightG.ToString("0.##")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @* Frozen summary facts (density used = the frozen value; never re-resolved) *@
+            <dl class="dmo-approve__summary" data-dmo-results-summary="true">
+                <div class="dmo-approve__fact"><dt>Densidade usada</dt><dd data-dmo-summary-density="true">@(sheet.Peso.GlassDensityGCm3?.ToString("0.####") ?? "—")</dd></div>
+            </dl>
+
+            @* Submission attribution + decided-facts summary (AuditTrail renders only supplied facts) *@
+            <div class="dmo-approve__attribution" data-dmo-attribution="true">
+                <span>Submetido por @sheet.Peso.SubmittedByUserId (utilizador backend, nunca sintetizado).</span>
+            </div>
+        </div>
+
+        @* ---- R4 — Decision region (DecisionBar + reason input + send affordance) ---------- *@
+        <div class="dmo-approve__region" data-dmo-approve-region="actions" aria-label="Decisão">
+            @if (Model.Actions is { } actions)
+            {
+                ViewData["DecisionBarRegionId"] = "dmo-approve-actions";
+                <partial name="~/Pages/Shared/Components/_DecisionBar.cshtml" model="actions" />
+            }
+
+            @* The reason input opened by Rejeitar/Reabrir (mandatory non-blank reason; backend authoritative) *@
+            <div class="dmo-approve__reason" data-dmo-reason-region="true" hidden>
+                <label class="dmo-approve__label" for="dmo-approve-reason">Motivo (obrigatório)</label>
+                <input class="dmo-approve__input" id="dmo-approve-reason" type="text" data-dmo-reason-input="true" maxlength="2000" />
+            </div>
+
+            @if (Model.Send is { } send)
+            {
+                @* Enviar para produção — initiation-only affordance (Q-SEND): explicit confirmed;
+                   NEVER automatic; unavailable-with-reason until P2-T08 owns execution; zero
+                   send mechanics and zero send persistence (§23.2/§23.4). *@
+                <button type="button"
+                        class="dmo-approve__send"
+                        data-dmo-send-affordance="true"
+                        disabled
+                        aria-disabled="true"
+                        aria-describedby="dmo-approve-send-reason"
+                        data-dmo-send-reason="@send.Reason">Enviar para produção</button>
+                <span class="dmo-approve__action-reason" id="dmo-approve-send-reason" data-dmo-send-reason-text="true">@send.Reason</span>
+            }
+
+            @* Page-owned failure surface (conflict = message + explicit reload recovery, D2) *@
+            <div class="dmo-approve__state" data-dmo-approve-state="true" hidden></div>
+        </div>
+
+        @* ---- R5 — Decision trail (append-only supplied events; never synthesized) --------- *@
+        <div class="dmo-approve__region" data-dmo-approve-region="trail" aria-label="Decisões">
+            @if (Model.Trail is { } trail)
+            {
+                <partial name="~/Pages/Shared/Components/_AuditTrail.cshtml" model="trail" />
+            }
+        </div>
+
+        @* Page-owned adapter state: the REAL observed version (backend fact; refreshed only on success) *@
+        <div class="dmo-approve__adapter-state" hidden
+             data-dmo-peso-id="@(Model.Sheet.Peso.PesoId)"
+             data-dmo-version="@Model.ObservedVersion"></div>
+    }
+</section>

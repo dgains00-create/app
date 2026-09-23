@@ -1,0 +1,206 @@
+/* P2-T06 Controlo Approve page-owned styles (Aprovar + Histórico de Pesos).
+ *
+ * Authority: P2-T06 contract §21/App. C — DMO FIXED DESKTOP LAYOUT POLICY.
+ * Canonical validation viewport: 1366 × 768. Region-stable composition (R1–R5, H1–H3):
+ * NO @media / @container / @supports structural rule, NO width listener, NO table→card
+ * conversion, NO required-column hiding and NO action relocation exist in this file — the
+ * layout, scrolling and shared primitives (DenseDataTable, DecisionBar, AuditTrail) come from
+ * the shared A1/A2 contract styles; this file only composes the page-owned regions on top of
+ * the shared design tokens.
+ */
+.dmo-controlo-approve {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dmo-space-lg, 1rem);
+  min-width: 0;
+}
+
+.dmo-approve__region {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dmo-space-sm, 0.5rem);
+  min-width: 0;
+}
+
+.dmo-approve__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--dmo-space-sm, 0.5rem);
+}
+
+.dmo-approve__label {
+  font-size: var(--dmo-font-size-sm, 0.8125rem);
+  color: var(--dmo-color-text-secondary, #444);
+}
+
+.dmo-approve__input {
+  font: inherit;
+  padding: 0.3125rem 0.5rem;
+  border: 1px solid var(--dmo-color-border, #999);
+  border-radius: 2px;
+  background: var(--dmo-color-surface, #fff);
+  color: var(--dmo-color-text, #111);
+  min-width: 8rem;
+}
+
+.dmo-approve__input--select {
+  min-width: 12rem;
+}
+
+.dmo-approve__button {
+  font: inherit;
+  padding: 0.3125rem 0.75rem;
+  border: 1px solid var(--dmo-color-border-strong, #666);
+  border-radius: 2px;
+  background: var(--dmo-color-surface, #fff);
+  cursor: pointer;
+}
+
+.dmo-approve__errors {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--dmo-color-danger, #9b1c1c);
+}
+
+.dmo-approve__pending-empty {
+  color: var(--dmo-color-text-secondary, #444);
+}
+
+.dmo-approve__route-map {
+  display: none;
+}
+
+/* R3/H3 — the shared read-only Peso presentation (parity hooks with the Create read-only view;
+   labels/order/normalization are contracted by the renderer-parity test, RD2). */
+.dmo-approve__strip {
+  border: 1px solid var(--dmo-color-border, #999);
+  border-radius: 2px;
+  padding: 0.5rem 0.75rem;
+}
+
+.dmo-approve__strip-facts,
+.dmo-approve__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  margin: 0;
+}
+
+.dmo-approve__strip-fact,
+.dmo-approve__fact {
+  display: flex;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.dmo-approve__strip-fact dt,
+.dmo-approve__fact dt {
+  font-weight: 600;
+}
+
+.dmo-approve__strip-fact dd,
+.dmo-approve__fact dd {
+  margin: 0;
+}
+
+.dmo-approve__strip-empty {
+  color: var(--dmo-color-text-secondary, #444);
+  margin: 0;
+}
+
+.dmo-approve__cm-context,
+.dmo-approve__pending-context {
+  border: 1px solid var(--dmo-color-border, #999);
+  border-radius: 2px;
+  padding: 0.5rem 0.75rem;
+}
+
+.dmo-approve__pending-context {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dmo-approve__frozen-triple {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  margin: 0;
+}
+
+/* Wide results table: local keyboard-reachable horizontal overflow (AC-L2). */
+.dmo-approve__results-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--dmo-color-border, #999);
+  border-radius: 2px;
+}
+
+.dmo-approve__results-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 34rem;
+}
+
+.dmo-approve__results-table th,
+.dmo-approve__results-table td {
+  padding: 0.375rem 0.625rem;
+  text-align: left;
+  border-bottom: 1px solid var(--dmo-color-border-subtle, #ddd);
+  white-space: nowrap;
+}
+
+.dmo-approve__results-table thead th {
+  font-weight: 600;
+}
+
+.dmo-approve__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  margin: 0;
+}
+
+.dmo-approve__attribution {
+  color: var(--dmo-color-text-secondary, #444);
+  font-size: var(--dmo-font-size-sm, 0.8125rem);
+}
+
+/* R4 — the reason input opened by Rejeitar/Reabrir (mandatory non-blank reason). */
+.dmo-approve__reason {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dmo-approve__send {
+  align-self: flex-start;
+  font: inherit;
+  padding: 0.3125rem 0.75rem;
+  border: 1px solid var(--dmo-color-border-strong, #666);
+  border-radius: 2px;
+  background: var(--dmo-color-surface, #fff);
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
+.dmo-approve__action-reason {
+  color: var(--dmo-color-text-secondary, #444);
+  font-size: var(--dmo-font-size-sm, 0.8125rem);
+}
+
+/* The page-owned failure surface (conflict = clear message + supplied recovery choices, D2). */
+.dmo-approve__state[data-dmo-conflict] {
+  border: 1px solid var(--dmo-color-danger, #9b1c1c);
+  border-radius: 2px;
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.dmo-approve__state ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--dmo-color-danger, #9b1c1c);
+}

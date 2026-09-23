@@ -212,7 +212,9 @@ public sealed class ToolRestrictionTests
         // repositories obtain their sets through the same private `DbSet<TEntity> => _context.Set<T>()`
         // convention, and the "no Tool entity is ever a DbSet" rule is unchanged. Since the
         // post-closure glass-density correction (disclosed): the one approved settings entity
-        // joins the set with the same convention.
+        // joins the set with the same convention. Since P2-T06 (disclosed): exactly ONE review
+        // entity joins the set (<c>PesoReviewDecisionEntity</c>); the review repository's composed
+        // list reads use the <c>IQueryable</c> accessor convention (no new Tool/CM/JobOn surface).
         var dbSetArguments = MatchGroup(allSources, @"DbSet<\s*(\w+)\s*>")
             .Distinct(StringComparer.Ordinal)
             .OrderBy(name => name, StringComparer.Ordinal)
@@ -223,8 +225,8 @@ public sealed class ToolRestrictionTests
                 "AdminAccountEntity", "EmailListEntity", "EmailListRecipientEntity",
                 "EmailTemplateEntity", "GlassDensitySettingEntity", "JobOnEntity",
                 "MachineRepairerAssignmentEntity", "PdfDirectorySettingsEntity", "PesoEntity",
-                "PesoMeasurementRowEntity", "RepairerEntity", "TemplateEntity",
-                "TemplateModuleEntity", "UserEntity",
+                "PesoMeasurementRowEntity", "PesoReviewDecisionEntity", "RepairerEntity",
+                "TemplateEntity", "TemplateModuleEntity", "UserEntity",
             ],
             dbSetArguments);
         Assert.DoesNotContain(dbSetArguments, name => name.Contains("Tool", StringComparison.Ordinal));
@@ -244,6 +246,7 @@ public sealed class ToolRestrictionTests
             .Concat(application)
             .SelectMany(source => MatchGroupFrom(
                 source.Text, @"(?:Concurrent)?Dictionary<[^>]*\b(\w*Tool\w*)[^>]*>"))
+
             .Distinct(StringComparer.Ordinal)
             .ToList();
 
