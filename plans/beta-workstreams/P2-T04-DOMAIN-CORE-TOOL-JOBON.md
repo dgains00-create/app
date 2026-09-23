@@ -100,28 +100,42 @@ Do **not** invent schema beyond what the authored contract fixes.
 
 ### 5.1 Contract status (recorded)
 
-**P2-T04: CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW.**
-**B1: AWAITING PLAN ACCEPT — NOT RESOLVED.**
+**P2-T04: IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW.**
+**B1: RESOLVED — PLAN ACCEPT `7d7a7c564027945a5c9a73cb798e9c226ee7f013`.**
 
-The B1 contract has been authored at
-`plans/contracts/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT.md` and fixes every item §5 lists:
-the physical schema/keys (canonical Tool, Job On occurrence, CM/MF/BQ contexts, the Tool
-machine-compatibility relation, the explicit duplication-source relation), the canonical Tool
-identity tuple and the production uniqueness tuple, the frozen contextual value set, the query
-shapes (reference → productions, Tool search, context resolution, Job On/Tool reads), the shared
-Tool search/select/create orchestration, the create/duplicate transaction boundaries, the delete
-dependency rule and probe seam, the complete route/endpoint set with its module policy per route,
-plus a one-migration contract and a 106-criterion / 155-test acceptance matrix.
+The B1 contract was authored at
+`plans/contracts/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT.md` (contract SHA
+`58c6c1e8b4c9617daefc4ed02f7e65fb450bdada`, blob `799e6053a52d96acd21ed6be0475f5180e2525df`) and
+fixes every item §5 lists: the physical schema/keys (canonical Tool, Job On occurrence, CM/MF/BQ
+contexts, the Tool machine-compatibility relation, the explicit duplication-source relation), the
+canonical Tool identity tuple and the production uniqueness tuple, the frozen contextual value set,
+the query shapes (reference → productions, Tool search, context resolution, Job On/Tool reads), the
+shared Tool search/select/create orchestration, the create/duplicate transaction boundaries, the
+delete dependency rule and probe seam, the complete route/endpoint set with its module policy per
+route, plus a one-migration contract and a 106-criterion / 155-test acceptance matrix. It records
+**22 NON-BLOCKING authority questions** with pinned defaults and **no BLOCKING** physical-schema
+question.
 
-It records **22 NON-BLOCKING authority questions** with pinned defaults and **no BLOCKING**
-physical-schema question.
+The Architect plan review
+`dev/reviews/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT_PLAN_REVIEW.md` (in `diogo-o/dmo-work`, SHA
+`7d7a7c564027945a5c9a73cb798e9c226ee7f013`) returned **PLAN ACCEPT** against exactly that contract
+SHA, dispositioned all 22 questions as **ACCEPT DEFAULT** (0 REQUIRES CORRECTION, 0 BLOCKING),
+stated **B1 → RESOLVED** and authorized P2-T04 implementation.
 
-**Implementation remains unauthorized and not started.** Per `dmo-beta-master/WORKFLOW.md` step 6,
-no code may be written until the Architect reviews that contract and returns `PLAN ACCEPT`. B1 is
-**not** resolved by authoring; it is resolved by the Architect's plan acceptance.
-Authoring verification: application code unchanged, 0 migrations added, Supabase untouched,
-`ModuleRegistrations.CurrentBuildAvailable` still `[]`, existing suite green
-(468 unit / 201 integration passed, 71 environment-gated skipped).
+P2-T04 is now implemented against the accepted contract: the domain types (`DMO.Domain.Tools`,
+`DMO.Domain.JobOn`), the application area (`DMO.Application.Tools`, `DMO.Application.JobOn`, the two
+repository contracts), the persistence layer (six entities, six configurations, two repositories,
+the lineage dependency probe), exactly one new migration (`ToolJobOnDomainCore`), the 14 contracted
+routes (6 Razor pages + 8 minimal-API endpoints) with one canonical Module policy each, the P2-T04
+stylesheet/adapter script, and the full 106-AC / 155-row test matrix. Verification evidence,
+including the build and test results, is recorded in
+`dev/responses/P2_T04_IMPLEMENTATION_RESPONSE.md`.
+
+`ModuleRegistrations.CurrentBuildAvailable` is still `[]`, `DestinationRouteRegistrations` is still
+empty, no destination route is registered and no navigation entry exists: P2-T10 owns
+availability/navigation registration, so P2-T04's surfaces exist but stay unreachable until that
+workstream registers the Module as available. P2-T04 is **not** closed, and P2-T05 and later remain
+**NOT AUTHORIZED**.
 
 ## 6. Explicit non-scope
 

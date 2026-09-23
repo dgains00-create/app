@@ -425,7 +425,7 @@ and they must not be resolved by invention.
 
 | Ref | Nature | What is absent | Blocking workstream | Required artefact |
 |---|---|---|---|---|
-| B1 | Backend/interface contract | Concrete Tool/Job On/CM/MF/BQ query + mutation contract and physical schema have not been published as an accepted contract | P2-T04+ (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T04 per Beta `WORKFLOW.md`. **Authored now:** `plans/contracts/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT.md` — status **CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW (`AWAITING PLAN ACCEPT`)**. B1 is **not** resolved: resolution requires the Architect's `PLAN ACCEPT` of that contract. |
+| B1 | Backend/interface contract | Concrete Tool/Job On/CM/MF/BQ query + mutation contract and physical schema have not been published as an accepted contract | P2-T04+ (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T04 per Beta `WORKFLOW.md`. **Authored:** `plans/contracts/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT.md` at contract SHA `58c6c1e8b4c9617daefc4ed02f7e65fb450bdada` (blob `799e6053a52d96acd21ed6be0475f5180e2525df`). **RESOLVED — PLAN ACCEPT:** Architect plan review `dev/reviews/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT_PLAN_REVIEW.md` at `diogo-o/dmo-work` SHA `7d7a7c564027945a5c9a73cb798e9c226ee7f013` returned **PLAN ACCEPT** (22 ACCEPT DEFAULT, 0 REQUIRES CORRECTION, 0 BLOCKING) and authorized P2-T04 implementation against that contract. B1 is closed; P2-T04 implementation is authorized and P2-T05+ remains unauthorized. |
 | B2 | Backend/interface contract | Concrete Peso/Pegamentos/Folha/Resumo calculate/persist/submit/read contract; **extended** to cover the Controlo_Create → Definições surfaces (repairer register, per-machine assignments, document base directory, email lists, email templates) settled in `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` | P2-T05/P2-T06 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T05 |
 | B3 | Backend/interface contract | Concrete Boquilhas aggregate/movement/edit-audit/close-reopen contract and `repairer_id` schema/query shape. The canonical `repairer_id` **directory source is now settled** (Controlo_Create → Definições), as are machine-assignment autonomy and historical repairer preservation (`…DELTA.md` §3.6, §4, §5, §6); the physical schema/query/endpoint contract is still absent | P2-T07 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T07 |
 | B4 | Backend/interface contract | Document generation contract + directory/filesystem capability (`Infrastructure/Files`, `Infrastructure/Pdf` do not exist); **extended** to cover the operator-configured base directory (configure/change/verify accessibility) and sending through configured email lists/templates (`…DELTA.md` §7, §8, §9) | P2-T08 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T08 |
@@ -435,12 +435,12 @@ the already-accepted A1 freeze plus `dmo-beta-master/contracts/SHARED_FRONTEND.m
 `IMPLEMENTATION_MODEL.md`. They also do not block P2-T04–P2-T08 **planning**, which this
 document completes.
 
-**Blocker status (recorded 2026-09-22, P2-T04 contract-authoring task).**
+**Blocker status (recorded 2026-09-22, P2-T04 implementation task).**
 
 | Blocker | Status |
 |---|---|
-| **B1** (P2-T04 Tool/Job On/context contract) | **CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW** (`AWAITING PLAN ACCEPT`). The contract is `plans/contracts/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT.md`. No implementation is authorized by it: per Beta `WORKFLOW.md` step 6 the Architect must return `PLAN ACCEPT` first. The contract's own §21 records 22 NON-BLOCKING authority questions, each with a pinned default; no physical-schema-critical question remains BLOCKING. |
-| **B2**, **B3**, **B4** | **UNCHANGED / OPEN** — no contract authored by this task. |
+| **B1** (P2-T04 Tool/Job On/context contract) | **RESOLVED — PLAN ACCEPT `7d7a7c564027945a5c9a73cb798e9c226ee7f013`.** Contract `plans/contracts/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT.md` at `58c6c1e8b4c9617daefc4ed02f7e65fb450bdada`; Architect plan review `dev/reviews/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT_PLAN_REVIEW.md` (in `diogo-o/dmo-work`) returned **PLAN ACCEPT** with 22 ACCEPT DEFAULT / 0 REQUIRES CORRECTION / 0 BLOCKING, stated **B1 → RESOLVED** and **P2-T04 implementation → AUTHORIZED**. P2-T04 is implemented against that contract and awaits independent verification / Architect implementation review. |
+| **B2**, **B3**, **B4** | **UNCHANGED / OPEN** — no contract authored. P2-T05 and later remain **NOT AUTHORIZED**. |
 
 ---
 
@@ -860,10 +860,23 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   repository/application interfaces and result vocabulary, the complete 14-route
   endpoint/route/policy matrix, the one-new-migration contract and a 106-criterion / 155-test
   test-to-acceptance matrix. It records **22 NON-BLOCKING** authority questions with pinned
-  defaults and **no** BLOCKING physical-schema question. **P2-T04 is still unimplemented and
-  unauthorized:** implementation requires the Architect's `PLAN ACCEPT` per Beta `WORKFLOW.md`
-  step 6. `ModuleRegistrations.CurrentBuildAvailable` is still `[]`, no route is registered, no
-  migration was added and no application code was changed by the authoring task.
+  defaults and **no** BLOCKING physical-schema question. `ModuleRegistrations.CurrentBuildAvailable`
+  is still `[]`, no route is registered and no application code was changed by the authoring task.
+
+- **IMPLEMENTATION STATUS: IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT
+  IMPLEMENTATION REVIEW.** P2-T04 was authorized by the Architect `PLAN ACCEPT`
+  (`7d7a7c564027945a5c9a73cb798e9c226ee7f013`, contract
+  `58c6c1e8b4c9617daefc4ed02f7e65fb450bdada`) and is implemented against that contract: the
+  canonical Tool registry, the Job On production occurrence, the CM/MF/BQ contexts with their frozen
+  `tool_type`/`tool_reference`/`tool_lot` triple, the reference → productions query, the shared Tool
+  search/select/create orchestration, Job On duplication, the delete dependency rule with its probe
+  seam, the contextual Ferramentas Light surfaces, the 14 contracted routes with one canonical
+  Module policy each, and exactly one new migration (`ToolJobOnDomainCore`) owning exactly the six
+  contracted tables. `ModuleRegistrations.CurrentBuildAvailable` remains `[]`,
+  `DestinationRouteRegistrations` remains empty and no destination route is registered: P2-T10 owns
+  availability/navigation registration. The evidence, the test-matrix result and the disclosed
+  literal-shape readings are recorded in `dev/responses/P2_T04_IMPLEMENTATION_RESPONSE.md`. P2-T04 is
+  **not** closed; P2-T05 and later remain **NOT AUTHORIZED**.
 
 ### P2-T05 — Controlo Create (Peso, Comparação, Pegamentos, Folha, Resumo) + shared Peso read model
 
@@ -1509,6 +1522,6 @@ Investigated during this planning run and determined **not** to require implemen
 | 11 A4 P1-T07 status | AMBIGUITY | RESOLVED, to P2-T00 | P2-T00 |
 | 11 canonical order | AMBIGUITY | ALREADY SATISFIED | — |
 | 11 Peso vocabulary | AMBIGUITY | RESOLVED | P2-T05/P2-T06 |
-| **B1** Tool/Job On/context backend contract | BLOCKER | **CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW** (NOT RESOLVED; requires `PLAN ACCEPT`) | P2-T04 |
+| **B1** Tool/Job On/context backend contract | BLOCKER | **RESOLVED — PLAN ACCEPT `7d7a7c564027945a5c9a73cb798e9c226ee7f013`** (contract `58c6c1e8b4c9617daefc4ed02f7e65fb450bdada`); P2-T04 implemented against it and awaiting Architect implementation review | P2-T04 |
 
 **Counts.** PARTIAL items dispositioned: **4/4**. MISSING items mapped: **17/17**. Ambiguities resolved: **7/7** (HISTÓRICO GLOBAL scope, missing design plan, P1-T07 status, canonical order, Peso vocabulary, plus the section-10 wiring set as three DO-NOT-IMPLEMENT resolutions). Ambiguities remaining BLOCKED BY AUTHORITY: **0**. Intra-workstream contract-authoring gaps (B1-B4): 4, none blocking planning.
