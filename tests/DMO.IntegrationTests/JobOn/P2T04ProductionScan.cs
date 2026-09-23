@@ -533,6 +533,11 @@ internal static class P2T04ProductionScan
         "JobOnDuplicationIntegrationTests.cs",
         "JobOnDeleteDependencyIntegrationTests.cs",
         "Migration003ToolJobOnDomainCoreTests.cs",
+        // Architect-mandated save-time concurrency-race regression (implementation review
+        // 5d490113b8dd1d80759742cc86a99e8f0294b44c, §15.1 correction): a new P2-T04 env-gated
+        // persistence test, deliberately outside the 155-row contract matrix (see the response
+        // file correction section).
+        "JobOnSaveTimeConcurrencyTests.cs",
     ];
 
     /// <summary>Returns whether a repository-relative test path belongs to the new P2-T04 surface.</summary>

@@ -147,7 +147,7 @@ public sealed class JobOnRepository : IJobOnRepository
                 await InsertContextFromLiveToolAsync(jobOn.JobOnId.Value, context, now, cancellationToken);
             }
 
-            await _context.SaveChangesAsync(cancellationToken);
+            await SaveAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
         catch (DbUpdateException exception) when (TryMapWriteFailure(exception, out var failure))
@@ -234,7 +234,7 @@ public sealed class JobOnRepository : IJobOnRepository
             entity.Version += 1;
             entity.UpdatedAt = now;
 
-            await _context.SaveChangesAsync(cancellationToken);
+            await SaveAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
         catch (DbUpdateException exception) when (TryMapWriteFailure(exception, out var failure))
@@ -318,7 +318,7 @@ public sealed class JobOnRepository : IJobOnRepository
                 InsertContextCopy(duplicate.JobOnId.Value, context, now);
             }
 
-            await _context.SaveChangesAsync(cancellationToken);
+            await SaveAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
         catch (DbUpdateException exception) when (TryMapWriteFailure(exception, out var failure))
@@ -388,13 +388,13 @@ public sealed class JobOnRepository : IJobOnRepository
             // delete).
             if (cm.Count + mf.Count + bq.Count > 0)
             {
-                await _context.SaveChangesAsync(cancellationToken);
+                await SaveAsync(cancellationToken);
             }
 
             // 2. Then the occurrence itself.
             JobOns.Remove(entity);
 
-            await _context.SaveChangesAsync(cancellationToken);
+            await SaveAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
         catch (DbUpdateException exception) when (TryMapWriteFailure(exception, out var failure))
@@ -426,6 +426,28 @@ public sealed class JobOnRepository : IJobOnRepository
     }
 
     private DbSet<JobOnEntity> JobOns => _context.Set<JobOnEntity>();
+
+    /// <summary>
+    /// Saves the tracked changes, mapping a save-time optimistic-concurrency conflict onto the
+    /// domain typed conflict (contract §15.1): the explicit in-transaction version compare closes
+    /// already-stale requests, while the active <c>IsConcurrencyToken</c> guard closes the remaining
+    /// race between that compare and this save. When another transaction commits a version bump in
+    /// that window, EF raises <see cref="DbUpdateConcurrencyException"/> (the guarded write matches
+    /// zero rows with no server error), which is surfaced here as
+    /// <see cref="ConcurrencyConflictException"/> so the application layer translates it into
+    /// <c>Refused(StaleVersion)</c> → HTTP 409 — never a silent overwrite and never a generic 500.
+    /// </summary>
+    private async Task SaveAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            throw ConcurrencyConflictExceptionMapping.ToDomainConflict(exception);
+        }
+    }
 
     private async Task ApplySetAsync(
         Guid jobOnId,
