@@ -426,7 +426,7 @@ and they must not be resolved by invention.
 | Ref | Nature | What is absent | Blocking workstream | Required artefact |
 |---|---|---|---|---|
 | B1 | Backend/interface contract | Concrete Tool/Job On/CM/MF/BQ query + mutation contract and physical schema have not been published as an accepted contract | P2-T04+ (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T04 per Beta `WORKFLOW.md`. **Authored:** `plans/contracts/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT.md` at contract SHA `58c6c1e8b4c9617daefc4ed02f7e65fb450bdada` (blob `799e6053a52d96acd21ed6be0475f5180e2525df`). **RESOLVED — PLAN ACCEPT:** Architect plan review `dev/reviews/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT_PLAN_REVIEW.md` at `diogo-o/dmo-work` SHA `7d7a7c564027945a5c9a73cb798e9c226ee7f013` returned **PLAN ACCEPT** (22 ACCEPT DEFAULT, 0 REQUIRES CORRECTION, 0 BLOCKING) and authorized P2-T04 implementation against that contract. B1 is closed; P2-T04 implementation is authorized and P2-T05+ remains unauthorized. |
-| B2 | Backend/interface contract | Concrete Peso/Pegamentos/Folha/Resumo calculate/persist/submit/read contract; **extended** to cover the Controlo_Create → Definições surfaces (repairer register, per-machine assignments, document base directory, email lists, email templates) settled in `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` | P2-T05/P2-T06 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T05. **Authored:** `plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md` — status **P2-T05 CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW** (Peso create/measurement core + the five Definições surfaces; Comparação/Pegamentos/Folha/Resumo and the read-model rendering recorded as P2-T05 handoff remainder per contract Q-SCOPE; **1 BLOCKING authority question Q-PDF** — PDF-directory accessibility-check deployment semantics — and 26 NON-BLOCKING questions with pinned defaults; 64 AC / complete test-to-acceptance matrix). |
+| B2 | Backend/interface contract | Concrete Peso/Pegamentos/Folha/Resumo calculate/persist/submit/read contract; **extended** to cover the Controlo_Create → Definições surfaces (repairer register, per-machine assignments, document base directory, email lists, email templates) settled in `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` | P2-T05/P2-T06 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T05. **Authored:** `plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md` — status **P2-T05 CONTRACT CORRECTED — AWAITING ARCHITECT RE-REVIEW** (Peso create/measurement core + the five Definições surfaces; Comparação/Pegamentos/Folha/Resumo and the read-model rendering recorded as P2-T05 handoff remainder per contract Q-SCOPE). **Architect plan review `256081fae43d4192b879b65fca0bb43efe8cdbca` (dmo-work): PLAN REJECT — C1–C4 only**; **Q-PDF resolved — ACCEPT DEFAULT, server-host filesystem configuration with server-side accessibility check**; 27 authority questions ACCEPT DEFAULT / 0 BLOCKING; corrections C1 (test matrix: 66 AC / 84 rows), C2 (`RESULT_NON_POSITIVE`), C3 (calculate route identity pin) and C4 (Appendix D.3 provenance) applied at the corrected contract commit. |
 | B3 | Backend/interface contract | Concrete Boquilhas aggregate/movement/edit-audit/close-reopen contract and `repairer_id` schema/query shape. The canonical `repairer_id` **directory source is now settled** (Controlo_Create → Definições), as are machine-assignment autonomy and historical repairer preservation (`…DELTA.md` §3.6, §4, §5, §6); the physical schema/query/endpoint contract is still absent | P2-T07 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T07 |
 | B4 | Backend/interface contract | Document generation contract + directory/filesystem capability (`Infrastructure/Files`, `Infrastructure/Pdf` do not exist); **extended** to cover the operator-configured base directory (configure/change/verify accessibility) and sending through configured email lists/templates (`…DELTA.md` §7, §8, §9) | P2-T08 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T08 |
 
@@ -440,7 +440,7 @@ document completes.
 | Blocker | Status |
 |---|---|
 | **B1** (P2-T04 Tool/Job On/context contract) | **RESOLVED — PLAN ACCEPT `7d7a7c564027945a5c9a73cb798e9c226ee7f013`.** Contract `plans/contracts/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT.md` at `58c6c1e8b4c9617daefc4ed02f7e65fb450bdada`; Architect plan review `dev/reviews/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT_PLAN_REVIEW.md` (in `diogo-o/dmo-work`) returned **PLAN ACCEPT** with 22 ACCEPT DEFAULT / 0 REQUIRES CORRECTION / 0 BLOCKING, stated **B1 → RESOLVED** and **P2-T04 implementation → AUTHORIZED**. P2-T04 is implemented against that contract and **CLOSED** (Architect focused re-review ACCEPT `b6f7a01c99fc8c517cca5cab335af5d47fb9e2f9` on the §15.1 correction, superseding the prior REJECT). |
-| **B2** (P2-T05/P2-T06 Controlo contract) | **AUTHORED — AWAITING ARCHITECT PLAN REVIEW.** Contract `plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md` (status **P2-T05 CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW**; 1 BLOCKING question Q-PDF; 26 NON-BLOCKING questions; 64 AC / complete test matrix). Requires Architect `PLAN ACCEPT` before P2-T05/P2-T06 execution. |
+| **B2** (P2-T05/P2-T06 Controlo contract) | **CORRECTED — AWAITING ARCHITECT RE-REVIEW.** Contract `plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md` (status **P2-T05 CONTRACT CORRECTED — AWAITING ARCHITECT RE-REVIEW**; Architect plan review `256081fae43d4192b879b65fca0bb43efe8cdbca` = PLAN REJECT — C1–C4 only; **Q-PDF resolved**: ACCEPT DEFAULT — server-host filesystem configuration with server-side accessibility check; 27 ACCEPT DEFAULT / 0 BLOCKING; corrections C1–C4 applied; 66 AC / 84 matrix rows). Requires Architect `PLAN ACCEPT` before P2-T05/P2-T06 execution. |
 | **B3**, **B4** | **UNCHANGED / OPEN** — no contract authored. P2-T07 and P2-T08 remain **NOT AUTHORIZED**. |
 
 ---
@@ -960,35 +960,43 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   consumed by P2-T06.
 - **Downstream dependents:** P2-T06, P2-T08, P2-T10.
 
-- **CONTRACT STATUS: AUTHORED — AWAITING ARCHITECT PLAN REVIEW.** The B2 contract is
+- **CONTRACT STATUS: CORRECTED — AWAITING ARCHITECT RE-REVIEW.** The B2 contract is
   `plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md`, status
-  **P2-T05 CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW** and **B2 AWAITING PLAN ACCEPT**.
+  **P2-T05 CONTRACT CORRECTED — AWAITING ARCHITECT RE-REVIEW** and **B2 AWAITING PLAN ACCEPT**.
   It fixes — over the real, closed P2-T04 seams — the Peso identity/anchoring model (`peso_id → cm_id` production | `tool_id` truthful pending with `Job On por associar`; no `production_id`,
   no duplicate identity chain, DB-enforced exclusive anchor), the weight **and** capacity
   registration (per-row `water_weight_g` entered + backend-derived `capacity_cm3` and
   `glass_weight_g` persisted; formulas contracted exactly; temperature 5–35 °C; `numeric(18,4)`
-  storage with ≤ 2 dp presentation), the row model (variable, ≥ 1, dense positional ordering),
-  the historical snapshot model (frozen: CM-context triple via `cm_id`, Peso inputs, density
-  used, per-row results, attribution; Job-On labels remain traversal, explicitly documented), the
-  create/edit/submit transactions on one `peso_id` with the minimal P2-T06 handoff carrier
-  (`submitted_at`/`submitted_by_user_id`; no delete path), the missing-CM creation composed
+  storage with ≤ 2 dp presentation; typed `RESULT_NON_POSITIVE` refusal for non-positive computed
+  results), the row model (variable, ≥ 1, dense positional ordering), the historical snapshot
+  model (frozen: CM-context triple via `cm_id`, Peso inputs, density used, per-row results,
+  attribution; Job-On labels remain traversal, explicitly documented), the create/edit/submit
+  transactions on one `peso_id` with the minimal P2-T06 handoff carrier
+  (`submitted_at`/`submitted_by_user_id`; no delete path), the stateless calculate route with
+  request-carrier identity (`POST /controlo/create/calculate`), the missing-CM creation composed
   through `IJobOnService` Set under the Controlo_Create gate, the `PesoJobOnDependencyProbe` on
   the accepted probe seam, the five **Definições** surfaces (name-only repairer register;
   independent `B1 B2 B3 C1 C2 C3` assignments, current-state only, no grouping; PDF base
-  directory configure/change/check; named email lists with recipients; email templates), the
-  physical schema (8 tables, 22 CHECKs, 7 RESTRICT FKs, query-justified indexes), ONE new
-  migration contract, the 17-route matrix (each exactly `controlo-create`; Definições never a
-  destination), the failure/result vocabulary and published Peso read-model shapes, and a
-  complete test-to-acceptance matrix (64 AC ↔ matrix rows) covering Peso identity, measurements,
-  snapshot, create, Job On/CM resolution, repairers, machine independence, settings, auth and
-  boundaries. It records **1 BLOCKING authority question (Q-PDF — PDF-directory
-  accessibility-check deployment semantics, per the task mandate; only the check operation is
-  affected — the setting's persistence/change surface is fixed)** and **26 NON-BLOCKING**
-  questions with pinned defaults (incl. Q-CALC divisor/density mapping values and Q-SCOPE
+  directory configure/change/check with the server-side check semantics of the resolved Q-PDF;
+  named email lists with recipients; email templates), the physical schema (8 tables, 22 CHECKs,
+  7 RESTRICT FKs, query-justified indexes), ONE new migration contract, the 17-route matrix
+  (each exactly `controlo-create`; Definições never a destination), the failure/result
+  vocabulary and published Peso read-model shapes, and a complete test-to-acceptance matrix
+  (**66 AC ↔ 84 matrix rows; audit: missing 0, dangling 0, orphan 0**) covering Peso identity,
+  measurements, snapshot, create, Job On/CM resolution, repairers, machine independence,
+  settings, auth, boundaries and fixed desktop. **Authority questions: 27 ACCEPT DEFAULT, 0
+  REQUIRES CORRECTION, 0 BLOCKING** — the former BLOCKING question **Q-PDF** (PDF-directory
+  accessibility-check deployment semantics) was **resolved by the Architect plan review**
+  (`256081fae43d4192b879b65fca0bb43efe8cdbca`, dmo-work): **ACCEPT DEFAULT — server-host
+  filesystem configuration with server-side accessibility check**; the setting's
+  persistence/change surface is fixed (incl. Q-CALC divisor/density mapping values and Q-SCOPE
   recording that Comparação/Pegamentos/Folha/Resumo and the read-model rendering remain P2-T05
-  handoff items authored by a follow-on contract). `ModuleRegistrations.CurrentBuildAvailable` is
-  still `[]`, no route is registered, and no application code was changed by the authoring task.
-  P2-T05 implementation remains **NOT AUTHORIZED**.
+  handoff items authored by a follow-on contract). The Architect plan review returned
+  **PLAN REJECT — C1–C4 only**; corrections C1 (matrix repair), C2 (`RESULT_NON_POSITIVE`),
+  C3 (calculate-route identity pin) and C4 (Appendix D.3 provenance) were applied by the
+  correction task at the corrected contract commit. `ModuleRegistrations.CurrentBuildAvailable`
+  is still `[]`, no route is registered, and no application code was changed by the
+  authoring/correction tasks. P2-T05 implementation remains **NOT AUTHORIZED**.
 
 ### P2-T06 — Controlo Approve
 
@@ -1554,6 +1562,6 @@ Investigated during this planning run and determined **not** to require implemen
 | 11 canonical order | AMBIGUITY | ALREADY SATISFIED | — |
 | 11 Peso vocabulary | AMBIGUITY | RESOLVED | P2-T05/P2-T06 |
 | **B1** Tool/Job On/context backend contract | BLOCKER | **RESOLVED — PLAN ACCEPT `7d7a7c564027945a5c9a73cb798e9c226ee7f013`** (contract `58c6c1e8b4c9617daefc4ed02f7e65fb450bdada`); P2-T04 implemented against it and **CLOSED** (Architect re-review ACCEPT `b6f7a01c99fc8c517cca5cab335af5d47fb9e2f9`) | P2-T04 |
-| **B2** Peso/Definições backend contract | BLOCKER | **AUTHORED — AWAITING ARCHITECT PLAN REVIEW** (`plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md`; **P2-T05 CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW**; 1 BLOCKING question Q-PDF, 26 NON-BLOCKING, 64 AC / complete test matrix) | P2-T05, P2-T06 |
+| **B2** Peso/Definições backend contract | BLOCKER | **CORRECTED — AWAITING ARCHITECT RE-REVIEW** (`plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md`; **P2-T05 CONTRACT CORRECTED — AWAITING ARCHITECT RE-REVIEW**; Architect plan review `256081fae…` PLAN REJECT — C1–C4 only; Q-PDF resolved — ACCEPT DEFAULT server-host filesystem configuration with server-side accessibility check; 27 ACCEPT DEFAULT / 0 BLOCKING; 66 AC / 84 matrix rows) | P2-T05, P2-T06 |
 
-**Counts.** PARTIAL items dispositioned: **4/4**. MISSING items mapped: **17/17**. Ambiguities resolved: **7/7** (HISTÓRICO GLOBAL scope, missing design plan, P1-T07 status, canonical order, Peso vocabulary, plus the section-10 wiring set as three DO-NOT-IMPLEMENT resolutions). Ambiguities remaining BLOCKED BY AUTHORITY: **0**. Intra-workstream contract-authoring gaps (B1–B4): **B1 RESOLVED — PLAN ACCEPT; B2 AUTHORED — AWAITING PLAN ACCEPT; B3/B4 OPEN** — none blocks planning.
+**Counts.** PARTIAL items dispositioned: **4/4**. MISSING items mapped: **17/17**. Ambiguities resolved: **7/7** (HISTÓRICO GLOBAL scope, missing design plan, P1-T07 status, canonical order, Peso vocabulary, plus the section-10 wiring set as three DO-NOT-IMPLEMENT resolutions). Ambiguities remaining BLOCKED BY AUTHORITY: **0**. Intra-workstream contract-authoring gaps (B1–B4): **B1 RESOLVED — PLAN ACCEPT; B2 CORRECTED — AWAITING ARCHITECT RE-REVIEW (Q-PDF resolved; 27 ACCEPT DEFAULT / 0 BLOCKING); B3/B4 OPEN** — none blocks planning.

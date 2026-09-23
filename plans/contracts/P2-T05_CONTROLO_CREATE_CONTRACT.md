@@ -174,7 +174,8 @@ that conflicts with current authority is superseded (§1.3). In particular:
   columns, no jsonb snapshot blob);
 - the legacy "Diretório principal dos relatórios … guardados neste computador / autorização
   pertence a este browser" concept conflicts with the current server-rendered web runtime and is
-  the basis of the **BLOCKING** deployment question §28 Q-PDF;
+  the basis of the deployment question §28 Q-PDF — **resolved** by the Architect plan review:
+  server-host filesystem configuration with a server-side accessibility check (§12.3, §27.2);
 - the legacy `Peso nominal`/`Estado do molde`/`Notas`/autosave elements are **not** current
   authority and are not contracted (§1.4, §28 Q-NOMINAL).
 
@@ -241,7 +242,7 @@ consumes accepted seams as they are.
 | S12 | Whether settings are **site-wide or user-specific** | site-wide (single-company operational configuration; no per-user settings model exists) → Q-SITE |
 | S13 | **Settings audit trail / actor columns** | none in P2-T05 (default); version tokens protect writes → Q-SETAUDIT |
 | S14 | **Document availability read** on the Create side | P2-T05 reserves the UI region only; the read contract is P2-T08 → §8.7 / Q-DOCREAD |
-| S15 | **"What accessible means" for the PDF base directory** | BLOCKING deployment question §28 Q-PDF |
+| S15 | **"What accessible means" for the PDF base directory** | **resolved** by the Architect plan review: "accessible" = server-process reachability of a server-host-visible path, checked server-side with the typed vocabulary of §12.2 (§27.2 Q-PDF) |
 | S16 | **Peso measurement row label** (legacy `cm_number`/`CM`) | rows are identified by dense 1-based `row_position` (positional pairing, `CONTROLO.md` §8.6); no label column in P2-T05 → Q-ROWLBL |
 | S17 | **SAP reference fields** | contracted per `CONTROLO.md` §8.1A (optional, manual, snapshotted by being Peso columns; never a Comparação relation) — not a silence, listed for completeness |
 | S18 | **Peso anchor re-establishment** (production-bound Peso moving to another `cm_id`) | not offered by P2-T05 (associate action applies only to the pending case) → Q-REANCHOR |
@@ -520,6 +521,15 @@ Peso do vidro (per row, g)
 - A row whose capacity cannot be computed (divisor unavailable) is refused with
   `CALCULATION_CONFIGURATION_MISSING` (§26.2, Q-CALC) — a typed failure, never a fabricated
   result and never a silent zero.
+- **A computed per-row result that is not strictly positive is refused before any write with the
+  typed `RESULT_NON_POSITIVE` token (C2 correction).** This covers `capacity_cm3 <= 0` (invalid
+  divisor configuration) and `glass_weight_g <= 0` (e.g. an entered `Volume Punção/PU` exceeding
+  `Capacidade do CM + Volume Marisa/BQ`). Triggering condition, domain result, transport token,
+  HTTP mapping, CHECK relationship and test proof: §5.5, §26.2, §20.2, §30 AC-M10, §26.4 MES11.
+  The physical CHECKs (`peso_measurement_rows_capacity_check`,
+  `peso_measurement_rows_glass_check`) are **never weakened or removed**; they remain the
+  database backstop, mapped by constraint name to the same `ResultNonPositive` domain refusal.
+  A validator-passing input combination can therefore never surface as a 500.
 - No other calculation exists in this workstream: tolerance corridors, `NotEvaluable`, ovalização
   and nominal belong to Pegamentos (not this contract, §29); Comparação differences belong to the
   Comparação slice (not this contract).
@@ -539,7 +549,9 @@ Peso do vidro (per row, g)
 ### 5.5 Validation (closed, exact tokens — §26.2)
 
 `WATER_TEMPERATURE_REQUIRED`, `TEMPERATURE_OUT_OF_RANGE`, `ROW_REQUIRED`, `ROW_WEIGHT_INVALID`,
-`ROW_POSITION_INVALID`, `DUPLICATE_ROW_POSITION`, `VOLUME_NEGATIVE`, `DENSITY_MISSING`
+`ROW_POSITION_INVALID`, `DUPLICATE_ROW_POSITION`, `VOLUME_NEGATIVE`, `RESULT_NON_POSITIVE`,
+(a computed per-row capacity/glass-weight result is not strictly positive — the pre-write face of
+the `capacity_cm3 > 0`/`glass_weight_g > 0` CHECKs, §5.3/C2), `DENSITY_MISSING`
 (calculation-configuration), `PESO_ANCHOR_REQUIRED`, `PESO_ANCHOR_CONFLICT`, `CM_CONTEXT_NOT_FOUND`,
 `TOOL_NOT_FOUND`, `TOOL_TYPE_MISMATCH`, `ASSOCIATION_MISMATCH`, `REFERENCE_REQUIRED`,
 `PRODUCTION_NUMBER_REQUIRED`, `MACHINE_UNKNOWN`, plus the settings tokens of §26.2.
@@ -645,12 +657,14 @@ BEGIN
   3. resolve calculation configuration (divisor via water_temperature; glass density via
      tool_id.processo -> density mapping). Missing configuration -> ROLLBACK ->
      Refused(CalculationConfigurationMissing) — nothing written; no invented value
-  4. allocate peso_id (+ one peso_measurement_row_id per row)
-  5. INSERT pesos (status = 'pendente', submitted_at = NULL, submitted_by = NULL,
+  4. compute every per-row result (§5.3) in memory; any non-positive capacity/glass weight ->
+     ROLLBACK -> Refused(ResultNonPositive) — nothing written; never a 500 (C2)
+  5. allocate peso_id (+ one peso_measurement_row_id per row)
+  6. INSERT pesos (status = 'pendente', submitted_at = NULL, submitted_by = NULL,
      created_by_user_id = current USER, created_at = now(), version = 1)
-  6. INSERT every peso_measurement_row with row_position 1..n, water_weight_g,
+  7. INSERT every peso_measurement_row with row_position 1..n, water_weight_g,
      capacity_cm3 and glass_weight_g computed by §5.3 (backend, in-transaction)
-  7. COMMIT
+  8. COMMIT
 ```
 
 Guarantees: the Peso with its full row set exists or nothing exists (atomicity; forced-failure
@@ -658,20 +672,51 @@ rollback test); no partial Peso record; the returned carrier carries the real `p
 `version = 1`; retry after commit creates a **new** legitimate Peso (no uniqueness refusal — S1);
 no client idempotency key is invented (accepted Q17 stance of P2-T04, same reasoning).
 
-### 7.2 Calculate (stateless, read-only)
+### 7.2 Calculate (stateless, read-only) — identity contract (C3 correction, exact)
 
 ```text
-POST /controlo/create/pesos/{pesoId:guid}/calculate    (route 8, §21.3)
+POST /controlo/create/calculate    (route 8, §21.3)
 ```
 
-- Inputs: current input facts (temperature, volumes, rows, anchor) as supplied by the operator
-  (draft can be calculated before the first save);
-- outputs: per-row `capacity_cm3`, `glass_weight_g` (full `numeric(18,4)` + 2-dp presentation) and
-  the resolved divisor/density facts (display only);
-- **no write, no version bump, no row creation** (exactly the P2-T04 read-transaction rule);
-- the save transaction **recomputes** from the inputs so stored results always equal the
-  authoritative formula (no preview/persist drift);
-- `CALCULATION_CONFIGURATION_MISSING` when the divisor/density mapping is unavailable.
+The calculate request is identified **by its request carrier only** — it is never identified by,
+and never resolved against, a persisted record:
+
+- **Exact route:** `POST /controlo/create/calculate` — **no path identity parameter**. The old
+  `{pesoId}` path-variable reading is removed: a calculation happens before the first save, so no
+  persisted id exists, and no client-supplied id may stand in for one (PID4). Route count is
+  unchanged (the same row 8 of §21.3).
+- **Request carrier (`CalculatePesoRequest`):** the calculation *context* — **exactly one anchor
+  from the accepted identity chain** — plus the current input facts:
+  `{ cmId: Guid? , pendingToolId: Guid? , waterTemperature, volumeMarisaBq?, volumePuncaoPu?,
+  previousProductionEndReference?, previousAverageWeightReference?, rows: [waterWeightG...] }`.
+  `cmId`/`pendingToolId` are the **existing** P2-T04 identities (`cm_contexts.cm_id`,
+  `tools.tool_id`) — the same anchors a create would use (§3.2). No `peso_id`, no `jobon_id`, no
+  client-minted identity, no draft-key alias appears anywhere in the carrier.
+- **What the anchor is calculated against:** the anchor supplies the *calculation context*, not a
+  stored draft: `cmId → tool_id → processo` (pending case: `pendingToolId → processo`) feeds the
+  glass-density resolution and temperature feeds the divisor resolution (§5.2/§5.3). Nothing is
+  loaded from a Peso record because none exists.
+- **Validation behavior (§5.5 closed set, in order):** exactly one anchor
+  (`PESO_ANCHOR_REQUIRED` / `PESO_ANCHOR_CONFLICT`); the anchor must exist
+  (`CM_CONTEXT_NOT_FOUND` / `TOOL_NOT_FOUND`); temperature range, ≥ 1 row, valid positive water
+  weights, dense positions, non-negative volumes; the derived per-row results are computed and
+  must be strictly positive (`RESULT_NON_POSITIVE`, C2). Refusals are 400 `validation-failed`
+  with the exact token list.
+- **Not-found/refusal behavior:** an unknown anchor is `CM_CONTEXT_NOT_FOUND` / `TOOL_NOT_FOUND`
+  (400); unavailable divisor/density configuration is `calculation-configuration-missing` (409);
+  a denied caller is 403. **404 is never returned** — the request never targets a persisted
+  record, so it can never be "not found" as a record.
+- **Authorization:** `controlo-create` — the single canonical policy of §21.2/§22, identical to
+  every other P2-T05 route.
+- **Response carrier:** 200 `PesoCalculationResponse` — per-row `capacity_cm3` and
+  `glass_weight_g` (full `numeric(18,4)` + 2-dp presentation), the resolved divisor/density
+  display facts, and the echoed anchor. **No write, no version bump, no row creation, no id
+  allocation** (exactly the P2-T04 read-transaction rule); `CALCULATION_CONFIGURATION_MISSING`
+  when the divisor/density mapping is unavailable.
+- The save transaction (§7.1 create / §7.3 edit) **recomputes** from the inputs so stored results
+  always equal the authoritative formula (no preview/persist drift).
+- **Planned proof:** JRC7 (AC-R7) for the identity/statelessness contract; MES11 (AC-M10) for the
+  non-positive refusal.
 
 ### 7.3 Edit (draft only; exact rules)
 
@@ -691,7 +736,8 @@ BEGIN
   4. validate (§5.5; same closed set as create)
   5. replace the row set: delete existing rows, insert the new set at dense positions
      (whole-set semantics — the measurement row set is an aggregate part of the Peso)
-  6. recompute derived columns (§5.3) from the new inputs
+  6. recompute derived columns (§5.3) from the new inputs; any non-positive per-row result ->
+     ROLLBACK -> Refused(ResultNonPositive) — nothing written (C2)
   7. version += 1; updated_at = now()
   8. COMMIT
 ```
@@ -713,7 +759,8 @@ BEGIN
   2. assert version == ExpectedVersion              else -> Refused(StaleVersion)
   3. assert submitted_at IS NULL                    else -> Refused(AlreadySubmitted)
   4. validate the full current state (§5.5: >= 1 valid row, temperature range, volumes, anchor)
-  5. recompute derived columns (guarantees stored == authoritative)
+  5. recompute derived columns (guarantees stored == authoritative); any non-positive per-row
+     result -> ROLLBACK -> Refused(ResultNonPositive) — nothing written (C2)
   6. submitted_at := now(); submitted_by_user_id := current USER
   7. version += 1; COMMIT
 ```
@@ -936,13 +983,15 @@ P2-T08's/generation's concern (§12.4, §15).
 | Persistence | one row in `pdf_directory_settings` (single-row table; §16); site-wide (Q-SITE) |
 | Path representation | absolute filesystem path, `text`, trimmed non-blank (`DIRECTORY_REQUIRED`); no trailing separator normalization is performed or claimed (stored verbatim, trimmed); paths are **never** used as identities, never join keys, never printed into documents (`DOCUMENTS_AND_FILES.md` §5) |
 | Configure / change | `PUT /controlo/create/definicoes/pdf-directory` — single upsert; version-checked; change is a plain setting change (no migration of documents, no availability change — P2-T08 consumes the new value; `…DELTA.md` §7.4) |
-| Check | `POST /controlo/create/definicoes/pdf-directory/check` returns a typed accessibility result (below) |
+| Execution host (**Q-PDF ruling, binding**) | the configured path is a **server-host filesystem path** — a path visible to the **deployed application host** (server process). Site-wide operational configuration (§9, Q-SITE). The browser **never** accesses arbitrary local workstation filesystem paths: no File System Access API, no browser file-storage authority, and **no assumption that client and server share a filesystem** |
+| Check | `POST /controlo/create/definicoes/pdf-directory/check` returns a typed accessibility result (below); the check **executes server-side** under the server process account |
+| Check semantics (**Q-PDF ruling, binding**) | the server-side check asserts, against the **server-host filesystem only**: absolute-path validity (`invalid-path`), existence (`directory-not-found`), is-a-directory (`not-a-directory`), read and write reachability from the server process account (`access-denied`); all other infrastructure failures are `check-failed` (never conflated with `directory-not-found`). The check is scoped to the configured path itself — it never proves, and never claims, reachability from the operator's workstation/browser (the legacy "browser/computer-local" semantic is superseded for this runtime — §1.2/§12.3). It creates/writes **no** production document: P2-T05 performs no file IO beyond the check probe itself |
 | Failure/result vocabulary | `not-configured` (no row yet — explicit state, not an error), `ok`, `directory-not-found`, `not-a-directory`, `access-denied` (permission/read-write), `invalid-path` (not an absolute path), `check-failed` (infrastructure lookup failure — never conflated with `directory-not-found`) |
-| Security constraints | the setting surface returns **only** the typed result and the configured path; it never lists directory contents, never follows/exposes other filesystem areas, never renders the path into documents, never reads files; no arbitrary file-read endpoint exists |
+| Security constraints | the setting surface returns **only** the typed result and the configured path; it never lists directory contents, never follows/exposes other filesystem areas, never renders the path into documents, never reads files, never turns the check into a generic filesystem browser; no arbitrary file-read endpoint exists; `controlo-create` gate on every directory route (§21.3/§22) |
 | Behavior when unavailable | the check reports the typed state; no P2-T05 workflow depends on the directory (P2-T05 performs no file IO); P2-T08 consumes availability through the accepted `AvailabilityState` `workspace-unavailable` family |
 | Directory creation | P2-T05 does **not** create directories (creation/use semantics belong to P2-T08's generator contract) |
 
-### 12.3 The BLOCKING deployment question (Part 18 — exact)
+### 12.3 The deployment question (Part 18 — exact; **RESOLVED by the Architect plan review**)
 
 The legacy authority's "main reports directory" was a **browser/computer-local** directory
 ("Os PDFs aprovados são guardados neste computador", "A autorização pertence a este
@@ -950,16 +999,31 @@ browser/computador" — legacy visual). The current runtime is a **server-side A
 monolith** (Razor pages + minimal APIs; PostgreSQL; no browser-file-system layer, no client-side
 storage authority anywhere in the accepted foundation), and **no repository authority records
 where the production runtime will be hosted** (no Dockerfile, no hosting/deployment contract in
-DMO-MODULAR; Supabase is the database, the web process location is unrecorded). Therefore:
+DMO-MODULAR; Supabase is the database, the web process location is unrecorded). Either server-host
+filesystem, network-share and browser-local semantics could be imagined — the Architect has ruled:
 
-- the **persistence and change surface** of the setting is architecture-neutral and is fixed
-  here (§12.2, schema §16);
-- the **"accessible" check semantics** — who can observe the path (server process filesystem,
-  network share reachable from the server, operator workstation, or a managed document store) —
-  **cannot be fixed without inventing either browser filesystem access or an unrecorded
-  deployment assumption**. This is recorded as **BLOCKING question Q-PDF** (§28). Until the
-  Architect resolves it, the check *operation* may not be implemented to a fabricated semantic;
-  the schema and the configuration/change surface are unaffected and remain fixed.
+> **Q-PDF: ACCEPT DEFAULT — server-host filesystem configuration with server-side accessibility
+> check.** The configured path is a path visible to the **deployed application host**; the check
+> operation (route 15) executes **server-side** under the server process account and returns only
+> the typed vocabulary of §12.2; the UI only edits/submits the configuration. The browser does
+> not browse or inspect the server filesystem; no File System Access API, no client↔server
+> same-filesystem assumption, no arbitrary filesystem exposure. The check proves
+> **server-process reachability only** and never claims workstation/browser reachability. P2-T08
+> owns downstream generation/storage/send and consumes the stored value (§12.4). If a later
+> deployment decision places storage elsewhere, P2-T08's contract owns any refinement of
+> availability semantics — recorded, not blocking, and no P2-T05 rework is implied.
+
+Consequences, exact:
+
+- the **persistence and change surface** of the setting is architecture-neutral and fixed here
+  (§12.2, schema §16);
+- the **check operation is implementable now** with the ruling's semantics: server-side probe of
+  the server-host-visible path with the typed result vocabulary (DB-class tests assert the
+  vocabulary and its non-conflation; the executable probe is unit-tested over a small filesystem
+  abstraction with temp directories — SET2/SET3/SET12, §26.4);
+- no browser filesystem access is invented and no unrecorded deployment assumption is needed:
+  every runtime the deployment chooses has a server process, and "the path as seen by that
+  process" is a definite, testable fact.
 
 ### 12.4 Ownership boundary with P2-T08
 
@@ -1448,8 +1512,11 @@ Binding rules (same as P2-T04 §12.2): `CancellationToken` mandatory last; `Task
 reads / `Task<IReadOnlyList<T>>` lists / `Task` writes; multi-row writes open their own
 transaction; private static `Project(...)` mapping; constraint violations mapped by
 `PostgresException.SqlState` + constraint name to typed failures (`DuplicateIdentity`-style where
-applicable, e.g. `email_lists_name_key` → `DuplicateName`); repositories own no domain rule;
-services contain no SQL.
+applicable, e.g. `email_lists_name_key` → `DuplicateName`; **CHECK backstop: SQLSTATE `23514` on
+`peso_measurement_rows_capacity_check` / `peso_measurement_rows_glass_check` → the same
+`ResultNonPositive` domain refusal the validator raises** — C2, so a validator-passing
+combination can never surface as a 500); repositories own no domain rule; services contain no
+SQL.
 
 ### 20.3 Service contracts (exact)
 
@@ -1569,7 +1636,7 @@ P2-T04 application reads never bypass a policy: the Tool search/create calls sta
 | 5 | `POST /controlo/create/pesos` | minimal API | create Peso (draft) transactionally | `controlo-create` | `CreatePesoRequest` | 201 `PesoCreatedResponse` (`pesoId`, `version`) | 400 `validation-failed`, 409 `calculation-configuration-missing`, 403 |
 | 6 | `GET /controlo/create/pesos/{pesoId:guid}` | minimal API | Peso read (ficha: anchor projection, inputs, rows+results, submitted attribution) | `controlo-create` | route `pesoId` | `PesoSheetResponse` (§26.3) | 404, 403 |
 | 7 | `PUT /controlo/create/pesos/{pesoId:guid}` | minimal API | update draft (inputs + whole row set, recompute) | `controlo-create` | `UpdatePesoRequest` | 200 `PesoUpdatedResponse` (`pesoId`, `version`) | 400, 404, 409 `stale-version` \| `already-submitted`, 403 |
-| 8 | `POST /controlo/create/pesos/{pesoId:guid}/calculate` | minimal API | stateless calculate (no write) | `controlo-create` | `CalculatePesoRequest` (current input facts) | 200 `PesoCalculationResponse` (per-row results, 2-dp presentation) | 400, 409 `calculation-configuration-missing`, 403 |
+| 8 | `POST /controlo/create/calculate` | minimal API | stateless calculate — request-carrier identity only (§7.2): no path identity, no record resolution, never 404 | `controlo-create` | `CalculatePesoRequest` (exactly one anchor `cmId`\|`pendingToolId` + current input facts) | 200 `PesoCalculationResponse` (per-row results, 2-dp presentation, resolved divisor/density display facts, echoed anchor) | 400 `validation-failed` (incl. `PESO_ANCHOR_REQUIRED`/`PESO_ANCHOR_CONFLICT`/`CM_CONTEXT_NOT_FOUND`/`TOOL_NOT_FOUND`/`RESULT_NON_POSITIVE`), 409 `calculation-configuration-missing`, 403 |
 | 9 | `POST /controlo/create/pesos/{pesoId:guid}/submit` | minimal API | submit the same `peso_id` (reviewable handoff) | `controlo-create` | `{ expectedVersion }` | 200 `PesoSubmittedResponse` (`pesoId`, `version`, `submittedAt`) | 400, 404, 409 `stale-version` \| `already-submitted`, 403 |
 | 10 | `POST /controlo/create/pesos/{pesoId:guid}/associate` | minimal API | explicit pending→cm association | `controlo-create` | `{ cmId, expectedVersion }` | 200 `PesoAssociatedResponse` (`pesoId`, `version`, `cmId`) | 400, 404, 409 `stale-version` \| `already-submitted` \| `association-mismatch` \| `already-associated`, 403 |
 | 11 | `POST /controlo/create/jobons/{jobonId:guid}/cm-association` | minimal API | create the missing CM context (composes `IJobOnService` association Set; CM-slot only, explicit human confirmation) | `controlo-create` | `{ toolId, expectedJobOnVersion }` | 201 `CmAssociationCreatedResponse` (`jobonId`, `cmId`, `version`) | 400 `TOOL_TYPE_MISMATCH`/`TOOL_NOT_FOUND`, 404, 409 `stale-version`, 403 |
@@ -1799,12 +1866,13 @@ public enum SettingsRefusalReason
 
 | Token | Raised by | Meaning |
 |---|---|---|
-| `validation-failed` (400) | every mutation/query | `errors[]` carries §5.5/§10.4/§12.2/§13.2/§14.2 codes: `REFERENCE_REQUIRED`, `PRODUCTION_NUMBER_REQUIRED`, `MACHINE_UNKNOWN`, `TEMPERATURE_OUT_OF_RANGE`, `WATER_TEMPERATURE_REQUIRED`, `ROW_REQUIRED`, `ROW_WEIGHT_INVALID`, `ROW_POSITION_INVALID`, `DUPLICATE_ROW_POSITION`, `VOLUME_NEGATIVE`, `PESO_ANCHOR_REQUIRED`, `PESO_ANCHOR_CONFLICT`, `CM_CONTEXT_NOT_FOUND`, `TOOL_NOT_FOUND`, `TOOL_TYPE_MISMATCH`, `NAME_REQUIRED`, `REPAIRER_NOT_FOUND`, `DIRECTORY_REQUIRED`, `DIRECTORY_INVALID`, `LIST_NAME_REQUIRED`, `TEMPLATE_NAME_REQUIRED`, `SUBJECT_REQUIRED`, `BODY_REQUIRED`, `DOCUMENT_TYPE_UNKNOWN`, `ADDRESS_REQUIRED`, `ADDRESS_INVALID`, `DELETE_NOT_CONFIRMED` |
+| `validation-failed` (400) | every mutation/query | `errors[]` carries §5.5/§10.4/§12.2/§13.2/§14.2 codes: `REFERENCE_REQUIRED`, `PRODUCTION_NUMBER_REQUIRED`, `MACHINE_UNKNOWN`, `TEMPERATURE_OUT_OF_RANGE`, `WATER_TEMPERATURE_REQUIRED`, `ROW_REQUIRED`, `ROW_WEIGHT_INVALID`, `ROW_POSITION_INVALID`, `DUPLICATE_ROW_POSITION`, `VOLUME_NEGATIVE`, `RESULT_NON_POSITIVE`, `PESO_ANCHOR_REQUIRED`, `PESO_ANCHOR_CONFLICT`, `CM_CONTEXT_NOT_FOUND`, `TOOL_NOT_FOUND`, `TOOL_TYPE_MISMATCH`, `NAME_REQUIRED`, `REPAIRER_NOT_FOUND`, `DIRECTORY_REQUIRED`, `DIRECTORY_INVALID`, `LIST_NAME_REQUIRED`, `TEMPLATE_NAME_REQUIRED`, `SUBJECT_REQUIRED`, `BODY_REQUIRED`, `DOCUMENT_TYPE_UNKNOWN`, `ADDRESS_REQUIRED`, `ADDRESS_INVALID`, `DELETE_NOT_CONFIRMED` |
 | `stale-version` (409) | every guarded write | observed version no longer current; nothing written |
 | `already-submitted` (409) | edit/associate/submit of a submitted Peso | Create-side mutation closed after submit |
 | `already-associated` (409) | associate on a production-bound Peso | anchor swap only from pending |
 | `association-mismatch` (409) | associate | candidate `cm_id` does not resolve to the anchor `tool_id` |
 | `calculation-configuration-missing` (409) | create/calculate/update/submit | divisor or density mapping unavailable; no invented value; nothing written |
+| `result-non-positive` (400) | create/update/submit/calculate validation | a computed per-row result (`capacity_cm3` or `glass_weight_g`) is not strictly positive for the entered inputs — e.g. entered `Volume Punção/PU` exceeding `Capacidade + Volume Marisa/BQ`, or an invalid divisor configuration (C2); refused **before any write**, nothing written, never a 500; the same `ResultNonPositive` domain refusal is the mapped backstop of the `peso_measurement_rows_capacity_check`/`peso_measurement_rows_glass_check` CHECKs (SQLSTATE `23514`, §20.2) — the CHECKs are never weakened or removed |
 | `dependency-exists` (409) | Job On delete/CM removal (via probe), list/template delete | `dependencies[]` names kinds (`peso`, `machine-assignment`, `duplication-lineage`, …); nothing deleted |
 | `duplicate-name` (409) | email list/template create/rename | `email_lists_name_key`/`email_templates_name_key` collision |
 | `not-found` (404) | reads and mutation targets | the record does not exist |
@@ -1864,12 +1932,12 @@ S = static/architecture scan, R = rendered. The matrix is bidirectional-complete
 
 | # | Class | Test | Proves |
 |---|---|---|---|
-| PID1 | DB | create with a real `cm_id` persists the Peso with `cm_id` set and `tool_id` NULL; read model resolves `cm_id → tool_id → jobon_id` | AC-P1, AC-A1 |
+| PID1 | DB | create with a real `cm_id` persists the Peso with `cm_id` set and `tool_id` NULL; read model resolves `cm_id → tool_id → jobon_id` | AC-P1 |
 | PID2 | DB | pending create persists `tool_id` with `cm_id` NULL; the row is `pendente` and measurable | AC-P2, AC-P3 |
 | PID3 | DB | the anchor CHECK rejects both-NULL and both-set rows | AC-P1 |
 | PID4 | U | `peso_id` appears in no command/request as client-supplied; only the backend allocates it | AC-P4 |
-| PID5 | S | no `production_id`, `job_on_revision_id`, reverse array, jsonb measurement blob, or legacy identity column exists in the new schema/code | AC-A6 |
-| PID6 | DB | pending→associate: candidate `cm_id` resolving to the same `tool_id` accepts; the anchor swaps and `tool_id` clears; version increments once | AC-P5, AC-A2 |
+| PID5 | S | no `production_id`, `job_on_revision_id`, reverse array, jsonb measurement blob, or legacy identity column exists in the new schema/code | AC-P1, AC-P3 |
+| PID6 | DB | pending→associate: candidate `cm_id` resolving to the same `tool_id` accepts; the anchor swaps and `tool_id` clears; version increments once | AC-P5, AC-C8 |
 | PID7 | DB | associate with a `cm_id` resolving to a different Tool → 409 `association-mismatch`, nothing written | AC-P5 |
 | PID8 | DB | associate on a production-bound or already-submitted Peso → 409 `already-associated`/`already-submitted` | AC-P5 |
 | PID9 | U | association candidates return only real `cm_contexts` rows resolving to the anchor Tool; no inference/ranking | AC-P6 |
@@ -1889,6 +1957,7 @@ S = static/architecture scan, R = rendered. The matrix is bidirectional-complete
 | MES8 | U | averages/deviations are derived and never stored; individual results all present in the read model | AC-M8 |
 | MES9 | U | missing calculation configuration → `calculation-configuration-missing` (nothing invented, no zero) | AC-M3, AC-M9 (Q-CALC) |
 | MES10 | DB | `glass_density_g_cm3` frozen once on the Peso at first calculate; a later density-mapping change does not rewrite it | AC-H3, AC-M4 |
+| MES11 | U/DB | computed per-row result ≤ 0 (capacity with an invalid divisor, or glass weight with `Volume Punção/PU` > `Capacidade + Volume Marisa/BQ`) → 400 `validation-failed` with `RESULT_NON_POSITIVE`, nothing written; the `> 0` CHECKs remain present and reject direct row inserts (23514 backstop maps to the same refusal, never 500) | AC-M10 (C2) |
 
 #### SNAPSHOT
 
@@ -1898,7 +1967,7 @@ S = static/architecture scan, R = rendered. The matrix is bidirectional-complete
 | SNA2 | DB | after a Job On edit (facts changed), the Peso's stored inputs/results/attribution are unchanged; the production projection reflects traversal (documented behavior) | AC-H1, AC-H2 |
 | SNA3 | DB | stored capacity/glass weight are never recomputed from current Tool state — no refresh path exists (static scan + DB proof) | AC-H2 |
 | SNA4 | DB | a later CM re-selection (`Set`) keeps `cm_id` and id stable; the Peso read composes live projection + frozen triple as separate facts | AC-H1 |
-| SNA5 | U/S | no code path copies live Tool values into Peso rows; no snapshot engine/table exists | AC-H3, AC-A6 |
+| SNA5 | U/S | no code path copies live Tool values into Peso rows; no snapshot engine/table exists | AC-H3 |
 
 #### CREATE
 
@@ -1925,6 +1994,7 @@ S = static/architecture scan, R = rendered. The matrix is bidirectional-complete
 | JRC4 | I | pending case renders `Job On por associar` (non-error), measurement can save/submit while pending | AC-R4 |
 | JRC5 | U/DB | ambiguity handling: N candidates → N items, explicit human selection; blank reference → 400 `REFERENCE_REQUIRED`; empty vs lookup-failed vs denied distinct | AC-R5 |
 | JRC6 | I | Tool search/create stays `ferramentas`-gated; a `controlo-create`-only caller is denied it (no second Tool access path) | AC-R6 |
+| JRC7 | I | `POST /controlo/create/calculate` is request-carrier-identified: returns 200 with no Peso ever persisted, carries no `peso_id`/`jobon_id`/client-minted id, never resolves a record (no 404), writes nothing and bumps nothing; unknown anchor → 400 `CM_CONTEXT_NOT_FOUND`/`TOOL_NOT_FOUND`; both anchors or none → `PESO_ANCHOR_CONFLICT`/`PESO_ANCHOR_REQUIRED`; `controlo-create` gate; save recomputes the same results (no preview/persist drift) | AC-R7 (C3) |
 
 #### REPAIRERS
 
@@ -1945,7 +2015,7 @@ S = static/architecture scan, R = rendered. The matrix is bidirectional-complete
 | MAC3 | DB | changing `B1` again changes only `B1` (B1 → A then B1 → B; others unchanged) | AC-E2 |
 | MAC4 | DB | clearing `C2` removes only its row; the other five remain | AC-E2 |
 | MAC5 | DB | each machine resolves `machine → assigned repairer` independently (the §11.4 resolution read) | AC-E3 |
-| MAC6 | U/S | no Line B/C grouping concept: no group column, no `linha` member, no cascade anywhere | AC-E4, AC-A6 |
+| MAC6 | U/S | no Line B/C grouping concept: no group column, no `linha` member, no cascade anywhere | AC-E4 |
 | MAC7 | I | assignment set/change/clear routes carry `controlo-create`; approve-only caller denied | AC-E5, AC-G2 |
 
 #### SETTINGS
@@ -1953,7 +2023,7 @@ S = static/architecture scan, R = rendered. The matrix is bidirectional-complete
 | # | Class | Test | Proves |
 |---|---|---|---|
 | SET1 | DB | PDF directory configure → persisted; change → version-guarded new value; `DIRECTORY_REQUIRED` blank | AC-F1 |
-| SET2 | DB | check returns the typed result states; `not-configured` distinct from all others | AC-F2 (Q-PDF semantics gate) |
+| SET2 | DB | check returns the typed result states; `not-configured` distinct from all others | AC-F2 (Q-PDF resolved — server-side check, §12.3) |
 | SET3 | U | check vocabulary: `ok | directory-not-found | not-a-directory | access-denied | invalid-path | check-failed` never conflated with `not-configured`, with each other, or with `empty` | AC-F2 |
 | SET4 | DB | email list create/update carries name + full recipient set atomically; `replace-all` leaves no partial set | AC-F3 |
 | SET5 | DB | list update: recipients replaced exactly (old removed, new inserted) in one transaction | AC-F3 |
@@ -1963,6 +2033,7 @@ S = static/architecture scan, R = rendered. The matrix is bidirectional-complete
 | SET9 | DB | list/template delete with confirmation; missing confirmation → `DELETE_NOT_CONFIRMED`; dependency refusal via RESTRICT backstop when referenced | AC-F7 |
 | SET10 | U | settings reads/writes are site-wide rows (no per-user dimension exists in the schema) | AC-F8 (Q-SITE) |
 | SET11 | DB | settings writes are version-guarded; save-time race maps to `stale-version` | AC-F9 |
+| SET12 | U | server-side check semantics (Q-PDF ruling): the check probe runs against a server-host filesystem abstraction — absolute-path validity, existence, is-directory and read/write reachability from the process account produce exactly the typed vocabulary (temp-directory based; environment-independent; never claims browser/workstation reachability; check creates no documents) | AC-F2 |
 
 #### AUTH
 
@@ -1979,33 +2050,59 @@ S = static/architecture scan, R = rendered. The matrix is bidirectional-complete
 | # | Class | Test | Proves |
 |---|---|---|---|
 | BND1 | S/R | `CurrentBuildAvailable` stays `[]`; no route registration, no navigation entry, no destination for Definições | AC-Y1 |
-| BND2 | S | no P2-T06 leakage: no approve/reject/reopen route, type, table or presentation; no approval queue; no per-CM decision | AC-Y2, AC-N2 |
+| BND2 | S | no P2-T06 leakage: no approve/reject/reopen route, type, table or presentation; no approval queue; no per-CM decision | AC-Y2 |
 | BND3 | S | no P2-T07 leakage: no Boquilhas type/movement/repairer-resolution/assignment-history table; nothing automated for future records | AC-Y3 |
 | BND4 | S | no P2-T08 leakage: no document table, no PDF/email code, no availability read, no file capability, no routing rule, no placeholder parsing | AC-Y4 |
-| BND5 | S | no duplicate Tool/JobOn/CM identity: no second registry, no fake ids, no reverse arrays | AC-A6, AC-A1 |
+| BND5 | S | no duplicate Tool/JobOn/CM identity: no second registry, no fake ids, no reverse arrays | AC-P1, AC-P3 |
 | BND6 | S | no unsupported machine registry, no `machine_id`, no line grouping | AC-E4 |
 | BND7 | S | `pesos`/settings rows carry no `previous_peso_id`, no Comparação/Pegamentos/Folha/Resumo columns or tables (Q-SCOPE seam) | AC-Y5 |
-| BND8 | R/S | migrations 001/002/003 byte-identical; `DmoDbContext.cs` byte-identical; frozen shared artifacts untouched | AC-Y6, AC-A7 |
+| BND8 | R/S | migrations 001/002/003 byte-identical; `DmoDbContext.cs` byte-identical; frozen shared artifacts untouched | AC-Y6 |
 | BND9 | S | no P2-T05 source change outside the contracted paths (production scan of the implementation commit) | AC-Y7 |
 
-**Completeness:** every §30 criterion maps to at least one row above and every row maps to at
-least one criterion (verified in the authoring run by the row↔AC key, mechanically in the
-eventual implementation response — P2-T04 §20.12 discipline).
+#### FIXED DESKTOP (AC-N1 — C1 correction)
+
+| # | Class | Test | Proves |
+|---|---|---|---|
+| LAY1 | S | static scan of the P2-T05-owned artifacts (`dmo-controlo.css`, `dmo-controlo.js`, `Pages/Controlo/*` markup): no `@media`/`@container`/`@supports` structural rule, no width listener, no breakpoint-driven variant, no table→card conversion, no required-column hiding, no action relocation anywhere in P2-T05 surfaces | AC-N1 |
+| LAY2 | R | Novo controlo (R1–R8) and Definições (five sections) render at the canonical 1366 × 768 validation viewport with region-stable composition; structural placement unchanged at a larger desktop width (extra space = whitespace/limited non-structural expansion only) | AC-N1 |
+| LAY3 | R | over-wide regions (results table, Definições tables) use keyboard-reachable local overflow; no required column is hidden and no action moves between regions at any desktop width | AC-N1 |
+
+**Completeness (mechanical audit, C1 correction):** the matrix is bidirectional and closed:
+
+- **Acceptance criteria: 66** — AC-P1…AC-P7 (7), AC-M1…AC-M10 (10), AC-H1…AC-H3 (3),
+  AC-C1…AC-C9 (9), AC-R1…AC-R7 (7), AC-D1…AC-D4 (4), AC-E1…AC-E5 (5), AC-F1…AC-F9 (9),
+  AC-G1…AC-G4 (4), AC-Y1…AC-Y7 (7), AC-N1 (1) = **66**; each criterion exists exactly once in
+  §30 (no aliases; the former `AC-A1/A2/A6/A7` and `AC-N2` keys were undocumented aliases —
+  removed, and their rows remapped to their real criteria above).
+- **Test rows: 84** — PID 10, MES 11, SNA 5, CRE 10, JRC 7, REP 5, MAC 7, SET 12, AUT 5,
+  BND 9, LAY 3 = **84**; all row ids unique.
+- **missing = 0** (every one of the 66 criteria maps to ≥ 1 row), **dangling = 0** (every row
+  maps only to keys that exist in §30), **orphan = 0** (no row without a criterion, no test of a
+  P2-T06/07/08 behavior — BND2/BND3/BND4/BND7 are negative-boundary scans).
+- The row↔AC key is re-verified mechanically in the eventual implementation response — P2-T04
+  §20.12 discipline.
 
 ---
 
 ## 27. Authority questions
 
-### 27.1 BLOCKING
+### 27.1 BLOCKING — NONE
 
-| # | Question | Authority gap (exact) | Options | Smallest recommended default | Implementation impact | Class |
-|---|---|---|---|---|---|---|
-| **Q-PDF** | What do "local directory" and "accessible" mean for the PDF/document base-directory in the **deployed web architecture**? | The settled delta fixes configure/change/check (§7.2) but not the mechanism; the legacy authority's "main reports directory … guardados neste computador / autorização pertence a este browser" is a **browser/computer-local** directory; the current runtime is a **server-side** ASP.NET monolith and **no repository authority records where the production web process runs** (no Dockerfile/hosting contract; Supabase = DB only). Server-local, network-share and browser-local semantics differ materially and cannot be decided from authority. | (a) server-process-local absolute path checked by the server process (needs the deployment to run on/near the storage); (b) UNC/network share reachable from the server (needs credentials/account facts); (c) browser-local directory via the File System Access API (requires a new, unauthorised client-storage capability); (d) managed document store (new architecture) | **(a)** server-process-local absolute path — the only option implementable with the current server-side architecture and no new client capability; the check asserts existence + directory + read/write reachability **from the server process account** | the `check` operation (route 15) semantics, its testability (DB-class tests can only assert the typed vocabulary; the executable check environment is deployment-dependent), and P2-T08's consumption. **The schema, the configure/change surface and the `not-configured` state are unaffected and remain FIXED.** | **BLOCKING** |
+There are **no BLOCKING authority questions**. The only question ever declared blocking —
+**Q-PDF** (PDF-directory accessibility-check deployment semantics) — was **resolved** by the
+Architect plan review (dmo-work `256081fae43d4192b879b65fca0bb43efe8cdbca`, verdict
+`PLAN REJECT — C1–C4 only`):
+
+> **Q-PDF: ACCEPT DEFAULT — server-host filesystem configuration with server-side accessibility
+> check** (§12.2/§12.3 and the Q-PDF row of §27.2).
+
+This contract applies that ruling; Q-PDF is no longer blocking anywhere in this document.
 
 ### 27.2 NON-BLOCKING (each with a pinned default already reflected in this contract)
 
 | # | Question | Authority gap | Pinned default | Impact | Class |
 |---|---|---|---|---|---|
+| Q-PDF | PDF-directory accessibility-check deployment semantics — **resolved by the Architect plan review** (dmo-work `256081fae43d4192b879b65fca0bb43efe8cdbca`) | settled delta fixes configure/change/check (§7.2) but not the mechanism; legacy "browser/computer-local" intent vs a server-side runtime with no recorded hosting contract | **ACCEPT DEFAULT — server-host filesystem configuration with server-side accessibility check**: the configured path is a server-host-visible path (§12.2); the check executes server-side (absolute-path validity, existence, is-directory, read/write reachability from the server process account) with the typed §12.2 vocabulary; the browser only edits/submits the configuration; **no** File System Access API, **no** client↔server same-filesystem assumption, no arbitrary filesystem browsing, the check creates no documents; P2-T08 owns downstream generation/storage/send | the `check` operation (route 15); persistence/change surface unaffected and FIXED (§12.2/§16) | ACCEPT DEFAULT (Architect ruling) |
 | Q-UNIQ | Exact Peso uniqueness | no current authority fixes a tuple (legacy tuple superseded) | **no tuple beyond PK**; duplicates legitimate; explicit selection everywhere | schema: no unique index | NON-BLOCKING |
 | Q-CALC | Water-temperature divisor table data and processo→density mapping values | formulas fixed; the **values** exist in no repository authority | mechanism contracted; values arrive as backend calculation configuration (not a Definições area, not hardcoded); until they exist → `calculation-configuration-missing` | calculate endpoint; no schema impact | NON-BLOCKING |
 | Q-UNIT | Units | authority silent; legacy shows g / cm³ / g·cm⁻³ / °C | g, cm³, g/cm³, °C | display + CHECKs | NON-BLOCKING |
@@ -2037,12 +2134,15 @@ eventual implementation response — P2-T04 §20.12 discipline).
 
 ## 28. Authority questions — summary
 
-**BLOCKING: 1** (Q-PDF — exactly the task-mandated deployment question; it gates only the
-directory **check** executable semantics; the setting's persistence/change surface stays FIXED).
+**BLOCKING: 0** — Q-PDF was resolved by the Architect plan review (dmo-work
+`256081fae43d4192b879b65fca0bb43efe8cdbca`): **ACCEPT DEFAULT — server-host filesystem
+configuration with server-side accessibility check** (§12.2/§12.3, §27.2). No blocking authority
+question remains.
 
-**NON-BLOCKING: 26** (Q-UNIQ … Q-SCOPE) — each with a pinned default reflected in the schema,
-interfaces and routes above; none blocks the PLAN REVIEW gate. If the Architect rejects a pinned
-default, the contract returns `CORRECTION REQUIRED` for that item rather than proceeding.
+**NON-BLOCKING: 27** (Q-PDF … Q-SCOPE) — each with a pinned default (or the Architect-resolved
+ruling for Q-PDF) reflected in the schema, interfaces and routes above; none blocks the PLAN
+REVIEW gate. If the Architect rejects a pinned default, the contract returns
+`CORRECTION REQUIRED` for that item rather than proceeding.
 
 ---
 
@@ -2080,7 +2180,7 @@ P2-T05 is acceptable only when every criterion below is satisfied and proven by 
 | AC-P6 | Association candidates are real context rows, never synthesized. |
 | AC-P7 | No Peso uniqueness tuple exists beyond the PK (Q-UNIQ default). |
 
-### Measurement model (AC-M1 … AC-M9)
+### Measurement model (AC-M1 … AC-M10)
 
 | # | Criterion |
 |---|---|
@@ -2093,6 +2193,7 @@ P2-T05 is acceptable only when every criterion below is satisfied and proven by 
 | AC-M7 | Presentation normalization (≤ 2 dp) never reduces calculation precision. |
 | AC-M8 | Individual results stay first-class; averages/deviations are derived and never hide them. |
 | AC-M9 | Missing calculation configuration yields a typed refusal, never an invented value. |
+| AC-M10 | A computed per-row result that is not strictly positive (capacity or glass weight, C2) is refused before any write with the typed `RESULT_NON_POSITIVE` token — nothing written, never a 500 — and the `> 0` CHECKs remain the mapped database backstop. |
 
 ### Historical snapshot (AC-H1 … AC-H3)
 
@@ -2116,7 +2217,7 @@ P2-T05 is acceptable only when every criterion below is satisfied and proven by 
 | AC-C8 | One version increment per mutation; reads never bump. |
 | AC-C9 | A save-time race never yields 500 and never overwrites silently. |
 
-### Job On / CM resolution (AC-R1 … AC-R6)
+### Job On / CM resolution (AC-R1 … AC-R7)
 
 | # | Criterion |
 |---|---|
@@ -2126,6 +2227,7 @@ P2-T05 is acceptable only when every criterion below is satisfied and proven by 
 | AC-R4 | The pending case blocks nothing and is presented truthfully. |
 | AC-R5 | Empty / lookup-failed / permission-denied / validation are four distinct outcomes. |
 | AC-R6 | Tool search/create access remains `ferramentas`-gated; no second Tool access path. |
+| AC-R7 | Calculate is request-carrier-identified (C3): `POST /controlo/create/calculate` carries no `peso_id`/`jobon_id`/client-minted identity, never resolves or targets a persisted record (no 404), writes and bumps nothing, validates exactly one existing anchor from the accepted identity chain, and its stored save-time results always equal the authoritative formula. |
 
 ### Definições (AC-D1 … AC-F9)
 
@@ -2167,8 +2269,9 @@ P2-T05 is acceptable only when every criterion below is satisfied and proven by 
 | AC-Y7 | Exactly one new migration owns exactly the eight contracted tables; no ninth table or unrequested column. |
 | AC-N1 | The fixed desktop policy holds for every P2-T05 surface (no breakpoint variant, no relocation, no hiding). |
 
-**Count: 64 criteria** (AC-P1…AC-P7, AC-M1…AC-M9, AC-H1…AC-H3, AC-C1…AC-C9, AC-R1…AC-R6,
-AC-D1…AC-D4, AC-E1…AC-E5, AC-F1…AC-F9, AC-G1…AC-G4, AC-Y1…AC-Y7, AC-N1) ↔ the §26.4 rows.
+**Count: 66 criteria** (AC-P1…AC-P7, AC-M1…AC-M10, AC-H1…AC-H3, AC-C1…AC-C9, AC-R1…AC-R7,
+AC-D1…AC-D4, AC-E1…AC-E5, AC-F1…AC-F9, AC-G1…AC-G4, AC-Y1…AC-Y7, AC-N1) ↔ the §26.4 rows
+(84 rows; audit in §26.4: missing 0, dangling 0, orphan 0).
 
 ---
 
@@ -2279,12 +2382,13 @@ variants.
 
 ## Appendix D — Governance record
 
-### D.1 Status recorded by this authoring task
+### D.1 Status recorded by this task (correction run)
 
 | Item | Status |
 |---|---|
-| P2-T05 | **CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW** |
-| B2 (`plans/BETA_IMPLEMENTATION_MASTER_PLAN.md` §4) | **AWAITING PLAN ACCEPT** (not resolved; resolution requires Architect `PLAN ACCEPT`) |
+| P2-T05 | **CONTRACT CORRECTED — AWAITING ARCHITECT RE-REVIEW** (C1–C4 applied; Q-PDF resolved) |
+| Architect plan review | **PLAN REJECT — C1–C4 only** (dmo-work commit `256081fae43d4192b879b65fca0bb43efe8cdbca`, review record `dev/reviews/P2-T05_CONTROLO_CREATE_CONTRACT_PLAN_REVIEW.md`); **Q-PDF ruling: ACCEPT DEFAULT — server-host filesystem configuration with server-side accessibility check** (§12.2/§12.3, §27.2); all 27 authority questions ACCEPT DEFAULT, 0 BLOCKING |
+| B2 (`plans/BETA_IMPLEMENTATION_MASTER_PLAN.md` §4) | **AWAITING ARCHITECT RE-REVIEW ACCEPT** (not resolved; resolution requires Architect `PLAN ACCEPT` after this corrected contract) |
 | Implementation | **NOT STARTED — NOT AUTHORIZED** |
 | Application code modified | NO |
 | Migration created | NO |
@@ -2294,31 +2398,44 @@ variants.
 | P2-T04 | CLOSED (Architect re-review ACCEPT `b6f7a01c99fc8c517cca5cab335af5d47fb9e2f9`) — unchanged by this task |
 | P2-T06 / P2-T07 / P2-T08 / P2-T10 | NOT AUTHORIZED — unchanged |
 
-### D.2 Governance files updated by this authoring task
+### D.2 Governance files updated by this task
 
 | File | Update |
 |---|---|
-| `plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md` | this contract (new) |
-| `plans/BETA_IMPLEMENTATION_MASTER_PLAN.md` | §4 B2 row + blocker-status table; §7 P2-T05 contract-status record; Appendix A B2 row |
-| `plans/beta-workstreams/P2-T05-CONTROLO-CREATE.md` | §5 contract-authored record |
-| `dev/responses/P2_T05_CONTRACT_AUTHORING_RESPONSE.md` | the authoring response (new) |
+| `plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md` | this correction: Q-PDF restated as resolved (server-host filesystem configuration, server-side check — §12.2/§12.3/§27.1/§27.2/§28); C1 matrix repair (66 AC / 84 rows, missing 0 / dangling 0 / orphan 0, AC-N1 proof LAY1–LAY3, AC-A1/A2/A6/A7/AC-N2 aliases removed); C2 `RESULT_NON_POSITIVE` token (§5.3/§5.5/§7.1/§7.3/§7.4/§20.2/§26.2/§30 AC-M10/§26.4 MES11); C3 calculate identity pin (`POST /controlo/create/calculate`, §7.2/§21.3/§30 AC-R7/§26.4 JRC7); C4 Appendix D.3 provenance (below) |
+| `plans/BETA_IMPLEMENTATION_MASTER_PLAN.md` | §4 B2 row + blocker-status table; §7 P2-T05 contract-status record; Appendix A B2 row (status records only) |
+| `plans/beta-workstreams/P2-T05-CONTROLO-CREATE.md` | §5 correction-status record |
+| `dev/responses/P2_T05_CONTRACT_CORRECTION_RESPONSE.md` | the correction response (new) |
 
 `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` is **not** edited (settled authority
-record; its §14.1 "B2 still open" statement remains correct). `reports/BETA_MASTER_RECONCILIATION.md`
-is **not** edited (audited current-state report of a specific commit).
+record). `reports/BETA_MASTER_RECONCILIATION.md` is **not** edited.
 
-### D.3 Baseline verification recorded by the authoring run
+### D.3 Baseline verification recorded by this task
 
 ```text
-DMO-MODULAR baseline            : c1b457f312e63bd32a718888d06793e249eec051 (origin/main, clean)
-P2-T04 FINAL ARCHITECT RE-REVIEW: b6f7a01c99fc8c517cca5cab335af5d47fb9e2f9 (dmo-work main, ACCEPT)
-dmo-beta-master main            : 78da49248f6cf7a8cbe4ddd946f3c38abbaf322f
-dmo-master main                 : 610c8b4d3084864a750f6aa00507b5273ef09567b
-build/tests                     : not modified (authoring task runs no build; baseline evidence
-                                  from P2-T04 response: build 0 errors; unit 509/0/0;
-                                  integration 385/0/2 env-gated)
-working tree (application code) : clean before and after authoring
+DMO-MODULAR baseline (pre-correction)      : c1adae808af11e1a9d68c8ed98e074259339f065 (origin/main, clean)
+P2-T04 FINAL ARCHITECT RE-REVIEW           : b6f7a01c99fc8c517cca5cab335af5d47fb9e2f9 (dmo-work main, ACCEPT)
+P2-T05 ARCHITECT PLAN REVIEW               : 256081fae43d4192b879b65fca0bb43efe8cdbca (dmo-work main, PLAN REJECT — C1–C4 only)
+dmo-beta-master main                       : 78da49248f6cf7a8cbe4ddd946f3c38abbaf322f
+dmo-master main (current)                  : 8f1ca3e27e0eaf58c3dce285b544066565fa3dc1
+dmo-master modular line (`dmo-modular`)    : ae2a9b9d12132ee4b41dc0696f34c6439b5cca52
+build/tests                                : not modified (correction task runs no build; baseline
+                                              evidence unchanged from the authoring response)
+working tree (application code)            : clean before and after correction
 ```
+
+**Provenance correction (C4 — exact):** the SHA `610c8b4d3084864a750f6aa00507b5273ef09567b`
+recorded as "dmo-master main" in the original authoring run of this appendix is **not
+retrievable**: it exists in no local clone or remote ref of `diogo-o/dmo-master` (history
+rewritten; GitHub refuses fetch-by-SHA; raw 404), and it is replaced above by the verified
+current heads — **no replacement SHA is invented**. The old-era master passages this contract
+cites were independently verified as **verbatim-accurate** against recovered lineage commits
+(`60c20d3` — `BETA_VERSION.md`; `b2b813b` — `INFORMATION_MODEL.md`, `ACCESS_MODEL.md` §9,
+`CONTROLO.md` §1–§19 and the §17 Machine/Line email-routing statement), and the preserved
+evidence record `dev/evidence/P2T05_DMO_MASTER_AUTHORITY_EVIDENCE.md` (dmo-work commit
+`01c3470f6a782d539d961d46c1ce2c6b1a32735d`) distinguishes **verified quotation provenance** from
+the **unavailable original commit identity**. There is no live dmo-master contradiction with
+this contract's model.
 
 ---
 
@@ -2327,8 +2444,10 @@ working tree (application code) : clean before and after authoring
 Implementation may begin only when the Architect has:
 
 1. reviewed **this** file at a recorded SHA;
-2. dispositioned the 27 authority questions of §28 — in particular the single **BLOCKING** item
-   Q-PDF (deployment semantics of the directory-accessible check) and the default for Q-CALC;
+2. dispositioned the 27 authority questions of §28 — all **ACCEPT DEFAULT** at the reviewed
+   state, in particular **Q-PDF** (resolved: **ACCEPT DEFAULT — server-host filesystem
+   configuration with server-side accessibility check**, §12.2/§12.3) and the default for
+   Q-CALC;
 3. confirmed the physical schema of §16/§17, the anchoring model of §3/§4, the frozen-facts model
    of §6, the transaction boundaries of §18 and the route/policy matrix of §21;
 4. returned an explicit `PLAN ACCEPT` (or `CORRECTION REQUIRED` / `REJECT`) per
@@ -2337,7 +2456,7 @@ Implementation may begin only when the Architect has:
 Until then:
 
 ```text
-P2-T05 CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW
+P2-T05 CONTRACT CORRECTED — AWAITING ARCHITECT RE-REVIEW
 B2 AWAITING PLAN ACCEPT
 NOT IMPLEMENTED
 ```
