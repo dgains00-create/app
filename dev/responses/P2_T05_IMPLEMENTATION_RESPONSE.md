@@ -17,6 +17,7 @@ IMPLEMENTATION REVIEW`.
 | Peso identity rule | `dev/rulings/P2_T05_PESO_IDENTITY_RULE.md` (dmo-work) — one `peso_id` per occurrence; same id across edits/resubmits |
 | Identity verification | `reports/P2_T05_COMPONENT_CONTEXT_IDENTITY_VERIFICATION.md` — PASS; P2-T05 mints no `cm_id`/`mf_id`/`bq_id` |
 | Implementation SHA | `092743a97da2fe6b90dac04d69a9a3986f0997d7` (see §12) |
+| Owner correction SHA | `66e7f0d` — WATER_TEMPERATURE_TO_WATER_DENSITY_LOOKUP (see §14) |
 | DMO-MODULAR remote `main` (start) | `b57eb1e…` (clean tree at start) |
 
 ## 2. Identity discipline (the hard rules, as built)
@@ -192,6 +193,17 @@ enum type, RLS policy or history statement (verified: no `InsertData`/`Sql(`/`Cr
 | Targeted P2-T05 (unit + integration, DB attached) | **119** | 0 | 0 | 26 unit + 93 integration (→ all 84 matrix rows implemented; several rows have both a U/I and a DB facet) |
 | Migration/schema verification | PASS | — | — | all 4 migrations applied to the disposable PostgreSQL 16 (`dotnet ef database update` + MIG rows); live catalog: 19 public tables (18 product + history), 22 named Controlo CHECKs, 7/7 Controlo FKs `ON DELETE RESTRICT` (`confdeltype='r'`; the only non-RESTRICT product FK is the pre-existing foundation cascade `FK_template_modules_templates_template_id`), 6 unique keys, declared indexes present, 0 seed rows, Down = exactly the 8 tables, re-run idempotent |
 
+**Correction re-run (§14, after `66e7f0d`):**
+
+| Suite | Passed | Failed | Skipped | Notes |
+|---|---|---|---|---|
+| `dotnet build DMO.slnx -c Debug` | — | 0 errors | — | same single pre-existing pinned analyzer warning (byte-identical `P2T02RegressionTests.cs`); 0 warnings in all correction code |
+| Full unit suite (`DMO.UnitTests`) | **577** | 0 | 0 | baseline 535 at the §1–§13 close; **+42 new WDL rows** |
+| Full integration suite (with disposable PostgreSQL 16) | **479** | 0 | **2** | the 2 skips are the pre-existing live-Supabase Auth category-B tests (unchanged posture); DB-class rows ran for real (`DMO_TEST_POSTGRES_CONNECTION`) |
+| Targeted P2-T05 (unit + integration, DB attached) | **162** | 0 | 0 | 68 unit (ControloCreate folder; 26 prior + 42 WDL) + 94 integration (prior 93 + 1 rendered-surface WDL1) |
+| Focused water-density lookup tests | **43** | 0 | 0 | `WaterDensityLookupTests` 42 rows + rendered-surface `WDL1` |
+| Migration/schema verification | UNCHANGED | — | — | correction touches NO migration file, NO model configuration; the one-migration/8-table contract is untouched (see §14.6) |
+
 ## 11. Negative-scope proofs (summary of the built-in evidence)
 
 - No `production_id`, no `job_on_revision_id`, no `rascunho` — PID5 static scan + schema scan.
@@ -222,6 +234,9 @@ enum type, RLS policy or history statement (verified: no `InsertData`/`Sql(`/`Cr
 - Remote `origin/main` at the implementation push: `092743a97da2fe6b90dac04d69a9a3986f0997d7` —
   the implementation commit is reachable from the current remote main
   (`git merge-base --is-ancestor 092743a origin/main` exits 0; verified after the final push).
+- Correction commit: `66e7f0d` (implementation + tests; 13 files, +314/−123) — see §14. This
+  response is the follow-on governance commit carrying the correction record (P2-T04
+  response-commit discipline).
 - No force push; working tree at the end: CLEAN.
 
 ## 13. Governance updates applied
@@ -231,3 +246,133 @@ enum type, RLS policy or history statement (verified: no `InsertData`/`Sql(`/`Cr
   VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW`.
 - `plans/beta-workstreams/P2-T05-CONTROLO-CREATE.md` §5.1: same record.
 - P2-T05 is NOT closed; P2-T06/T07/T08/T10 remain NOT AUTHORIZED.
+
+## 14. Focused Owner correction — WATER_TEMPERATURE_TO_WATER_DENSITY_LOOKUP (applied)
+
+This section records the Owner clarification received AFTER the §1–§13 implementation close and
+BEFORE independent verification, and its fully applied correction. Commit:
+`66e7f0d` (implementation + tests), governance follow-up recorded below. **P2-T05 is NOT
+closed; independent verification / Architect implementation review still has NOT happened.**
+
+### 14.1 The Owner clarification (authoritative, applied verbatim)
+
+For Peso/Controlo the operator enters ONLY the **water temperature**. The operator does NOT
+enter water density, a divisor, or any manually selected calculation factor. The application
+**automatically resolves the WATER DENSITY** corresponding to the entered temperature from the
+application's authoritative water-temperature table:
+
+```text
+water_temperature → built-in water temperature table → water_density
+capacity_cm3 = water_weight_g ÷ water_density_for_entered_temperature
+```
+
+The value previously described generically in the contract as "valor da tabela de temperatura"
+/ "temperature divisor" is specifically **the water density corresponding to the entered water
+temperature**. This is a different fact from **glass density** (resolved from the Tool/processo
+mapping; used later for glass weight). The two density lookups remain strictly separate.
+
+### 14.2 Authoritative numeric table — FOUND (no blocker; not invented)
+
+Every source the task named was searched before any data change:
+
+| Source | Finding |
+|---|---|
+| `dmo-master` (`modules/CONTROLO.md` §8.2/§8.5) | formula + "configured divisor" seam only; **no numeric table** |
+| `dmo-beta-master` (`modules/CONTROLO_CREATE.md`) | formula + 5–35 °C range only; **no numeric table** |
+| Legacy BA-DMO corpus (the contract's referenced historical evidence) | **THE TABLE**: `src/BA.Dmo.Domain/Modules/Peso/WeightCalculator.cs` — `WaterDensityByCelsius` (31 entries 5–35 °C, "TD-25", the single authoritative weight/volume engine) with `LookupDensity`; identical blob in every BA-DMO copy (hash-checked across BA-DMO, BA-DMO-CLEAN, -SOURCE-TMP, -wt-peso, -bb3065c6, -jobon-fix, -SMOKE, -wt, dmo-clean-v2; a second copy differs only in line endings, content-identical) |
+| Shipped legacy web application (`DENSITY_TABLE` in `app-core.js`) | identical 31-entry table, including the **PORTAL_DMO 5.5.0 production distribution** and its packed bundles (`v5-operator.bundle.js`/`v5-manager.bundle.js`) |
+| Legacy tests/spec | `WeightCalculatorTests.cs` (31-row density theory, rounding boundaries D1–D4) and `02_PESO_COMPLETE_SPEC.md` §4 ("devolve o valor da tabela `DENSITY_TABLE` para a temperatura arredondada (5–35 °C). Se fora do intervalo, erro.") |
+| `CONTROLO_TECHNICAL_MODEL.md` §6/G5 | "Capacidade = PesoEmAgua ÷ densidade(água, temp)"; the water-density table is deterministic code (`LookupDensity`, divisor 5–35 °C); `TemperaturaC` persisted, **divisor deliberately not snapshotted** (G5: the stored record is the truth) |
+| Manuals/reference files, migrations, archived material | `N06_peso.sql` and manuals repeat the formula/range; the values live in code (above) |
+
+All independent copies agree on the exact 31 values (g/cm³, per whole degree):
+`5→0.99888, 6→0.99885, 7→0.99882, 8→0.99877, 9→0.99871, 10→0.99863, 11→0.99854,
+12→0.99844, 13→0.99832, 14→0.99819, 15→0.99805, 16→0.99789, 17→0.99773, 18→0.99765,
+19→0.99737, 20→0.99717, 21→0.99696, 22→0.99674, 23→0.99652, 24→0.99628, 25→0.99603,
+26→0.99577, 27→0.99551, 28→0.99523, 29→0.99494, 30→0.99485, 31→0.99435, 32→0.99403,
+33→0.99371, 34→0.99339, 35→0.99305`.
+
+### 14.3 Exact lookup behavior (as built)
+
+- **Table granularity:** per WHOLE degree, 31 entries, 5–35 °C. The source defines **no
+  interpolation** — none is implemented.
+- **Rule (authoritative, from the legacy engine):** the entered temperature is rounded to the
+  nearest whole degree with `MidpointRounding.AwayFromZero` (identical to the legacy
+  `Math.Round`/`Math.round` for positive temperatures) and the exact 5–35 °C entry is used.
+  Examples proven in tests: 20.4 → 20 → 0.99717; 20.5 → 21 → 0.99696 (never the midpoint);
+  4.50 → 5 → 0.99888; 35.49 → 35 → 0.99305.
+- **Shipment (smallest deterministic representation in the established architecture):**
+  `ConfigurationCalculationConfiguration.AuthoritativeWaterDensityByCelsius` — the built-in
+  authoritative table used automatically by the application. Deployment calibration is still
+  possible through the backend calculation configuration section
+  `Controlo:Calculation:WaterDensities` (entries `{Temperature, Density}`); a supplied section
+  **replaces** the built-in table (exact fail-closed semantics — an entry it omits resolves no
+  density; the built-in is never silently substituted under an override). The table is NOT:
+  Peso-owned editable data, an operator field, a `Definições` area, a business identity, or a
+  user-CRUD table.
+- **Validation range preserved:** the accepted 5–35 °C request-validation range is unchanged
+  (`TEMPERATURE_OUT_OF_RANGE` untouched; the `numeric(4,1)` CHECK untouched).
+- **Fail-closed preserved:** an entered valid-range temperature for which no density can be
+  resolved (e.g. a whole degree absent from a supplied override table) produces the accepted
+  `calculation-configuration-missing` refusal — nothing written, nothing invented. Rounded
+  degrees outside 5–35 fail closed at the lookup as defense in depth.
+- **Vocabulary:** the resolution member is renamed `TryGetWaterDivisor` →
+  `TryGetWaterDensity`; the API display fact `waterDivisorGCm3` → `waterDensityGCm3`. Transport
+  tokens are unchanged (`calculation-configuration-missing`, `RESULT_NON_POSITIVE`, …).
+
+### 14.4 Water density vs glass density — kept separate
+
+1. **WATER DENSITY** — resolved from the entered water temperature via the authoritative table;
+   used for capacity; never entered manually. 2. **GLASS DENSITY** — resolved from the Tool/
+   processo mapping (`cm_id → tool_id → processo`; pending: `tool_id → processo`); used later for
+   glass weight; frozen onto the Peso as `glass_density_g_cm3`. The two lookups remain separate
+   facts in the calculation configuration and are proven independent in both directions
+   (same temperature + different processo → same capacity, different glass weight; a missing
+   glass mapping refuses the calculation without affecting the water lookup, and a missing water
+   entry refuses it without touching the glass mapping).
+
+### 14.5 Tests added (focused coverage)
+
+- **Unit `WaterDensityLookupTests` (WDL1–WDL9, 42 rows)** against the REAL shipped
+  `ConfigurationCalculationConfiguration`: (1) no density/divisor/factor member exists on any
+  create/edit/calculate/row carrier; (2) the 31-entry authoritative theory (exact values);
+  (3) rounding to the nearest whole degree with NO interpolation (20.5 → 21, midpoint never
+  used); (4) capacity = water weight ÷ resolved density end-to-end (997.17 g ÷ 0.99717 →
+  1000.0000 cm³ at 20 °C); (5) temperature change changes density and capacity as expected;
+  (6) glass-density lookup independent from the water-density lookup; (7) a valid-range
+  temperature absent from an override table fails closed
+  (`calculation-configuration-missing`, nothing written); (8) unsupported degrees fail closed
+  at the lookup + override replace semantics without silent fallback; (9)
+  `RESULT_NON_POSITIVE` stays intact with the shipped configuration.
+- **Integration rendered-surface `WDL1`** (`ControloSurfaceRenderingTests`): the operator
+  surface renders exactly ONE water input — `Temperatura da água (°C)` (5–35) — and no
+  water-density/divisor field: the workflow is exactly
+  `[ Temperatura da água: ____ °C ]`.
+- Existing P2-T05 rows updated only for the resolution-fact naming (MES3/MES9/MES11 comments
+  and the echoed display fact) and all remain green.
+
+### 14.6 Persistence / schema — UNCHANGED (explicit decision)
+
+**NO schema change.** Rationale, per the task's persistence-review instruction:
+
+1. The Peso already persists `water_temperature` plus the backend-derived frozen per-row
+   results (`capacity_cm3`, `glass_weight_g`) and the frozen `glass_density_g_cm3`.
+2. The accepted historical model (§6.3: stored results are never recomputed from current
+   state; a later configuration change affects NEW Pesos only) makes the **frozen per-row
+   results** the reproducible historical fact — exactly the legacy authority's conclusion
+   (`CONTROLO_TECHNICAL_MODEL.md` G5: "o registo guardado é a verdade; recalculo é
+   pré-visualização"; the legacy engine deliberately did **not** snapshot the water-density
+   divisor, and §6.3.3 already equivalent-frosts the glass side).
+3. The task's rule "DO NOT add a column merely because it seems convenient" applies: no current
+   authority requires water-density snapshotting, and a table change in the future would still
+   never rewrite stored Pesos. **Reported explicitly:** if full re-derivation of an historical
+   Peso under a CHANGED future table were ever required (an audit proving the exact old
+   density), that would need an explicitly justified additive migration — none is made here.
+4. Consequence: the accepted **one-migration / 8-table contract is untouched** — no ninth
+   table, no column, no new identity; `20260923045054_ControloCreateDomain` byte-unchanged.
+
+### 14.7 Routes / availability — unchanged
+
+No route, policy, availability entry or destination registration changed. `CurrentBuildAvailable`
+stays `[]`. P2-T10 still owns availability registration. Negative-scope pins (BND1–BND9) are
+unaffected (verified by the untouched-file set and the full suites).
