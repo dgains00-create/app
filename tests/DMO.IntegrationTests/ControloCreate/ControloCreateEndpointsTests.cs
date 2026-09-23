@@ -464,7 +464,7 @@ public sealed class ControloCreateEndpointsTests
         Assert.Equal(tool.ToolId.Value, payload.GetProperty("pendingToolId").GetGuid());
         Assert.Equal(JsonValueKind.Null, payload.GetProperty("cmId").ValueKind);
         Assert.Equal(20m, payload.GetProperty("waterTemperature").GetDecimal());
-        Assert.Equal(0.9982m, payload.GetProperty("waterDivisorGCm3").GetDecimal());
+        Assert.Equal(0.9982m, payload.GetProperty("waterDensityGCm3").GetDecimal());
         Assert.Equal(2.50m, payload.GetProperty("glassDensityGCm3").GetDecimal());
 
         var rows = payload.GetProperty("rows");
@@ -648,7 +648,7 @@ public sealed class ControloCreateEndpointsTests
 
         var payload = await ReadJsonAsync(response);
         Assert.Equal(
-            new[] { "cmId", "glassDensityGCm3", "pendingToolId", "rows", "waterDivisorGCm3", "waterTemperature" },
+            new[] { "cmId", "glassDensityGCm3", "pendingToolId", "rows", "waterDensityGCm3", "waterTemperature" },
             payload.EnumerateObject().Select(member => member.Name).OrderBy(name => name, StringComparer.Ordinal));
 
         // No record identity leaks into the response either: every response key set is the
@@ -721,7 +721,7 @@ public sealed class ControloCreateEndpointsTests
 
             var payload = await ReadJsonAsync(calculate);
             Assert.Equal(cmId, payload.GetProperty("cmId").GetGuid());
-            Assert.Equal(0.9971m, payload.GetProperty("waterDivisorGCm3").GetDecimal());
+            Assert.Equal(0.9971m, payload.GetProperty("waterDensityGCm3").GetDecimal());
             Assert.Equal(2.50m, payload.GetProperty("glassDensityGCm3").GetDecimal());
 
             previewCapacity = payload.GetProperty("rows")[0].GetProperty("capacityCm3").GetDecimal();

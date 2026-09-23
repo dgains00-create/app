@@ -89,14 +89,18 @@ public sealed record PesoRowCalculation(
     decimal GlassWeightG);
 
 /// <summary>
-/// The stateless calculation payload (Route 8): echoed anchor, the resolved divisor/density
-/// display facts and the per-row results. No write, no version, no id allocation (§7.2, AC-R7).
+/// The stateless calculation payload (Route 8): echoed anchor, the resolved water density and
+/// glass density display facts and the per-row results. No write, no version, no id allocation
+/// (§7.2, AC-R7). The water-density fact is the application-resolved value of the entered
+/// temperature's authoritative table entry (Owner clarification
+/// WATER_TEMPERATURE_TO_WATER_DENSITY_LOOKUP) — an echo of the automatic resolution, never an
+/// operator-entered value.
 /// </summary>
 public sealed record PesoCalculation(
     Guid? CmId,
     Guid? PendingToolId,
     decimal WaterTemperature,
-    decimal WaterDivisorGCm3,
+    decimal WaterDensityGCm3,
     decimal GlassDensityGCm3,
     IReadOnlyList<PesoRowCalculation> Rows);
 
@@ -117,7 +121,7 @@ public enum PesoRefusalReason
     /// <summary>The candidate <c>cm_id</c> does not resolve to the anchor <c>tool_id</c>.</summary>
     AssociationMismatch,
 
-    /// <summary>The divisor or density mapping is unavailable; no invented value, nothing written.</summary>
+    /// <summary>The water density or glass-density mapping is unresolvable; no invented value, nothing written.</summary>
     CalculationConfigurationMissing,
 
     /// <summary>Dependent facts exist; nothing deleted.</summary>

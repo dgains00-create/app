@@ -231,7 +231,7 @@ public static class ControloCreateEndpoints
                         value.CmId,
                         value.PendingToolId,
                         value.WaterTemperature,
-                        value.WaterDivisorGCm3,
+                        value.WaterDensityGCm3,
                         value.GlassDensityGCm3,
                         value.Rows
                             .Select(row => new PesoRowCalculationResponse(
@@ -420,7 +420,7 @@ public static class ControloCreateEndpoints
             value.CmId,
             value.PendingToolId,
             value.WaterTemperature,
-            value.WaterDivisorGCm3,
+            value.WaterDensityGCm3,
             value.GlassDensityGCm3,
             value.Rows
                 .Select(row => new PesoRowCalculationResponse(
@@ -652,7 +652,7 @@ public static class ControloCreateEndpoints
         Guid? CmId,
         Guid? PendingToolId,
         decimal WaterTemperature,
-        decimal WaterDivisorGCm3,
+        decimal WaterDensityGCm3,
         decimal GlassDensityGCm3,
         IReadOnlyList<PesoRowCalculationResponse> Rows);
 

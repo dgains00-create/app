@@ -204,6 +204,40 @@ public sealed class ControloSurfaceRenderingTests
             "The decision bar must be rendered INSIDE the actions region, before the status region.");
     }
 
+    /// <summary>
+    /// WDL1 (Owner clarification WATER_TEMPERATURE_TO_WATER_DENSITY_LOOKUP, requirement 1 + 6) —
+    /// the rendered operator surface shows exactly ONE water-input: the
+    /// <c>Temperatura da água (°C)</c> field (5–35). There is NO second field for water density
+    /// (or any divisor/calculation-factor input): the density is resolved automatically by the
+    /// application. The operator workflow is exactly
+    /// <c>[ Temperatura da água: ____ °C ]</c>.
+    /// </summary>
+    [Fact]
+    public async Task WDL1_TheOperatorSurfaceRendersOnlyTheWaterTemperatureInput_NoDensityInput()
+    {
+        var composition = new P2T05TestComposition();
+
+        using var factory = P2T05TestHost.ForUser(P2T05TestHost.AllGranted(), composition);
+        using var client = factory.CreateClient();
+
+        using var response = await P2T05TestHost.GetAsync(client, CreatePath);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var html = await response.Content.ReadAsStringAsync();
+
+        // The temperature input: label + exactly one number field named waterTemperature, 5–35.
+        Assert.Contains("Temperatura da água (°C)", html, StringComparison.Ordinal);
+        Assert.Equal(1, Count(html, "name=\"waterTemperature\""));
+        Assert.Contains("min=\"5\"", html, StringComparison.Ordinal);
+        Assert.Contains("max=\"35\"", html, StringComparison.Ordinal);
+
+        // NO water-density/divisor input exists anywhere on the surface.
+        Assert.DoesNotContain("name=\"waterDensity\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("name=\"divisor\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Densidade da água", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("dmo-controlo-density", html, StringComparison.Ordinal);
+    }
+
     // ---- arrangement helpers -------------------------------------------------------------
 
     /// <summary>Asserts that the supplied fragments appear in the text in the supplied order.</summary>

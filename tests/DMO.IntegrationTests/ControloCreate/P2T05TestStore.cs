@@ -519,19 +519,29 @@ internal sealed class P2T05TestComposition :
 }
 
 /// <summary>
-/// The fixed test calculation configuration (Q-CALC): explicit divisor/density mappings with an
-/// empty-variant for the configuration-missing paths.
+/// The fixed test calculation configuration (Q-CALC; Owner clarification
+/// WATER_TEMPERATURE_TO_WATER_DENSITY_LOOKUP): explicit water-density/glass-density mappings
+/// with an empty-variant for the configuration-missing paths.
 /// </summary>
+/// <remarks>
+/// The fixture densities (20 °C → 0.9982, 25 °C → 0.9971) are ARBITRARY FIXED TEST VALUES used
+/// to prove the formula mechanics; they are deliberately NOT the application's authoritative
+/// water-temperature table (which is tested separately against
+/// <c>ConfigurationCalculationConfiguration.AuthoritativeWaterDensityByCelsius</c> in
+/// <c>WaterDensityLookupTests</c>). The implementation applies the same authoritative lookup
+/// rule as the production implementation: the entered temperature rounds to the nearest whole
+/// degree (<see cref="MidpointRounding.AwayFromZero"/>) before the exact-key lookup.
+/// </remarks>
 internal sealed class FixedCalculationConfiguration : IControloCalculationConfiguration
 {
-    private readonly IReadOnlyDictionary<decimal, decimal> _divisors;
+    private readonly IReadOnlyDictionary<decimal, decimal> _waterDensities;
     private readonly IReadOnlyDictionary<string, decimal> _densities;
 
     public FixedCalculationConfiguration(
-        IReadOnlyDictionary<decimal, decimal>? divisors = null,
+        IReadOnlyDictionary<decimal, decimal>? waterDensities = null,
         IReadOnlyDictionary<string, decimal>? densities = null)
     {
-        _divisors = divisors
+        _waterDensities = waterDensities
             ?? new Dictionary<decimal, decimal> { [20] = 0.9982m, [25] = 0.9971m };
         _densities = densities
             ?? new Dictionary<string, decimal>
@@ -541,8 +551,11 @@ internal sealed class FixedCalculationConfiguration : IControloCalculationConfig
             };
     }
 
-    public bool TryGetWaterDivisor(decimal waterTemperature, out decimal divisor) =>
-        _divisors.TryGetValue(waterTemperature, out divisor);
+    public bool TryGetWaterDensity(decimal waterTemperature, out decimal waterDensity)
+    {
+        var key = (int)Math.Round(waterTemperature, MidpointRounding.AwayFromZero);
+        return _waterDensities.TryGetValue(key, out waterDensity);
+    }
 
     public bool TryGetGlassDensity(Processo? processo, out decimal density)
     {
@@ -567,8 +580,9 @@ internal sealed class FixedCalculationConfiguration : IControloCalculationConfig
         new Dictionary<decimal, decimal>(),
         new Dictionary<string, decimal>());
 
-    /// <summary>A configuration with an invalid (non-positive) divisor (RESULT_NON_POSITIVE path).</summary>
-    public static FixedCalculationConfiguration InvalidDivisor { get; } = new(
+    /// <summary>A configuration with an invalid (non-positive) water density (RESULT_NON_POSITIVE
+    /// path).</summary>
+    public static FixedCalculationConfiguration InvalidWaterDensity { get; } = new(
         new Dictionary<decimal, decimal> { [20] = 0 },
         new Dictionary<string, decimal> { ["NNPB"] = 2.50m });
 }

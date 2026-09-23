@@ -23,7 +23,7 @@ namespace DMO.Application.ControloCreate;
 /// through <see cref="IPesoContextRead"/>.</para>
 /// <para>
 /// Historical immutability (§6): stored results are never recomputed from current Tool/Job On
-/// state and the frozen density is never refreshed by later config changes (§6.3.3); the submit
+/// state and the frozen glass density is never refreshed by later config changes (§6.3.3); the submit
 /// path re-derives and <b>verifies</b> the stored results with the authoritative formula, refusing
 /// anything non-positive (C2) or non-derivable — nothing is silently rewritten and nothing is
 /// invented.</para>
@@ -78,19 +78,20 @@ public sealed class ControloCreateService : IControloCreateService
         if (!TryResolveCalculationFacts(
                 anchor.Processo,
                 command.WaterTemperature,
-                out var divisor,
-                out var density))
+                out var waterDensity,
+                out var glassDensity))
         {
             return Refuse(
                 PesoRefusalReason.CalculationConfigurationMissing,
-                "The water-temperature divisor or the glass-density mapping for this calculation is not " +
-                "configured; no value is invented and nothing is written. Configure the calculation and retry.");
+                "The water density for the entered temperature or the glass-density mapping for " +
+                "this calculation is not resolvable; no value is invented and nothing is written. " +
+                "Configure the calculation and retry.");
         }
 
         var rows = ComputeRows(
             command.RowWaterWeightsG,
-            divisor,
-            density,
+            waterDensity,
+            glassDensity,
             command.VolumeMarisaBq,
             command.VolumePuncaoPu,
             out var resultErrors);
@@ -103,8 +104,8 @@ public sealed class ControloCreateService : IControloCreateService
             command.CmId,
             command.PendingToolId,
             command.WaterTemperature,
-            divisor,
-            density,
+            waterDensity,
+            glassDensity,
             rows));
     }
 
@@ -130,19 +131,20 @@ public sealed class ControloCreateService : IControloCreateService
         if (!TryResolveCalculationFacts(
                 anchor.Processo,
                 command.WaterTemperature,
-                out var divisor,
-                out var density))
+                out var waterDensity,
+                out var glassDensity))
         {
             return Refuse(
                 PesoRefusalReason.CalculationConfigurationMissing,
-                "The water-temperature divisor or the glass-density mapping for this Peso is not " +
-                "configured; no value is invented and nothing is written. Configure the calculation and retry.");
+                "The water density for the entered temperature or the glass-density mapping for " +
+                "this Peso is not resolvable; no value is invented and nothing is written. " +
+                "Configure the calculation and retry.");
         }
 
         var rows = ComputeRows(
             command.RowWaterWeightsG,
-            divisor,
-            density,
+            waterDensity,
+            glassDensity,
             command.VolumeMarisaBq,
             command.VolumePuncaoPu,
             out var resultErrors);
@@ -164,7 +166,7 @@ public sealed class ControloCreateService : IControloCreateService
             command.WaterTemperature,
             command.VolumeMarisaBq,
             command.VolumePuncaoPu,
-            density,
+            glassDensity,
             TrimToNull(command.PreviousProductionEndReference),
             TrimToNull(command.PreviousAverageWeightReference),
             Version: 1,
@@ -236,16 +238,17 @@ public sealed class ControloCreateService : IControloCreateService
             return new PesoResult.ValidationFailed(anchor.ValidationErrors);
         }
 
-        // The divisor for the edit recompute comes from the current calculation configuration; the
+        // The water density for the edit recompute comes from the current calculation
+        // configuration (the authoritative water-temperature table of the application); the
         // glass DENSITY is the Peso's FROZEN density — written once at the first successful
         // calculate/save and never refreshed by later config changes (§6.3.3; a later
         // density-mapping change affects NEW Peso calculations only, MES10).
-        if (!_calculation.TryGetWaterDivisor(command.WaterTemperature, out var divisor))
+        if (!_calculation.TryGetWaterDensity(command.WaterTemperature, out var waterDensity))
         {
             return Refuse(
                 PesoRefusalReason.CalculationConfigurationMissing,
-                "The water-temperature divisor for this edit is not available; no value is invented " +
-                "and nothing was written.");
+                "The water density for the entered temperature is not resolvable; no value is " +
+                "invented and nothing was written.");
         }
 
         if (persisted.GlassDensityGCm3 is not { } frozenDensity)
@@ -258,7 +261,7 @@ public sealed class ControloCreateService : IControloCreateService
 
         var rows = ComputeRows(
             command.RowWaterWeightsG,
-            divisor,
+            waterDensity,
             frozenDensity,
             command.VolumeMarisaBq,
             command.VolumePuncaoPu,
@@ -273,7 +276,7 @@ public sealed class ControloCreateService : IControloCreateService
             WaterTemperature = command.WaterTemperature,
             VolumeMarisaBq = command.VolumeMarisaBq,
             VolumePuncaoPu = command.VolumePuncaoPu,
-            // The frozen density is retained verbatim (never refreshed, §6.3.3).
+            // The frozen glass density is retained verbatim (never refreshed, §6.3.3).
             PreviousProductionEndReference = TrimToNull(command.PreviousProductionEndReference),
             PreviousAverageWeightReference = TrimToNull(command.PreviousAverageWeightReference),
             Rows = ToRows(persisted.PesoId, rows, persisted.CreatedAt),
@@ -334,8 +337,9 @@ public sealed class ControloCreateService : IControloCreateService
         }
 
         // Step 5: recompute and verify — the stored results must equal the authoritative formula
-        // (no preview/persist drift; frozen density per §6.3.3, current divisor configuration), and
-        // every per-row result must be strictly positive (C2). Nothing is silently rewritten.
+        // (no preview/persist drift; frozen glass density per §6.3.3, current water-density
+        // resolution for the persisted temperature), and every per-row result must be strictly
+        // positive (C2). Nothing is silently rewritten.
         var verification = VerifyStoredResults(persisted);
         if (verification is not null)
         {
@@ -515,45 +519,48 @@ public sealed class ControloCreateService : IControloCreateService
     }
 
     /// <summary>
-    /// Resolves the calculation configuration (Q-CALC): the divisor for the entered temperature and
-    /// the glass density for the anchor's processo. Missing configuration is the typed
+    /// Resolves the calculation configuration (Q-CALC; Owner clarification
+    /// WATER_TEMPERATURE_TO_WATER_DENSITY_LOOKUP): the WATER DENSITY for the entered temperature
+    /// (resolved automatically from the application's authoritative water-temperature table)
+    /// and the GLASS density for the anchor's processo. The two lookups are separate facts and
+    /// are never conflated. Missing configuration is the typed
     /// <c>calculation-configuration-missing</c> refusal — never an invented value and never a
-    /// silent zero (MES9/AC-M9).
+    /// silent zero (MES9/AC-M9). The operator never enters a water density or a divisor.
     /// </summary>
     private bool TryResolveCalculationFacts(
         Processo? processo,
         decimal waterTemperature,
-        out decimal divisor,
-        out decimal density)
+        out decimal waterDensity,
+        out decimal glassDensity)
     {
-        divisor = default;
-        density = default;
+        waterDensity = default;
+        glassDensity = default;
 
-        return _calculation.TryGetWaterDivisor(waterTemperature, out divisor)
-            && _calculation.TryGetGlassDensity(processo, out density);
+        return _calculation.TryGetWaterDensity(waterTemperature, out waterDensity)
+            && _calculation.TryGetGlassDensity(processo, out glassDensity);
     }
 
     /// <summary>
     /// Computes every per-row result with the authoritative §5.3 formulas
-    /// (<c>Capacidade = Peso de água ÷ valor da tabela de temperatura</c>;
+    /// (<c>Capacidade = Peso de água ÷ densidade da água para a temperatura introduzida</c>;
     /// <c>Peso do vidro = (Capacidade + Volume Marisa/BQ − Volume Punção/PU) × Densidade do vidro</c>).
     /// A computed per-row result that is not strictly positive is refused BEFORE any write with the
     /// typed <c>RESULT_NON_POSITIVE</c> token (C2) — never a 500.
     /// </summary>
     private IReadOnlyList<PesoRowCalculation>? ComputeRows(
         IReadOnlyList<decimal> waterWeightsG,
-        decimal divisor,
-        decimal density,
+        decimal waterDensity,
+        decimal glassDensity,
         decimal? volumeMarisaBq,
         decimal? volumePuncaoPu,
         out IReadOnlyList<string> errors)
     {
         errors = [];
 
-        // An invalid divisor/density configuration can never fabricate a result (MES11): a
-        // non-positive divisor or density means the entered combination yields no strictly
+        // An invalid water-density/glass-density configuration can never fabricate a result
+        // (MES11): a non-positive density means the entered combination yields no strictly
         // positive derived result — the typed RESULT_NON_POSITIVE refusal, nothing written.
-        if (divisor <= 0 || density <= 0)
+        if (waterDensity <= 0 || glassDensity <= 0)
         {
             errors = [ControloCreateValidationErrors.ResultNonPositive];
             return null;
@@ -563,9 +570,9 @@ public sealed class ControloCreateService : IControloCreateService
 
         for (var index = 0; index < waterWeightsG.Count; index++)
         {
-            var capacity = decimal.Round(waterWeightsG[index] / divisor, 4, MidpointRounding.AwayFromZero);
+            var capacity = decimal.Round(waterWeightsG[index] / waterDensity, 4, MidpointRounding.AwayFromZero);
             var glass = decimal.Round(
-                (capacity + (volumeMarisaBq ?? 0) - (volumePuncaoPu ?? 0)) * density,
+                (capacity + (volumeMarisaBq ?? 0) - (volumePuncaoPu ?? 0)) * glassDensity,
                 4,
                 MidpointRounding.AwayFromZero);
 
@@ -583,19 +590,20 @@ public sealed class ControloCreateService : IControloCreateService
 
     /// <summary>
     /// The submit recompute-and-verify (contract §7.4 step 5): re-derives every per-row result from
-    /// the persisted facts with the authoritative formula — the Peso's FROZEN density (never
-    /// refreshed, §6.3.3) and the current divisor configuration — verifying that every re-derived
-    /// result is strictly positive (C2) and equals the stored result (no preview/persist drift).
-    /// Returns the typed refusal, or <c>null</c> when the stored facts verify cleanly.
+    /// the persisted facts with the authoritative formula — the Peso's FROZEN glass density (never
+    /// refreshed, §6.3.3) and the current water-density resolution for the persisted temperature —
+    /// verifying that every re-derived result is strictly positive (C2) and equals the stored
+    /// result (no preview/persist drift). Returns the typed refusal, or <c>null</c> when the stored
+    /// facts verify cleanly.
     /// </summary>
     private PesoResult? VerifyStoredResults(Peso peso)
     {
-        if (!_calculation.TryGetWaterDivisor(peso.WaterTemperature, out var divisor))
+        if (!_calculation.TryGetWaterDensity(peso.WaterTemperature, out var waterDensity))
         {
             return Refuse(
                 PesoRefusalReason.CalculationConfigurationMissing,
-                "The water-temperature divisor for this Peso is not available; the stored results " +
-                "cannot be verified. Nothing was written.");
+                "The water density for this Peso's temperature is not resolvable; the stored " +
+                "results cannot be verified. Nothing was written.");
         }
 
         if (peso.GlassDensityGCm3 is not { } frozenDensity)
@@ -608,7 +616,7 @@ public sealed class ControloCreateService : IControloCreateService
 
         foreach (var row in peso.Rows.OrderBy(row => row.RowPosition))
         {
-            var capacity = decimal.Round(row.WaterWeightG / divisor, 4, MidpointRounding.AwayFromZero);
+            var capacity = decimal.Round(row.WaterWeightG / waterDensity, 4, MidpointRounding.AwayFromZero);
             var glass = decimal.Round(
                 (capacity + (peso.VolumeMarisaBq ?? 0) - (peso.VolumePuncaoPu ?? 0)) * frozenDensity,
                 4,

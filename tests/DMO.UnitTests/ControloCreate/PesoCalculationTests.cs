@@ -22,18 +22,22 @@ public sealed class PesoCalculationTests
         BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly;
 
     /// <summary>The fixed values of the Q-CALC configuration used by the formula proofs:
-    /// divisor 25 °C → 0.9971 g/cm³; densities NNPB → 2.50, PS → 2.52.</summary>
+    /// arbitrary test-fixture water density 25 °C → 0.9971 g/cm³ (NOT the authoritative table —
+    /// that table is proven in <c>WaterDensityLookupTests</c> against
+    /// <c>ConfigurationCalculationConfiguration.AuthoritativeWaterDensityByCelsius</c>);
+    /// glass densities NNPB → 2.50, PS → 2.52.</summary>
     private static readonly FixedCalculationConfiguration StandardConfiguration = new(
         new Dictionary<decimal, decimal> { [25m] = 0.9971m },
         new Dictionary<Processo, decimal> { [Processo.Nnpb] = 2.50m, [Processo.Ps] = 2.52m });
 
     /// <summary>
-    /// MES3 (AC-M3) — capacity = water weight ÷ divisor, computed by the backend: with the fixed
-    /// divisor 0.9971 g/cm³, 997.1 g → 1000 cm³ and 1994.2 g → 2000 cm³; the resolved divisor,
-    /// temperature and anchor are echoed in the stateless result, and no Peso is ever written.
+    /// MES3 (AC-M3) — capacity = water weight ÷ resolved water density, computed by the backend:
+    /// with the fixed water density 0.9971 g/cm³, 997.1 g → 1000 cm³ and 1994.2 g → 2000 cm³; the
+    /// resolved water density, temperature and anchor are echoed in the stateless result, and no
+    /// Peso is ever written.
     /// </summary>
     [Fact]
-    public async Task MES3_CapacityIsWaterWeightDividedByTheConfiguredDivisor()
+    public async Task MES3_CapacityIsWaterWeightDividedByTheResolvedWaterDensity()
     {
         var toolId = Guid.NewGuid();
         var (service, pesos) = BuildService(StandardConfiguration, toolId);
@@ -46,7 +50,7 @@ public sealed class PesoCalculationTests
         Assert.Null(value.CmId);
         Assert.Equal(toolId, value.PendingToolId);
         Assert.Equal(25m, value.WaterTemperature);
-        Assert.Equal(0.9971m, value.WaterDivisorGCm3);
+        Assert.Equal(0.9971m, value.WaterDensityGCm3);
         Assert.Equal(2.50m, value.GlassDensityGCm3);
 
         Assert.Equal(2, value.Rows.Count);
@@ -88,7 +92,7 @@ public sealed class PesoCalculationTests
     }
 
     /// <summary>
-    /// MES9 (AC-M9, AC-M3) — a missing divisor/density mapping is the typed
+    /// MES9 (AC-M9, AC-M3) — a missing water-density/glass-density mapping is the typed
     /// <c>calculation-configuration-missing</c> refusal: no value is invented, no silent zero is
     /// produced and the fake repository store stays at zero Pesos.
     /// </summary>
@@ -123,14 +127,14 @@ public sealed class PesoCalculationTests
 
     /// <summary>
     /// MES11 (AC-M10, C2) — a computed per-row result that is not strictly positive is refused
-    /// BEFORE any write with exactly <c>RESULT_NON_POSITIVE</c>: (a) an invalid divisor
-    /// configuration (divisor 0) can never fabricate a capacity; (b) Punção/PU &gt; capacity +
+    /// BEFORE any write with exactly <c>RESULT_NON_POSITIVE</c>: (a) an invalid water-density
+    /// configuration (density 0) can never fabricate a capacity; (b) Punção/PU &gt; capacity +
     /// Marisa/BQ turns the glass weight negative. Nothing reaches the repository in either case.
     /// </summary>
     [Fact]
     public async Task MES11_NonPositiveDerivedResultsAreRefusedBeforeAnyWrite()
     {
-        // (a) Invalid divisor configuration: the entered combination yields no derivable capacity.
+        // (a) Invalid water-density configuration: the entered combination yields no derivable capacity.
         var toolId = Guid.NewGuid();
         var (zeroDivisorService, zeroDivisorPesos) = BuildService(
             new FixedCalculationConfiguration(
@@ -169,7 +173,7 @@ public sealed class PesoCalculationTests
     /// <summary>
     /// MES7 (AC-M7) — presentation rounding is a render-time rule that never reduces the stored
     /// precision: the model retains full <c>numeric(18,4)</c> precision (an entered 1.23456 g with
-    /// divisor 1 is stored as capacity 1.2346 — never rounded to 2 dp), and the presentation wrapper
+    /// water density 1 is stored as capacity 1.2346 — never rounded to 2 dp), and the presentation wrapper
     /// over 3+ dp rows keeps the model values verbatim.
     /// </summary>
     [Fact]
@@ -404,22 +408,25 @@ public sealed class PesoCalculationTests
             Task.FromResult<JobOnResult>(new JobOnResult.AssociationCandidates([]));
     }
 
-    /// <summary>A calculation configuration with fixed divisor/density mappings.</summary>
+    /// <summary>A calculation configuration with fixed water-density/glass-density mappings.</summary>
     private sealed class FixedCalculationConfiguration : IControloCalculationConfiguration
     {
-        private readonly IReadOnlyDictionary<decimal, decimal> _divisors;
+        private readonly IReadOnlyDictionary<decimal, decimal> _waterDensities;
         private readonly IReadOnlyDictionary<Processo, decimal> _densities;
 
         public FixedCalculationConfiguration(
-            IReadOnlyDictionary<decimal, decimal> divisors,
+            IReadOnlyDictionary<decimal, decimal> waterDensities,
             IReadOnlyDictionary<Processo, decimal> densities)
         {
-            _divisors = divisors;
+            _waterDensities = waterDensities;
             _densities = densities;
         }
 
-        public bool TryGetWaterDivisor(decimal waterTemperature, out decimal divisor) =>
-            _divisors.TryGetValue(waterTemperature, out divisor);
+        public bool TryGetWaterDensity(decimal waterTemperature, out decimal waterDensity)
+        {
+            var key = (int)Math.Round(waterTemperature, MidpointRounding.AwayFromZero);
+            return _waterDensities.TryGetValue(key, out waterDensity);
+        }
 
         public bool TryGetGlassDensity(Processo? processo, out decimal density)
         {

@@ -375,9 +375,9 @@ public sealed class PesoIdentityContractTests
     /// <summary>A calculation configuration that resolves nothing (never consulted here).</summary>
     private sealed class EmptyCalculationConfiguration : IControloCalculationConfiguration
     {
-        public bool TryGetWaterDivisor(decimal waterTemperature, out decimal divisor)
+        public bool TryGetWaterDensity(decimal waterTemperature, out decimal waterDensity)
         {
-            divisor = default;
+            waterDensity = default;
             return false;
         }
 

@@ -1164,7 +1164,7 @@ public sealed class PesoRepositoryIntegrationTests
     }
 
     /// <summary>
-    /// MES11-DB (AC-M10 backstop): a non-positive divisor configuration is refused before any write
+    /// MES11-DB (AC-M10 backstop): a non-positive water-density configuration is refused before any write
     /// with <c>RESULT_NON_POSITIVE</c>, and the database CHECKs reject a zero capacity/glass row with
     /// <c>23514</c> naming the contracted constraints.
     /// </summary>
@@ -1183,8 +1183,8 @@ public sealed class PesoRepositoryIntegrationTests
         {
             var toolId = await CreateCmToolAsync(context, $"ref-{token}", "01");
 
-            // Service level: the invalid-divisor configuration can never fabricate a result.
-            var refused = Assert.IsType<PesoResult.ValidationFailed>(await Pesos(context, FixedCalculationConfiguration.InvalidDivisor).CreateAsync(
+            // Service level: the invalid-density configuration can never fabricate a result.
+            var refused = Assert.IsType<PesoResult.ValidationFailed>(await Pesos(context, FixedCalculationConfiguration.InvalidWaterDensity).CreateAsync(
                 new CreatePesoCommand(null, toolId, WaterTemperature: 20m, null, null, null, null, [997.1m], userId),
                 CancellationToken.None));
             Assert.Contains(ControloCreateValidationErrors.ResultNonPositive, refused.Errors);
