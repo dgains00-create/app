@@ -216,12 +216,12 @@ enum type, RLS policy or history statement (verified: no `InsertData`/`Sql(`/`Cr
 - Implementation commit: `092743a97da2fe6b90dac04d69a9a3986f0997d7` (implementation + tests +
   migration + governance status updates; 105 files, +21120/−43).
 - This response is the follow-up governance commit `f4e81da1f714cb473cce6f336169cf28dabd8e88`
-  (response record) with the SHA-record follow-ups `db797728028e762d373f87b80e072393e817dc5e`
-  and `1bbbedf6a28ae61aec2b5cd05f566cf7e22854cb` (see §1 table note: the P2-T04 discipline —
-  the implementation response is recorded in its own governance commit after the
-  implementation commit, so the response can carry the implementation SHA).
-- Remote `origin/main` after push: `1bbbedf6a28ae61aec2b5cd05f566cf7e22854cb` (all commits on
-  top; reachability verified: `git merge-base --is-ancestor 092743a origin/main` exits 0).
+  (response record) with SHA-record follow-ups (see §1 table note: the P2-T04 discipline — the
+  implementation response is recorded in its own governance commit after the implementation
+  commit, so the response can carry the implementation SHA).
+- Remote `origin/main` at the implementation push: `092743a97da2fe6b90dac04d69a9a3986f0997d7` —
+  the implementation commit is reachable from the current remote main
+  (`git merge-base --is-ancestor 092743a origin/main` exits 0; verified after the final push).
 - No force push; working tree at the end: CLEAN.
 
 ## 13. Governance updates applied
