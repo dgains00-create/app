@@ -26,7 +26,8 @@ internal static class P2T05ProductionScan
     public static IReadOnlyList<string> DomainSourcePaths { get; } =
         P2T04ProductionScan.FilesUnder("src/DMO.Domain/Controlo", ".cs");
 
-    /// <summary>The new P2-T05 application sources (contract Appendix B).</summary>
+    /// <summary>The new P2-T05 application sources (contract Appendix B; post-closure correction
+    /// adds the glass-density settings repository contract).</summary>
     public static IReadOnlyList<string> ApplicationSourcePaths { get; } =
         P2T04ProductionScan.FilesUnder("src/DMO.Application/ControloCreate", ".cs")
             .Concat(
@@ -37,11 +38,13 @@ internal static class P2T05ProductionScan
                 "src/DMO.Application/Repositories/IPdfDirectorySettingsRepository.cs",
                 "src/DMO.Application/Repositories/IEmailListRepository.cs",
                 "src/DMO.Application/Repositories/IEmailTemplateRepository.cs",
+                "src/DMO.Application/Repositories/IGlassDensitySettingsRepository.cs",
                 "src/DMO.Application/Persistence/ControloPersistenceException.cs",
             ])
             .ToList();
 
-    /// <summary>The new P2-T05 persistence sources (contract Appendix B).</summary>
+    /// <summary>The new P2-T05 persistence sources (contract Appendix B; post-closure correction
+    /// adds the glass-density settings repository, entity and configuration).</summary>
     public static IReadOnlyList<string> PersistenceSourcePaths { get; } =
     [
         "src/DMO.Infrastructure/Persistence/PesoRepository.cs",
@@ -50,6 +53,7 @@ internal static class P2T05ProductionScan
         "src/DMO.Infrastructure/Persistence/PdfDirectorySettingsRepository.cs",
         "src/DMO.Infrastructure/Persistence/EmailListRepository.cs",
         "src/DMO.Infrastructure/Persistence/EmailTemplateRepository.cs",
+        "src/DMO.Infrastructure/Persistence/GlassDensitySettingsRepository.cs",
         "src/DMO.Infrastructure/Persistence/DmoPesoContextRead.cs",
         "src/DMO.Infrastructure/Persistence/PesoJobOnDependencyProbe.cs",
         "src/DMO.Infrastructure/Persistence/Entities/PesoEntity.cs",
@@ -60,6 +64,7 @@ internal static class P2T05ProductionScan
         "src/DMO.Infrastructure/Persistence/Entities/EmailListEntity.cs",
         "src/DMO.Infrastructure/Persistence/Entities/EmailListRecipientEntity.cs",
         "src/DMO.Infrastructure/Persistence/Entities/EmailTemplateEntity.cs",
+        "src/DMO.Infrastructure/Persistence/Entities/GlassDensitySettingEntity.cs",
         "src/DMO.Infrastructure/Persistence/EntityConfigurations/PesoEntityConfiguration.cs",
         "src/DMO.Infrastructure/Persistence/EntityConfigurations/PesoMeasurementRowEntityConfiguration.cs",
         "src/DMO.Infrastructure/Persistence/EntityConfigurations/RepairerEntityConfiguration.cs",
@@ -68,14 +73,18 @@ internal static class P2T05ProductionScan
         "src/DMO.Infrastructure/Persistence/EntityConfigurations/EmailListEntityConfiguration.cs",
         "src/DMO.Infrastructure/Persistence/EntityConfigurations/EmailListRecipientEntityConfiguration.cs",
         "src/DMO.Infrastructure/Persistence/EntityConfigurations/EmailTemplateEntityConfiguration.cs",
+        "src/DMO.Infrastructure/Persistence/EntityConfigurations/GlassDensitySettingEntityConfiguration.cs",
         "src/DMO.Infrastructure/Configuration/ConfigurationCalculationConfiguration.cs",
     ];
 
-    /// <summary>The single P2-T05 migration and its EF designer (contract §25.1).</summary>
+    /// <summary>The P2-T05 migrations and their EF designers (contract §25.1; the post-closure
+    /// correction adds its single additive migration 005).</summary>
     public static IReadOnlyList<string> MigrationSourcePaths { get; } =
     [
         "src/DMO.Infrastructure/Migrations/20260923045054_ControloCreateDomain.cs",
         "src/DMO.Infrastructure/Migrations/20260923045054_ControloCreateDomain.Designer.cs",
+        "src/DMO.Infrastructure/Migrations/20260923122429_GlassDensitySettings.cs",
+        "src/DMO.Infrastructure/Migrations/20260923122429_GlassDensitySettings.Designer.cs",
     ];
 
     /// <summary>
@@ -270,7 +279,8 @@ internal static class P2T05ProductionScan
 
     // ================= ownership / allow-list ============================================
 
-    /// <summary>The P2-T05 owned source path prefixes (contract Appendix B and §23).</summary>
+    /// <summary>The P2-T05 owned source path prefixes (contract Appendix B and §23; the
+    /// post-closure correction adds the glass-density settings sources and migration 005).</summary>
     public static IReadOnlyList<string> OwnedPathPrefixes { get; } =
     [
         "src/DMO.Domain/Controlo/",
@@ -283,6 +293,7 @@ internal static class P2T05ProductionScan
         "src/DMO.Infrastructure/Persistence/PdfDirectorySettings",
         "src/DMO.Infrastructure/Persistence/EmailList",
         "src/DMO.Infrastructure/Persistence/EmailTemplate",
+        "src/DMO.Infrastructure/Persistence/GlassDensity",
         "src/DMO.Infrastructure/Persistence/DmoPesoContextRead.cs",
         "src/DMO.Infrastructure/Persistence/PesoJobOnDependencyProbe.cs",
         "src/DMO.Infrastructure/Persistence/Entities/Peso",
@@ -292,6 +303,7 @@ internal static class P2T05ProductionScan
         "src/DMO.Infrastructure/Persistence/Entities/PdfDirectorySettingsEntity.cs",
         "src/DMO.Infrastructure/Persistence/Entities/EmailList",
         "src/DMO.Infrastructure/Persistence/Entities/EmailTemplateEntity.cs",
+        "src/DMO.Infrastructure/Persistence/Entities/GlassDensity",
         "src/DMO.Infrastructure/Persistence/EntityConfigurations/Peso",
         "src/DMO.Infrastructure/Persistence/EntityConfigurations/PesoMeasurementRowEntityConfiguration.cs",
         "src/DMO.Infrastructure/Persistence/EntityConfigurations/RepairerEntityConfiguration.cs",
@@ -299,8 +311,10 @@ internal static class P2T05ProductionScan
         "src/DMO.Infrastructure/Persistence/EntityConfigurations/PdfDirectorySettingsEntityConfiguration.cs",
         "src/DMO.Infrastructure/Persistence/EntityConfigurations/EmailList",
         "src/DMO.Infrastructure/Persistence/EntityConfigurations/EmailTemplateEntityConfiguration.cs",
+        "src/DMO.Infrastructure/Persistence/EntityConfigurations/GlassDensity",
         "src/DMO.Infrastructure/Configuration/ConfigurationCalculationConfiguration.cs",
         "src/DMO.Infrastructure/Migrations/20260923045054_ControloCreateDomain",
+        "src/DMO.Infrastructure/Migrations/20260923122429_GlassDensitySettings",
         "src/DMO.Web/Pages/Controlo/",
         "src/DMO.Web/Endpoints/Controlo",
         "src/DMO.Web/wwwroot/css/dmo-controlo.css",
@@ -322,7 +336,8 @@ internal static class P2T05ProductionScan
         "src/DMO.Application/JobOn/JobOnModels.cs",
     ];
 
-    /// <summary>The P2-T05 vocabulary fragments of the changed-path allow-list row (BND9).</summary>
+    /// <summary>The P2-T05 vocabulary fragments of the changed-path allow-list row (BND9; the
+    /// post-closure correction adds the glass-density vocabulary).</summary>
     public static IReadOnlyList<string> SourceVocabularyFragments { get; } =
     [
         string.Concat("peso"),
@@ -333,6 +348,8 @@ internal static class P2T05ProductionScan
         string.Concat("email", "_template"),
         string.Concat("pdf", "_directory"),
         string.Concat("machine", "_repairer"),
+        string.Concat("glass", "_density"),
+        string.Concat("Glass", "Density"),
     ];
 
     /// <summary>Whether the supplied relative path belongs to the P2-T05 owned surface.</summary>

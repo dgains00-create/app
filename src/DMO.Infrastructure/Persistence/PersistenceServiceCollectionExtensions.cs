@@ -55,6 +55,7 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<IPdfDirectorySettingsRepository, PdfDirectorySettingsRepository>();
         services.AddScoped<IEmailListRepository, EmailListRepository>();
         services.AddScoped<IEmailTemplateRepository, EmailTemplateRepository>();
+        services.AddScoped<IGlassDensitySettingsRepository, GlassDensitySettingsRepository>();
         services.AddScoped<IPesoContextRead, DmoPesoContextRead>();
         services.AddScoped<IJobOnDependencyProbe, PesoJobOnDependencyProbe>();
 

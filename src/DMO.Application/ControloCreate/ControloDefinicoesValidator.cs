@@ -1,3 +1,4 @@
+using DMO.Application.Tools;
 using DMO.Domain.Tools;
 
 namespace DMO.Application.ControloCreate;
@@ -46,6 +47,18 @@ public static class ControloDefinicoesValidationErrors
 
     /// <summary>The delete was not explicitly confirmed.</summary>
     public const string DeleteNotConfirmed = "DELETE_NOT_CONFIRMED";
+
+    /// <summary>
+    /// The glass-density update targeted a processo that is not one of the canonical tokens
+    /// (<c>NNPB</c>/<c>PS</c>) — correction contract §5.3.
+    /// </summary>
+    public const string ProcessoUnknown = "PROCESSO_UNKNOWN";
+
+    /// <summary>
+    /// The glass-density update carried a density that is not strictly positive (<c>≤ 0</c>) —
+    /// correction contract §5.3/R7.
+    /// </summary>
+    public const string DensityNotPositive = "DENSITY_NOT_POSITIVE";
 }
 
 /// <summary>
@@ -209,6 +222,31 @@ public static class ControloDefinicoesValidator
         return command.DeleteConfirmed
             ? []
             : [ControloDefinicoesValidationErrors.DeleteNotConfirmed];
+    }
+
+    /// <summary>
+    /// Validates the glass-density update command (correction contract §5.3): the path processo
+    /// must be exactly the canonical <c>NNPB</c>/<c>PS</c> token and the density must be strictly
+    /// positive. No alias, no case folding and no other processo is accepted.
+    /// </summary>
+    public static IReadOnlyList<string> Validate(UpdateGlassDensityCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(command.Processo)
+            || ToolTokens.ParseProcesso(command.Processo.Trim()) is null)
+        {
+            errors.Add(ControloDefinicoesValidationErrors.ProcessoUnknown);
+        }
+
+        if (command.DensityGCm3 <= 0)
+        {
+            errors.Add(ControloDefinicoesValidationErrors.DensityNotPositive);
+        }
+
+        return errors;
     }
 
     private static IReadOnlyList<string> ValidateList(string name, IReadOnlyList<string> recipients)

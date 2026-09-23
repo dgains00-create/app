@@ -13,7 +13,10 @@ namespace DMO.Application.ControloCreate;
 /// </summary>
 /// <remarks>
 /// Authority: P2-T05 contract §7 (create §7.1, calculate §7.2, edit §7.3, submit §7.4), §5.3
-/// (formulas), §20.3.
+/// (formulas), §20.3; post-closure glass-density correction contract §5.4 (the ONLY calculation
+/// delta: the glass density is the CURRENT operational value of the anchor's processo from the
+/// Definições settings store <c>glass_density_settings</c> — never a deployment configuration;
+/// the former <c>Controlo:Calculation:GlassDensities</c> section lost authority).
 /// <para>
 /// The backend is the <b>only</b> calculation authority: the formulas are never redefined on the
 /// frontend and the persisted per-row results always equal the authoritative formula
@@ -22,11 +25,12 @@ namespace DMO.Application.ControloCreate;
 /// contracted anchor traversal <c>cm_id → tool_id → jobon_id</c> (§6.1/§7.2/§26.3) is resolved
 /// through <see cref="IPesoContextRead"/>.</para>
 /// <para>
-/// Historical immutability (§6): stored results are never recomputed from current Tool/Job On
-/// state and the frozen glass density is never refreshed by later config changes (§6.3.3); the submit
-/// path re-derives and <b>verifies</b> the stored results with the authoritative formula, refusing
-/// anything non-positive (C2) or non-derivable — nothing is silently rewritten and nothing is
-/// invented.</para>
+/// Historical immutability (§6, Owner rule R3–R6): stored results are never recomputed from
+/// current Tool/Job On state and the frozen glass density is never refreshed by later settings
+/// changes; the submit path re-derives and <b>verifies</b> the stored results with the
+/// authoritative formula, refusing anything non-positive (C2) or non-derivable — nothing is
+/// silently rewritten and nothing is invented. A missing glass-density row (defensive only — both
+/// rows are always seeded) fails closed with <c>calculation-configuration-missing</c>.</para>
 /// </remarks>
 public sealed class ControloCreateService : IControloCreateService
 {
@@ -35,6 +39,7 @@ public sealed class ControloCreateService : IControloCreateService
     private readonly IJobOnService _jobOns;
     private readonly IToolService _tools;
     private readonly IControloCalculationConfiguration _calculation;
+    private readonly IGlassDensitySettingsRepository _glassDensities;
 
     /// <summary>Creates the service over its repositories and the composed P2-T04 contracts.</summary>
     public ControloCreateService(
@@ -42,18 +47,21 @@ public sealed class ControloCreateService : IControloCreateService
         IPesoContextRead contextRead,
         IJobOnService jobOns,
         IToolService tools,
-        IControloCalculationConfiguration calculation)
+        IControloCalculationConfiguration calculation,
+        IGlassDensitySettingsRepository glassDensities)
     {
         ArgumentNullException.ThrowIfNull(pesos);
         ArgumentNullException.ThrowIfNull(contextRead);
         ArgumentNullException.ThrowIfNull(jobOns);
         ArgumentNullException.ThrowIfNull(tools);
         ArgumentNullException.ThrowIfNull(calculation);
+        ArgumentNullException.ThrowIfNull(glassDensities);
         _pesos = pesos;
         _contextRead = contextRead;
         _jobOns = jobOns;
         _tools = tools;
         _calculation = calculation;
+        _glassDensities = glassDensities;
     }
 
     /// <inheritdoc />
@@ -75,23 +83,22 @@ public sealed class ControloCreateService : IControloCreateService
             return new PesoResult.ValidationFailed(anchor.ValidationErrors);
         }
 
-        if (!TryResolveCalculationFacts(
+        if (await TryResolveCalculationFactsAsync(
                 anchor.Processo,
                 command.WaterTemperature,
-                out var waterDensity,
-                out var glassDensity))
+                cancellationToken) is not { } facts)
         {
             return Refuse(
                 PesoRefusalReason.CalculationConfigurationMissing,
-                "The water density for the entered temperature or the glass-density mapping for " +
+                "The water density for the entered temperature or the glass-density setting for " +
                 "this calculation is not resolvable; no value is invented and nothing is written. " +
                 "Configure the calculation and retry.");
         }
 
         var rows = ComputeRows(
             command.RowWaterWeightsG,
-            waterDensity,
-            glassDensity,
+            facts.WaterDensity,
+            facts.GlassDensity,
             command.VolumeMarisaBq,
             command.VolumePuncaoPu,
             out var resultErrors);
@@ -104,8 +111,8 @@ public sealed class ControloCreateService : IControloCreateService
             command.CmId,
             command.PendingToolId,
             command.WaterTemperature,
-            waterDensity,
-            glassDensity,
+            facts.WaterDensity,
+            facts.GlassDensity,
             rows));
     }
 
@@ -128,23 +135,22 @@ public sealed class ControloCreateService : IControloCreateService
             return new PesoResult.ValidationFailed(anchor.ValidationErrors);
         }
 
-        if (!TryResolveCalculationFacts(
+        if (await TryResolveCalculationFactsAsync(
                 anchor.Processo,
                 command.WaterTemperature,
-                out var waterDensity,
-                out var glassDensity))
+                cancellationToken) is not { } createFacts)
         {
             return Refuse(
                 PesoRefusalReason.CalculationConfigurationMissing,
-                "The water density for the entered temperature or the glass-density mapping for " +
+                "The water density for the entered temperature or the glass-density setting for " +
                 "this Peso is not resolvable; no value is invented and nothing is written. " +
                 "Configure the calculation and retry.");
         }
 
         var rows = ComputeRows(
             command.RowWaterWeightsG,
-            waterDensity,
-            glassDensity,
+            createFacts.WaterDensity,
+            createFacts.GlassDensity,
             command.VolumeMarisaBq,
             command.VolumePuncaoPu,
             out var resultErrors);
@@ -166,7 +172,7 @@ public sealed class ControloCreateService : IControloCreateService
             command.WaterTemperature,
             command.VolumeMarisaBq,
             command.VolumePuncaoPu,
-            glassDensity,
+            createFacts.GlassDensity,
             TrimToNull(command.PreviousProductionEndReference),
             TrimToNull(command.PreviousAverageWeightReference),
             Version: 1,
@@ -518,26 +524,47 @@ public sealed class ControloCreateService : IControloCreateService
         return new AnchorResolution([ControloCreateValidationErrors.PesoAnchorRequired], null);
     }
 
+    /// <summary>The two resolved calculation facts of one calculation (water + glass densities).</summary>
+    private sealed record CalculationFacts(decimal WaterDensity, decimal GlassDensity);
+
     /// <summary>
     /// Resolves the calculation configuration (Q-CALC; Owner clarification
-    /// WATER_TEMPERATURE_TO_WATER_DENSITY_LOOKUP): the WATER DENSITY for the entered temperature
-    /// (resolved automatically from the application's authoritative water-temperature table)
-    /// and the GLASS density for the anchor's processo. The two lookups are separate facts and
-    /// are never conflated. Missing configuration is the typed
-    /// <c>calculation-configuration-missing</c> refusal — never an invented value and never a
-    /// silent zero (MES9/AC-M9). The operator never enters a water density or a divisor.
+    /// WATER_TEMPERATURE_TO_WATER_DENSITY_LOOKUP + glass-density correction
+    /// GLASS_DENSITY_CONFIGURATION): the WATER DENSITY for the entered temperature (resolved
+    /// automatically from the application's authoritative water-temperature table) and the GLASS
+    /// density for the anchor's processo — resolved at calculation time from the CURRENT
+    /// OPERATIONAL value maintained in <c>Controlo → Definições</c>
+    /// (<c>glass_density_settings</c>, per-processo row; never a deployment configuration). The
+    /// two lookups are separate facts and are never conflated. An unresolvable fact is
+    /// <c>null</c> → the typed <c>calculation-configuration-missing</c> refusal — never an
+    /// invented value and never a silent zero (MES9/AC-M9). The operator never enters a water
+    /// density or a divisor.
     /// </summary>
-    private bool TryResolveCalculationFacts(
+    private async Task<CalculationFacts?> TryResolveCalculationFactsAsync(
         Processo? processo,
         decimal waterTemperature,
-        out decimal waterDensity,
-        out decimal glassDensity)
+        CancellationToken cancellationToken)
     {
-        waterDensity = default;
-        glassDensity = default;
+        if (!_calculation.TryGetWaterDensity(waterTemperature, out var waterDensity))
+        {
+            return null;
+        }
 
-        return _calculation.TryGetWaterDensity(waterTemperature, out waterDensity)
-            && _calculation.TryGetGlassDensity(processo, out glassDensity);
+        // The glass density is the CURRENT operational value of the anchor's processo from the
+        // Definições settings store (Owner rule): cm_id → tool_id → processo → settings row →
+        // density_g_cm3. A missing row is defensive only (both rows are always seeded); it fails
+        // closed exactly like the former missing mapping — nothing is invented.
+        var token = ToolTokens.ToToken(processo);
+        var setting = token is null
+            ? null
+            : await _glassDensities.GetByProcessoAsync(token, cancellationToken);
+
+        if (setting is null)
+        {
+            return null;
+        }
+
+        return new CalculationFacts(waterDensity, setting.DensityGCm3);
     }
 
     /// <summary>

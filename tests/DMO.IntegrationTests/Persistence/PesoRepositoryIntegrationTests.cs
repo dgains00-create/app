@@ -93,6 +93,7 @@ public sealed class PesoRepositoryIntegrationTests
 
         await using var context = PersistenceTestDatabase.CreateContext();
         await PersistenceTestDatabase.ApplyMigrationsAsync(context);
+        await GlassDensityTestState.RestoreAsync(context); // the glass assertions need the canonical NNPB 2.4027
 
         var token = Guid.NewGuid().ToString("N");
         var userId = await SeedUserAsync(context, token);
@@ -123,7 +124,7 @@ public sealed class PesoRepositoryIntegrationTests
             Assert.Equal(toolId, calculation.Value.PendingToolId);
             var row = Assert.Single(calculation.Value.Rows);
             Assert.Equal(1000m, row.CapacityCm3);
-            Assert.Equal(2500m, row.GlassWeightG); // (1000 + 0 − 0) × 2.50
+            Assert.Equal(2402.7000m, row.GlassWeightG); // (1000 + 0 − 0) × 2.4027 (seeded NNPB)
         }
         finally
         {
@@ -450,6 +451,7 @@ public sealed class PesoRepositoryIntegrationTests
 
         await using var context = PersistenceTestDatabase.CreateContext();
         await PersistenceTestDatabase.ApplyMigrationsAsync(context);
+        await GlassDensityTestState.RestoreAsync(context); // the glass assertions need the canonical NNPB 2.4027
 
         var token = Guid.NewGuid().ToString("N");
         var userId = await SeedUserAsync(context, token);
@@ -467,12 +469,12 @@ public sealed class PesoRepositoryIntegrationTests
             var sheet = Assert.IsType<PesoResult.Found>(await Pesos(context).GetAsync(
                 created.PesoId, CancellationToken.None)).Sheet;
 
-            // 997.1 ÷ 0.9971 = 1000.0000 — (1000 + 10 − 5) × 2.50 = 2512.5000.
-            // 1994.2 ÷ 0.9971 = 2000.0000 — (2000 + 10 − 5) × 2.50 = 5012.5000.
+            // 997.1 ÷ 0.9971 = 1000.0000 — (1000 + 10 − 5) × 2.4027 = 2414.7135.
+            // 1994.2 ÷ 0.9971 = 2000.0000 — (2000 + 10 − 5) × 2.4027 = 4817.4135.
             Assert.Equal(1000.0000m, sheet.Rows[0].CapacityCm3);
-            Assert.Equal(2512.5000m, sheet.Rows[0].GlassWeightG);
+            Assert.Equal(2414.7135m, sheet.Rows[0].GlassWeightG);
             Assert.Equal(2000.0000m, sheet.Rows[1].CapacityCm3);
-            Assert.Equal(5012.5000m, sheet.Rows[1].GlassWeightG);
+            Assert.Equal(4817.4135m, sheet.Rows[1].GlassWeightG);
 
             // The stateless calculation with the same anchor writes nothing and bumps nothing.
             var before = await CountAsync(
@@ -542,8 +544,11 @@ public sealed class PesoRepositoryIntegrationTests
     }
 
     /// <summary>
-    /// MES10 (AC-H3/AC-M4): the glass density is written once and frozen — a later density-mapping
-    /// change never refreshes an existing Peso (§6.3.3) and affects new Peso records only.
+    /// MES10 (AC-H3/AC-M4; post-closure correction R4/R5): the glass density is written once and
+    /// frozen — a later Definições SETTINGS change never refreshes an existing Peso (§6.3.3) and
+    /// affects new Peso records only. The glass value now resolves from
+    /// <c>glass_density_settings</c> (seeded NNPB 2.4027); the "later" value is applied through
+    /// the REAL settings repository exactly like the Definições surface would.
     /// </summary>
     [SkippableFact]
     public async Task MES10_FrozenDensityIsNeverRefreshedByLaterConfiguration()
@@ -552,6 +557,7 @@ public sealed class PesoRepositoryIntegrationTests
 
         await using var context = PersistenceTestDatabase.CreateContext();
         await PersistenceTestDatabase.ApplyMigrationsAsync(context);
+        await GlassDensityTestState.RestoreAsync(context);
 
         var token = Guid.NewGuid().ToString("N");
         var userId = await SeedUserAsync(context, token);
@@ -560,19 +566,26 @@ public sealed class PesoRepositoryIntegrationTests
         {
             var (_, _, cmId) = await SeedCmProductionAsync(context, token);
 
-            // Under the default configuration the NNPB density is 2.50.
+            // Under the seeded settings the NNPB density is 2.4027.
             var created = Assert.IsType<PesoResult.Created>(await Pesos(context).CreateAsync(
                 new CreatePesoCommand(
                     cmId, null, WaterTemperature: 25m, VolumeMarisaBq: 10m, VolumePuncaoPu: 5m,
                     null, null, [997.1m], userId),
                 CancellationToken.None));
 
-            // The later configuration maps NNPB → 3.00; the edit with SAME facts is recomputed with
-            // the FROZEN density 2.50, so the stored values never change.
-            var later = new FixedCalculationConfiguration(
-                densities: new Dictionary<string, decimal> { ["NNPB"] = 3.00m });
+            // The Definições surface later changes NNPB → 3.00 (version-guarded settings write).
+            var settings = new GlassDensitySettingsRepository(context);
+            var current = await settings.GetByProcessoAsync("NNPB", CancellationToken.None);
+            Assert.Equal(2.4027m, current!.DensityGCm3);
+            Assert.Equal(1, current.Version);
+            var changed = await settings.UpdatedAsync(
+                current with { DensityGCm3 = 3.00m },
+                CancellationToken.None);
+            Assert.Equal(2, changed.Version);
 
-            var updated = Assert.IsType<PesoResult.Updated>(await Pesos(context, later).UpdateAsync(
+            // The edit with SAME facts is recomputed with the FROZEN density 2.4027, so the
+            // stored values never change.
+            var updated = Assert.IsType<PesoResult.Updated>(await Pesos(context).UpdateAsync(
                 new UpdatePesoCommand(
                     created.PesoId, ExpectedVersion: 1, WaterTemperature: 25m,
                     VolumeMarisaBq: 10m, VolumePuncaoPu: 5m, null, null, [997.1m]),
@@ -582,11 +595,11 @@ public sealed class PesoRepositoryIntegrationTests
             var sheet = Assert.IsType<PesoResult.Found>(await Pesos(context).GetAsync(
                 created.PesoId, CancellationToken.None)).Sheet;
 
-            Assert.Equal(2.50m, sheet.GlassDensityGCm3); // frozen — never refreshed
-            Assert.Equal(2512.5000m, Assert.Single(sheet.Rows).GlassWeightG); // recomputed with 2.50
+            Assert.Equal(2.4027m, sheet.GlassDensityGCm3); // frozen — never refreshed
+            Assert.Equal(2414.7135m, Assert.Single(sheet.Rows).GlassWeightG); // recomputed with 2.4027
 
-            // A NEW Peso created under the later configuration freezes the NEW density.
-            var laterCreated = Assert.IsType<PesoResult.Created>(await Pesos(context, later).CreateAsync(
+            // A NEW Peso created under the changed settings freezes the NEW value.
+            var laterCreated = Assert.IsType<PesoResult.Created>(await Pesos(context).CreateAsync(
                 new CreatePesoCommand(
                     cmId, null, WaterTemperature: 25m, VolumeMarisaBq: 10m, VolumePuncaoPu: 5m,
                     null, null, [997.1m], userId),
@@ -599,6 +612,8 @@ public sealed class PesoRepositoryIntegrationTests
         }
         finally
         {
+            // The shared disposable DB must never leak the mutated setting into later tests.
+            await GlassDensityTestState.RestoreAsync(context);
             await CleanupAsync(context, token);
         }
     }
@@ -662,6 +677,7 @@ public sealed class PesoRepositoryIntegrationTests
 
         await using var context = PersistenceTestDatabase.CreateContext();
         await PersistenceTestDatabase.ApplyMigrationsAsync(context);
+        await GlassDensityTestState.RestoreAsync(context); // the glass assertions need the canonical NNPB 2.4027
 
         var token = Guid.NewGuid().ToString("N");
         var userId = await SeedUserAsync(context, token);
@@ -697,7 +713,7 @@ public sealed class PesoRepositoryIntegrationTests
             Assert.Equal(1, sheet.Version);
             Assert.Equal(25m, sheet.WaterTemperature);
             Assert.Equal(1000m, Assert.Single(sheet.Rows).CapacityCm3);
-            Assert.Equal(2512.5m, sheet.Rows[0].GlassWeightG);
+            Assert.Equal(2414.7135m, sheet.Rows[0].GlassWeightG);
 
             // …and only the traversal labels show the new Job On facts.
             Assert.Equal($"ref-{token}-renamed", sheet.Production!.Reference);
@@ -1241,12 +1257,14 @@ public sealed class PesoRepositoryIntegrationTests
 
     private static ControloCreateService Pesos(
         DmoDbContext context,
-        FixedCalculationConfiguration? calculation = null) => new(
+        FixedCalculationConfiguration? calculation = null,
+        IGlassDensitySettingsRepository? glassDensities = null) => new(
         new PesoRepository(context),
         new DmoPesoContextRead(context),
         new JobOnService(new JobOnRepository(context), new ToolRepository(context), []),
         new ToolService(new ToolRepository(context)),
-        calculation ?? new FixedCalculationConfiguration());
+        calculation ?? new FixedCalculationConfiguration(),
+        glassDensities ?? new GlassDensitySettingsRepository(context));
 
     private static ToolService Tools(DmoDbContext context) => new(new ToolRepository(context));
 

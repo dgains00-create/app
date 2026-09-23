@@ -4,9 +4,10 @@ namespace DMO.Application.ControloCreate;
 /// The single <c>Controlo_Create → Definições</c> settings service contract.
 /// </summary>
 /// <remarks>
-/// Authority: P2-T05 contract §9–§14 and §20.3.
+/// Authority: P2-T05 contract §9–§14 and §20.3; post-closure glass-density correction
+/// contract §5.3 (the current operational glass density per processo, routes 18/19).
 /// <para>
-/// All five areas are site-wide database configuration owned by Controlo_Create (Q-SITE); no
+/// All areas are site-wide database configuration owned by Controlo_Create (Q-SITE); no
 /// per-user dimension exists. No setting value ever becomes a canonical identity, a join key, a
 /// document identity or production truth (§9.1). The PDF-directory check (Q-PDF) executes on the
 /// <b>server host</b> through the filesystem probe abstraction (SET12) and returns only the typed
@@ -75,4 +76,14 @@ public interface IControloDefinicoesService
 
     /// <summary>Deletes an email template after explicit confirmation.</summary>
     Task<SettingsResult> DeleteEmailTemplateAsync(DeleteEmailTemplateCommand command, CancellationToken cancellationToken);
+
+    // Glass densities (correction contract §5.3) — the current operational value per processo.
+    /// <summary>Reads BOTH current operational glass densities (NNPB and PS, with versions).</summary>
+    Task<SettingsResult> ListGlassDensitiesAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Updates the current operational glass density of ONE canonical processo, version-guarded;
+    /// the other processo is never touched (per-processo independence).
+    /// </summary>
+    Task<SettingsResult> UpdateGlassDensityAsync(UpdateGlassDensityCommand command, CancellationToken cancellationToken);
 }

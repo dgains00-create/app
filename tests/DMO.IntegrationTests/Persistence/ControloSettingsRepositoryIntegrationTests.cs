@@ -40,6 +40,7 @@ public sealed class ControloSettingsRepositoryIntegrationTests
         new PdfDirectorySettingsRepository(context),
         new EmailListRepository(context),
         new EmailTemplateRepository(context),
+        new GlassDensitySettingsRepository(context),
         probe ?? new FixedPdfDirectoryProbe());
 
     /// <summary>The six settled machine codes, in the settled order.</summary>

@@ -9,9 +9,10 @@
 <script src="~/js/dmo-controlo.js" defer></script>
 
 @*
-    P2-T05 Definições surface (contract §9, §8.7; routes 12–17).
+    P2-T05 Definições surface (contract §9, §8.7; routes 12–17; post-closure glass-density
+    correction contract §5.3 adds section 6 + routes 18/19).
 
-    One page, five sections (Q-SURF default), inside the Controlo Create working area — NOT a
+    One page, six sections (Q-SURF default), inside the Controlo Create working area — NOT a
     destination, NOT a Module, NOT registered anywhere. Gated by exactly the same `controlo-create`
     policy as every P2-T05 route; only the backend decides (AUT1/AUT2/AC-G1/AC-G2).
 
@@ -22,7 +23,10 @@
 
     Every fact is a real backend read; the page-owned adapter (dmo-controlo.js) executes the
     accepted settings routes. No recipient address is hardcoded anywhere (SET8/AC-F6); the PDF
-    check executes server-side with the typed vocabulary only (Q-PDF).
+    check executes server-side with the typed vocabulary only (Q-PDF). The glass-density section
+    shows the two fixed canonical entries NNPB/PS with the unit g/cm³; a save submits ONE
+    processo's value (positive, ≤ 4 decimal places) with the observed version (Owner rule:
+    the Tool does not own an editable density).
 *@
 <section class="dmo-controlo dmo-controlo--definicoes" data-dmo-controlo-surface="definicoes" data-dmo-controlo-root="true">
     @if (Model.LookupFailed)
@@ -220,6 +224,43 @@
                 <button class="dmo-controlo__button" type="button" data-dmo-template-edit-cancel="true">Cancelar edição</button>
             </div>
         </form>
+    </div>
+
+    @* ---- Section 6 — Densidades do vidro (NNPB/PS; current operational values, g/cm³) ---- *@
+    <div class="dmo-controlo__region" data-dmo-controlo-region="glass-densities" aria-label="Densidade do vidro">
+        <h2 class="dmo-controlo__section-title">Densidade do vidro (g/cm³)</h2>
+        <div class="dmo-controlo__settings-scroll" role="region" tabindex="0" aria-label="Densidade do vidro por processo">
+            <table class="dmo-controlo__settings-table" data-dmo-glass-densities-table="true">
+                <thead>
+                    <tr><th>Processo</th><th>Densidade (g/cm³)</th><th>Versão</th><th>Guardar</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var setting in Model.GlassDensities)
+                    {
+                        <tr data-dmo-glass-density-row="@setting.Processo">
+                            <td>@setting.Processo</td>
+                            <td>
+                                <input class="dmo-controlo__input dmo-controlo__input--compact"
+                                       type="number"
+                                       step="0.0001"
+                                       min="0.0001"
+                                       value="@setting.DensityGCm3.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)"
+                                       data-dmo-glass-density-input="@setting.Processo"
+                                       data-dmo-glass-density-version="@setting.Version"
+                                       aria-label="Densidade do vidro do processo @setting.Processo (g/cm³)" />
+                                <span class="dmo-controlo__unit">g/cm³</span>
+                            </td>
+                            <td data-dmo-glass-density-version-cell="@setting.Processo">@setting.Version</td>
+                            <td>
+                                <button class="dmo-controlo__button" type="button"
+                                        data-dmo-glass-density-save="@setting.Processo">Guardar</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p class="dmo-controlo__hint">Valores usados em novos cálculos do processo correspondente. A densidade efetivamente usada é preservada em cada controlo (histórico imutável); alterações afetam apenas cálculos futuros.</p>
     </div>
 
     <div class="dmo-controlo__state" data-dmo-controlo-state="true" hidden></div>

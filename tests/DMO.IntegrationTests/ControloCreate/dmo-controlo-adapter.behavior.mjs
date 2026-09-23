@@ -303,6 +303,20 @@ function definicoesListsSurface() {
   return root;
 }
 
+function definicoesGlassDensitiesSurface() {
+  const root = new Element("section", { "data-dmo-controlo-root": "true", "data-dmo-controlo-surface": "definicoes" });
+  const stateRegion = new Element("div", { "data-dmo-controlo-state": "true" });
+  stateRegion.hidden = true;
+  root.appendChild(stateRegion);
+  const input = new Element("input", { "data-dmo-glass-density-input": "NNPB", "data-dmo-glass-density-version": "2" });
+  input.value = "2,41";
+  root.appendChild(input);
+  const saveButton = new Element("button", { "data-dmo-glass-density-save": "NNPB" });
+  saveButton.textContent = "Guardar";
+  root.appendChild(saveButton);
+  return root;
+}
+
 const results = [];
 function scenario(name, fn) {
   return Promise.resolve()
@@ -595,6 +609,67 @@ await scenario("S6 non-stale typed failures keep the existing presentation", asy
   assert.equal(region.getAttribute("data-dmo-conflict"), null, "no conflict marker for already-submitted");
   assert.equal(region.querySelector("[data-dmo-conflict-reload]"), null, "no recovery control for already-submitted");
   assert.equal(fetchStub.calls.length, 1, "exactly ONE request for the second mutation");
+});
+
+// S7 — D2 regression for the glass-density Definições PUT (routes 18/19, post-closure
+// correction): a typed 409 stale-version enters the SAME conflict state with recovery, exactly
+// ONE request is issued (no automatic retry), and the entered value is retained in the input.
+await scenario("S7 glass-density save stale-version enters conflict with recovery", async () => {
+  const documentStub = createDocument();
+  const root = definicoesGlassDensitiesSurface();
+  documentStub.roots.push(root);
+  const windowStub = createWindow();
+  const fetchStub = createFetch([
+    {
+      method: "PUT",
+      pathPrefix: "/controlo/create/definicoes/glass-densities/NNPB",
+      response: { status: 409, body: { reason: "stale-version", message: "density changed." } },
+    },
+  ]);
+
+  loadAdapter(windowStub, documentStub, fetchStub);
+
+  root.querySelector("[data-dmo-glass-density-save]").click();
+  await flush();
+
+  assert.equal(fetchStub.calls.length, 1, "exactly ONE request — no automatic retry");
+  assert.equal(fetchStub.calls[0].method, "PUT", "glass-density save is a PUT");
+  assert.equal(fetchStub.calls[0].body.densityGcm3, 2.41, "the comma decimal is parsed and sent");
+  assert.equal(fetchStub.calls[0].body.expectedVersion, 2, "the observed version is sent");
+  const region = root.querySelector("[data-dmo-controlo-state]");
+  assert.equal(region.getAttribute("data-dmo-conflict"), "true", "conflict marker set");
+  assert.match(region.textContent, /density changed/, "typed message surfaced");
+  root.querySelector("[data-dmo-conflict-reload]").click();
+  assert.equal(windowStub.reloadCalls, 1, "recovery reloads the authoritative current state");
+});
+
+// S8 — D2 regression for the glass-density PUT: NON-stale typed failures (validation-failed 400
+// with DENSITY_NOT_POSITIVE/PROCESSO_UNKNOWN) keep the existing plain error presentation — no
+// conflict marker, no recovery control.
+await scenario("S8 glass-density validation failure keeps the plain error presentation", async () => {
+  const documentStub = createDocument();
+  const root = definicoesGlassDensitiesSurface();
+  documentStub.roots.push(root);
+  const windowStub = createWindow();
+  const fetchStub = createFetch([
+    {
+      method: "PUT",
+      pathPrefix: "/controlo/create/definicoes/glass-densities/NNPB",
+      response: { status: 400, body: { reason: "validation-failed", errors: ["DENSITY_NOT_POSITIVE"] } },
+    },
+  ]);
+
+  loadAdapter(windowStub, documentStub, fetchStub);
+
+  root.querySelector("[data-dmo-glass-density-save]").click();
+  await flush();
+
+  assert.equal(fetchStub.calls.length, 1, "exactly ONE request — no automatic retry");
+  const region = root.querySelector("[data-dmo-controlo-state]");
+  assert.equal(region.hidden, false, "typed validation failure must be surfaced");
+  assert.match(region.textContent, /DENSITY_NOT_POSITIVE/, "validation token listed");
+  assert.equal(region.getAttribute("data-dmo-conflict"), null, "no conflict marker for validation-failed");
+  assert.equal(region.querySelector("[data-dmo-conflict-reload]"), null, "no recovery control for validation-failed");
 });
 
 // ---------------------------------------------------------------------------------------------

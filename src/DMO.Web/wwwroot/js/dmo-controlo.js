@@ -3,7 +3,8 @@
  * Two surfaces:
  *   create     — Novo controlo: calculate (route 8), save-create (route 5), save-edit (route 7),
  *                submit (route 9), associate (route 10), open-draft support.
- *   definicoes — the five Definições sections (routes 13–17).
+ *   definicoes — the six Definições sections (routes 13–17; glass densities routes 18/19,
+ *                post-closure correction contract §5.3).
  *
  * The adapter performs NO domain decision: backend validation is authoritative, entered values are
  * retained on refusal, and every persisted-state refusal surfaces its typed reason. No width
@@ -471,6 +472,22 @@ if (!window.dmoControlo) {
       });
     }
 
+    function wireGlassDensities(root) {
+      // One processo per save: ONLY the targeted row is submitted, with its observed version and
+      // a strictly positive density (the backend is authoritative; a failure keeps the entry).
+      root.querySelectorAll("[data-dmo-glass-density-save]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          var processo = button.getAttribute("data-dmo-glass-density-save");
+          var input = root.querySelector("[data-dmo-glass-density-input='" + processo + "']");
+          var version = parseInt(input.getAttribute("data-dmo-glass-density-version") || "1", 10);
+          api("/controlo/create/definicoes/glass-densities/" + processo, "PUT", { densityGcm3: toDecimal(input.value), expectedVersion: version }).then(function (response) {
+            if (response.ok) { window.location.reload(); }
+            else { renderMutationFailure(root, response); }
+          });
+        });
+      });
+    }
+
     function templatePayload(root) {
       return {
         name: value(root, "[data-dmo-template-new-name]"),
@@ -523,6 +540,7 @@ if (!window.dmoControlo) {
           wirePdfDirectory(root);
           wireEmailLists(root);
           wireEmailTemplates(root);
+          wireGlassDensities(root);
         }
       });
     }

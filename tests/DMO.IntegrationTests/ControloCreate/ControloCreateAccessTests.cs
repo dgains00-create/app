@@ -297,6 +297,11 @@ public sealed class ControloCreateAccessTests
             new(HttpMethod.Put, $"{DefinicoesPage}/email-templates/{id}",
                 P2T05TestHost.Json(new { expectedVersion = 1, name = "Peso", subject = "Relatório", body = "Em anexo", documentType = "peso" })),
             new(HttpMethod.Delete, $"{DefinicoesPage}/email-templates/{id}?expectedVersion=1&deleteConfirmed=true", null),
+
+            // Definições routes 18/19 — glass densities (post-closure correction §5.3).
+            new(HttpMethod.Get, $"{DefinicoesPage}/glass-densities", null),
+            new(HttpMethod.Put, $"{DefinicoesPage}/glass-densities/NNPB",
+                P2T05TestHost.Json(new { densityGcm3 = 2.5m, expectedVersion = 1 })),
         ];
     }
 

@@ -198,8 +198,11 @@ public sealed class P2T05RegressionTests
                 "src/DMO.Infrastructure/Persistence/DmoPesoContextRead.cs",
                 "src/DMO.Infrastructure/Persistence/EntityConfigurations/PesoEntityConfiguration.cs",
                 "src/DMO.Infrastructure/Persistence/PesoJobOnDependencyProbe.cs",
-                // EF-generated: the migration Designer declares the FK to cm_contexts by type name.
+                // EF-generated: the migration Designers declare the FK to cm_contexts by type name.
                 "src/DMO.Infrastructure/Migrations/20260923045054_ControloCreateDomain.Designer.cs",
+                // EF-generated: the glass-density correction migration's Designer (the newest
+                // designer) declares the complete model, including the cm_contexts FK by type name.
+                "src/DMO.Infrastructure/Migrations/20260923122429_GlassDensitySettings.Designer.cs",
             }.OrderBy(path => path, StringComparer.Ordinal),
             cmEntitySources.OrderBy(path => path, StringComparer.Ordinal));
 

@@ -1,16 +1,17 @@
 using DMO.Application.ControloCreate;
-using DMO.Domain.Tools;
 using Microsoft.Extensions.Configuration;
 
 namespace DMO.Infrastructure.Configuration;
 
 /// <summary>
-/// The configuration-backed <see cref="IControloCalculationConfiguration"/>: the
-/// <c>Controlo:Calculation</c> sections.
+/// The configuration-backed <see cref="DMO.Application.ControloCreate.IControloCalculationConfiguration"/>:
+/// the <c>Controlo:Calculation</c> sections.
 /// </summary>
 /// <remarks>
 /// Authority: P2-T05 contract §5.2/§5.3 and Q-CALC, as clarified by the Owner
-/// (WATER_TEMPERATURE_TO_WATER_DENSITY_LOOKUP). The formula mechanics are contracted exactly.
+/// (WATER_TEMPERATURE_TO_WATER_DENSITY_LOOKUP) and as amended by the post-closure glass-density
+/// correction (Owner rule GLASS_DENSITY_CONFIGURATION): after the correction this class carries
+/// the WATER side only.
 /// <para>
 /// <b>Water density:</b> the application ships the authoritative water-temperature table
 /// (<see cref="AuthoritativeWaterDensityByCelsius"/> — per whole degree 5–35 °C, recovered from
@@ -26,17 +27,16 @@ namespace DMO.Infrastructure.Configuration;
 /// authoritative built-in table). The water density is never a Peso-owned editable fact, never
 /// an operator input and never part of <c>Controlo → Definições</c>.</para>
 /// <para>
-/// <b>Glass density:</b> resolved only from the anchor's <c>processo</c> through the
-/// <c>Controlo:Calculation:GlassDensities</c> section (entries
-/// <c>{"Processo": "NNPB", "Density": …}</c>). This lookup is independent of the water-density
-/// lookup and is never confused with it. Until a mapping exists, calculation-dependent
-/// operations return the typed <c>calculation-configuration-missing</c> refusal (MES9/AC-M9);
-/// no value is ever invented and no silent zero is ever produced.</para>
+/// <b>Glass density:</b> resolved ONLY from the current operational value of the anchor's
+/// processo in the Definições settings store (<c>glass_density_settings</c>); the former
+/// deployment section <c>Controlo:Calculation:GlassDensities</c> LOST authority and is no
+/// longer read anywhere (no dual source of truth — the calculation reads the operational store
+/// through <c>DMO.Application.Repositories.IGlassDensitySettingsRepository</c>). This lookup is
+/// independent of the water-density lookup and is never confused with it.</para>
 /// </remarks>
 public sealed class ConfigurationCalculationConfiguration : IControloCalculationConfiguration
 {
     private readonly IReadOnlyDictionary<int, decimal>? _waterDensities;
-    private readonly IReadOnlyDictionary<string, decimal> _glassDensities;
 
     /// <summary>Section root of the whole calculation configuration.</summary>
     public const string SectionName = "Controlo:Calculation";
@@ -84,8 +84,8 @@ public sealed class ConfigurationCalculationConfiguration : IControloCalculation
     /// <summary>The maximum supported water temperature (inclusive).</summary>
     public const int MaxTemperatureCelsius = 35;
 
-    /// <summary>Binds the configuration sections (missing sections = the authoritative built-in
-    /// water table and an empty glass-density mapping).</summary>
+    /// <summary>Binds the configuration sections (a missing section = the authoritative built-in
+    /// water table).</summary>
     public ConfigurationCalculationConfiguration(IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
@@ -107,15 +107,6 @@ public sealed class ConfigurationCalculationConfiguration : IControloCalculation
             : entries
                 .GroupBy(entry => RoundToWholeDegree(entry.Temperature!.Value))
                 .ToDictionary(group => group.Key, group => group.First().Density!.Value);
-
-        _glassDensities = configuration.GetSection($"{SectionName}:GlassDensities").GetChildren()
-            .Select(entry => new
-            {
-                Processo = entry["Processo"],
-                Density = TryParseDecimal(entry["Density"]),
-            })
-            .Where(entry => !string.IsNullOrWhiteSpace(entry.Processo) && entry.Density is not null)
-            .ToDictionary(entry => entry.Processo!.Trim(), entry => entry.Density!.Value);
     }
 
     /// <inheritdoc />
@@ -142,25 +133,6 @@ public sealed class ConfigurationCalculationConfiguration : IControloCalculation
         }
 
         return AuthoritativeWaterDensityByCelsius.TryGetValue(key, out waterDensity);
-    }
-
-    /// <inheritdoc />
-    public bool TryGetGlassDensity(Processo? processo, out decimal density)
-    {
-        if (processo is not { } known)
-        {
-            density = default;
-            return false;
-        }
-
-        var token = known switch
-        {
-            Processo.Nnpb => "NNPB",
-            Processo.Ps => "PS",
-            _ => throw new ArgumentOutOfRangeException(nameof(processo), processo, "Unknown processo."),
-        };
-
-        return _glassDensities.TryGetValue(token, out density);
     }
 
     /// <summary>The authoritative rounding rule of the water-temperature table (nearest whole

@@ -465,7 +465,7 @@ public sealed class ControloCreateEndpointsTests
         Assert.Equal(JsonValueKind.Null, payload.GetProperty("cmId").ValueKind);
         Assert.Equal(20m, payload.GetProperty("waterTemperature").GetDecimal());
         Assert.Equal(0.9982m, payload.GetProperty("waterDensityGCm3").GetDecimal());
-        Assert.Equal(2.50m, payload.GetProperty("glassDensityGCm3").GetDecimal());
+        Assert.Equal(2.4027m, payload.GetProperty("glassDensityGCm3").GetDecimal());
 
         var rows = payload.GetProperty("rows");
         Assert.Equal(1, rows.GetArrayLength());
@@ -722,7 +722,7 @@ public sealed class ControloCreateEndpointsTests
             var payload = await ReadJsonAsync(calculate);
             Assert.Equal(cmId, payload.GetProperty("cmId").GetGuid());
             Assert.Equal(0.9971m, payload.GetProperty("waterDensityGCm3").GetDecimal());
-            Assert.Equal(2.50m, payload.GetProperty("glassDensityGCm3").GetDecimal());
+            Assert.Equal(2.4027m, payload.GetProperty("glassDensityGCm3").GetDecimal());
 
             previewCapacity = payload.GetProperty("rows")[0].GetProperty("capacityCm3").GetDecimal();
             previewGlass = payload.GetProperty("rows")[0].GetProperty("glassWeightG").GetDecimal();

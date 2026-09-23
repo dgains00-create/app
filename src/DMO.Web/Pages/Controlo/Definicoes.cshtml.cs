@@ -11,19 +11,21 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 namespace DMO.Web.Pages.Controlo;
 
 /// <summary>
-/// Definições surface: the five operational configuration sections owned by Controlo_Create
-/// (P2-T05 contract §9, §8.7).
+/// Definições surface: the operational configuration sections owned by Controlo_Create
+/// (P2-T05 contract §9, §8.7; post-closure glass-density correction contract §5.3 adds the
+/// current operational glass densities per processo).
 /// </summary>
 /// <remarks>
 /// Authority: P2-T05 contract §9 (ownership), §10 (repairers), §11 (machine assignments),
-/// §12 (PDF directory), §13 (email lists), §14 (email templates).
+/// §12 (PDF directory), §13 (email lists), §14 (email templates); post-closure glass-density
+/// correction contract §5.1–§5.3 (glass densities).
 /// <para>
 /// Definições is a <b>surface inside the Controlo Create working area</b> — not a destination, not
 /// a Module, not registered anywhere (§9.1, AC-Y1). It is gated by exactly the same
 /// <c>controlo-create</c> policy as every other P2-T05 route (§21.2/§22); an approve-only caller is
-/// denied server-side (§21.5, AUT2). One page, five sections (Q-SURF default). Every fact is a
-/// real backend read; the page-owned adapter (<c>dmo-controlo.js</c>) executes the accepted
-/// settings routes.</para>
+/// denied server-side (§21.5, AUT2). Every fact is a real backend read; the page-owned adapter
+/// (<c>dmo-controlo.js</c>) executes the accepted settings routes. NNPB and PS are fixed canonical
+/// process entries — no per-Tool selection, no process creation/deletion.</para>
 /// </remarks>
 [Authorize(Policy = ControloPolicyNames.ControloCreate)]
 public sealed class DefinicoesModel : PageModel
@@ -67,6 +69,9 @@ public sealed class DefinicoesModel : PageModel
 
     /// <summary>Section 5 — the email templates.</summary>
     public IReadOnlyList<EmailTemplate> EmailTemplates { get; private set; } = [];
+
+    /// <summary>Section 6 — the current operational glass densities (NNPB and PS, g/cm³).</summary>
+    public IReadOnlyList<GlassDensitySetting> GlassDensities { get; private set; } = [];
 
     /// <summary>Whether any settings read failed (a section is never silently empty).</summary>
     public bool LookupFailed { get; private set; }
@@ -124,6 +129,15 @@ public sealed class DefinicoesModel : PageModel
             if (await _settings.ListEmailTemplatesAsync(cancellationToken) is SettingsResult.EmailTemplatesFound(var templates))
             {
                 EmailTemplates = templates;
+            }
+            else
+            {
+                LookupFailed = true;
+            }
+
+            if (await _settings.ListGlassDensitiesAsync(cancellationToken) is SettingsResult.GlassDensitiesFound(var densities))
+            {
+                GlassDensities = densities;
             }
             else
             {

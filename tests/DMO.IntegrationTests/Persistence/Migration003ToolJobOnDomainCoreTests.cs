@@ -40,6 +40,9 @@ public sealed class Migration003ToolJobOnDomainCoreTests
     /// </summary>
     private const string ControloCreateMigrationName = "ControloCreateDomain";
 
+    /// <summary>The glass-density correction migration 005 (post-closure correction §5.6).</summary>
+    private const string CorrectionMigrationName = "GlassDensitySettings";
+
     /// <summary>The four foundation tables of migrations 001/002.</summary>
     private static readonly string[] FoundationTables =
         ["admin_accounts", "templates", "template_modules", "users"];
@@ -58,6 +61,9 @@ public sealed class Migration003ToolJobOnDomainCoreTests
         "machine_repairer_assignments", "pdf_directory_settings", "peso_measurement_rows",
         "pesos", "repairers",
     ];
+
+    /// <summary>The single approved table of the post-closure glass-density correction (migration 005).</summary>
+    private const string GlassDensitySettingsTable = "glass_density_settings";
 
     /// <summary>EF's own migration bookkeeping table (never a product table).</summary>
     private const string MigrationHistoryTable = "__EFMigrationsHistory";
@@ -211,9 +217,11 @@ public sealed class Migration003ToolJobOnDomainCoreTests
             "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"));
 
         // Disclosed P2-T05 extension: the shared schema now also holds the eight contracted
-        // Controlo tables (migration 004); the P2-T04 rows keep pinning the complete set.
+        // Controlo tables (migration 004); the post-closure glass-density correction adds
+        // exactly the one approved settings table (migration 005). The P2-T04 rows keep
+        // pinning the complete set.
         Assert.Equal(
-            Sorted([.. FoundationTables, .. DomainCoreTables, .. ControloTables, MigrationHistoryTable]),
+            Sorted([.. FoundationTables, .. DomainCoreTables, .. ControloTables, GlassDensitySettingsTable, MigrationHistoryTable]),
             tables);
 
         foreach (var forbidden in ForbiddenTables)
@@ -524,7 +532,7 @@ public sealed class Migration003ToolJobOnDomainCoreTests
 
     /// <summary>
     /// MIG10 (AC-103): exactly one new migration file pair exists for the P2-T04 migration, and
-    /// the model snapshot records exactly the six new tables.
+    /// the model snapshot records exactly the six new tables (plus the correction table).
     /// </summary>
     [SkippableFact]
     public async Task MIG10_ExactlyOneMigrationFilePairExistsAndTheSnapshotRecordsTheSixTables()
@@ -547,9 +555,10 @@ public sealed class Migration003ToolJobOnDomainCoreTests
                 && !name.StartsWith("DmoDbContextModelSnapshot", StringComparison.Ordinal))
             .ToList();
 
-        // Exactly four migrations exist: 001, 002, the P2-T04 migration and the P2-T05 Controlo
-        // migration (disclosed extension).
-        Assert.Equal(4, migrationFiles.Count);
+        // Exactly five migrations exist: 001, 002, the P2-T04 migration, the P2-T05 Controlo
+        // migration (disclosed extension) and the glass-density correction migration 005
+        // (post-closure correction; Architect review observation N-1).
+        Assert.Equal(5, migrationFiles.Count);
         var toolJobOnMigrations = migrationFiles
             .Where(name => name.EndsWith($"_{ToolJobOnMigrationName}.cs", StringComparison.Ordinal))
             .ToList();
@@ -575,14 +584,16 @@ public sealed class Migration003ToolJobOnDomainCoreTests
         Assert.StartsWith(controloStamp, controloDesignerFile, StringComparison.Ordinal);
 
         // The snapshot and the CONTROL migration designers record exactly the eighteen product tables
-        // (disclosed P2-T05 extension: ten prior + eight Controlo). The P2-T04 migration's OWN
-        // designer is a frozen historical artifact of its generation time and still records the
-        // ten tables it shipped with.
+        // (disclosed P2-T05 extension: ten prior + eight Controlo); the snapshot ALSO records the
+        // one correction table (nineteen product tables after migration 005). The P2-T04
+        // migration's OWN designer is a frozen historical artifact of its generation time and
+        // still records the ten tables it shipped with.
         var expectedTables = Sorted([.. FoundationTables, .. DomainCoreTables, .. ControloTables]);
+        var expectedSnapshotTables = Sorted([.. FoundationTables, .. DomainCoreTables, .. ControloTables, GlassDensitySettingsTable]);
         var expectedP2T04DesignerTables = Sorted([.. FoundationTables, .. DomainCoreTables]);
 
         var snapshot = await File.ReadAllTextAsync(Path.Combine(migrationsDirectory, "DmoDbContextModelSnapshot.cs"));
-        Assert.Equal(expectedTables, Sorted(TablesOf(snapshot)));
+        Assert.Equal(expectedSnapshotTables, Sorted(TablesOf(snapshot)));
 
         var designer = await File.ReadAllTextAsync(Path.Combine(migrationsDirectory, designerFile));
         Assert.Equal(expectedP2T04DesignerTables, Sorted(TablesOf(designer)));
@@ -604,8 +615,14 @@ public sealed class Migration003ToolJobOnDomainCoreTests
         await PersistenceTestDatabase.ApplyMigrationsAsync(context);
 
         var latest = context.Database.GetMigrations().Last();
-        // Disclosed P2-T05 extension: the latest migration is now the Controlo domain migration.
-        Assert.EndsWith(ControloCreateMigrationName, latest, StringComparison.Ordinal);
+        // Disclosed P2-T05 extension: the latest migration is now the Controlo domain migration;
+        // the post-closure correction adds the glass-density migration 005 on top (Architect
+        // review observation N-1: the correction migration is the FIFTH overall).
+        var latestIsControlo = latest.EndsWith(ControloCreateMigrationName, StringComparison.Ordinal);
+        var latestIsCorrection = latest.EndsWith(CorrectionMigrationName, StringComparison.Ordinal);
+        Assert.True(
+            latestIsControlo || latestIsCorrection,
+            $"The latest migration must be the Controlo domain or the glass-density correction, was {latest}.");
 
         try
         {

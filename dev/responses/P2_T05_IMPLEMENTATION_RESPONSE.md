@@ -493,3 +493,181 @@ structure, no availability registration was touched by this correction. The diff
 **NOT CLOSED**; D3/D4 remain recorded as NON-BLOCKING; the next gate is the quick independent
 re-verification limited to D1/D2 + regression preservation, then the Architect implementation
 review. P2-T06 / P2-T07 / P2-T08 / P2-T10 remain NOT AUTHORIZED.
+
+## 16. Post-closure correction - GLASS-DENSITY CONFIGURATION (Owner rule) - IMPLEMENTATION RECORD
+
+This section records the **focused implementation of the approved post-closure correction**:
+the glass-density operational values now live in `Controlo -> Definições`
+(`glass_density_settings`), per the Owner rule GLASS_DENSITY_CONFIGURATION; nothing else in
+closed P2-T05 is reopened.
+
+### 16.1 Authority chain
+
+| Item | Value |
+|---|---|
+| Owner rule | GLASS_DENSITY_CONFIGURATION (dmo-work `dev/rulings/P2_T05_GLASS_DENSITY_CONFIGURATION_OWNER_RULE.md` @ `409ac24…`); `tool_id` carries ONLY the processo (NNPB/PS); `Controlo -> Definições` keeps the current operational density per processo; new Pesos resolve the current value and FREEZE it on `pesos.glass_density_g_cm3`; later changes affect only new Pesos; **no per-`tool_id` density exists** |
+| Correction contract | `plans/contracts/P2-T05_CONTROLO_CREATE_GLASS_DENSITY_CORRECTION_CONTRACT.md` @ authoring commit `1c3f36e` (SHA-record follow-up `0436cdd`, DMO-MODULAR remote `main` before this task) |
+| Architect PLAN review | dmo-work `dev/reviews/P2-T05_CONTROLO_CREATE_GLASS_DENSITY_CORRECTION_PLAN_REVIEW.md` — **PLAN ACCEPT** @ `4924982f…` (blocking findings NONE; observations N-1 migration ordinal, N-2 seed-version convention, N-3 evidence rows) |
+| Closed P2-T05 baseline | accepted contract `b38993f`; CLOSED implementation `9fbfcf4`; Architect implementation review ACCEPT `ae99d1f…`; closure `3491097…` |
+| Implementation authorization | **AUTHORIZED — focused correction only** (per the Architect PLAN ACCEPT; no P2-T06/07/08/10) |
+| DMO-MODULAR remote `main` before this task | `0436cdd1097bd71f5956641c39fc2f46f0ada809` |
+
+### 16.2 Migration number actually used and seed-version convention (N-1, N-2)
+
+- **Migration number: the FIFTH migration overall** — `20260923122429_GlassDensitySettings`
+  (+ `.Designer.cs`), generated with `dotnet ef migrations add GlassDensitySettings` through the
+  accepted `DesignTimeDmoDbContextFactory`, applied AFTER
+  `20260923045054_ControloCreateDomain`. Architect observation **N-1** confirmed the repo then
+  held exactly four migrations (001–004); the contract's "sixth migration overall" wording was a
+  descriptive miscount and was NOT preserved anywhere in code.
+- **Seed version: 1 (the established sibling-settings convention)** — Architect observation
+  **N-2**: contract §5.2 literally said "version 0", but EVERY sibling Definições settings table
+  creates rows at `version DEFAULT 1` (migration 004: `email_lists`, `repairers`,
+  `machine_repairer_assignments`, `pdf_directory_settings` all `defaultValue: 1`), and the
+  repository convention is first-write-at-1 / version+1-per-committed-mutation. Seeding at 1
+  makes the bootstrap rows indistinguishable from rows the settings surface itself would have
+  created and produces the exact sibling stale-version behavior (a fresh surface sends
+  `expectedVersion 1` -> writes version 2). No new concurrency model was invented: the seed rows
+  carry the same `version integer NOT NULL DEFAULT 1` + in-transaction compare ->
+  `ConcurrencyConflictException` -> 409 `stale-version` machinery as every other Definições
+  settings row (the choice is documented here as N-2 required).
+
+### 16.3 Schema delta (exactly one approved table)
+
+`glass_density_settings` — a sibling of the five existing Definições settings tables:
+
+| Column | Type / constraint |
+|---|---|
+| `processo` | `text NOT NULL`, **PRIMARY KEY**; CHECK `glass_density_settings_processo_check` = `processo IN ('NNPB','PS')` (named per contract; the Tool-owned two-value set, no FK, no process catalog) |
+| `density_g_cm3` | `numeric(18,4) NOT NULL`; CHECK `glass_density_settings_density_check` = `density_g_cm3 > 0` — the SAME type/posture as the frozen `pesos.glass_density_g_cm3` (no rounding drift) |
+| `version` | `integer NOT NULL DEFAULT 1`, concurrency token |
+| `created_at` / `updated_at` | `timestamptz NOT NULL DEFAULT now()` |
+
+No extra index (the PK covers the only query shapes), no `pesos`/`peso_measurement_rows` column
+change, no other table, no availability/destination/navigation registration. The closed
+"8-table P2-T05 schema / no ninth table" decision is superseded **to the exact extent of this
+one table**; migration 004's eight `CreateTable` calls are byte-identical (BND2/BND8 still pin
+004's eight tables and the protected files).
+
+### 16.4 Seeded authoritative values and provenance
+
+The migration inserts EXACTLY two rows (a deliberate, documented exception to the baseline's
+"no seeds" posture, superseded to this exact extent by correction contract §5.2):
+
+```
+NNPB → 2.4027 (version 1)
+PS   → 2.4231 (version 1)
+```
+
+Provenance (contract §4, verified in the PLAN review directly against the legacy tree):
+`BA-DMO/src/BA.Dmo.Domain/Modules/Peso/PesoModuleCatalog.cs` (`public const decimal ConstantNnpb
+= 2.4027m;` / `ConstantPs = 2.4231m;`), the legacy settings store `peso_settings`
+(`constant_nnpb`/`constant_ps`, "fallback catálogo 2.4027/2.4231"), and the legacy UI
+(`Responsavel.cshtml` placeholders `2,4027`/`2,4231`, step 0.0001). Recovered, **not invented**;
+operator-editable afterwards; no generic catalog and no runtime fallback — a missing row
+(defensive only, never reachable on the normal path) fails closed with
+`calculation-configuration-missing` (409), nothing invented.
+
+### 16.5 Route delta (exactly the two approved routes)
+
+| # | Route | Behavior (as built) |
+|---|---|---|
+| 18 | `GET /controlo/create/definicoes/glass-densities` | both CURRENT operational values + versions — always exactly NNPB/PS in canonical order: `[{"processo":"NNPB","densityGcm3":…,"version":…},{"processo":"PS",…}]` (transport member exactly `densityGcm3`, correction §5.3 vocabulary) |
+| 19 | `PUT /controlo/create/definicoes/glass-densities/{processo}` | body `{ densityGcm3, expectedVersion }`; updates ONLY that processo's row (per-processo independence); version-guarded -> 409 `stale-version`, nothing written, success returns the new row/version; refusals: 400 `validation-failed` with `PROCESSO_UNKNOWN` (path not NNPB/PS) and `DENSITY_NOT_POSITIVE` (value ≤ 0); defensive 404 `not-found` |
+
+Both routes sit inside the existing Definições group and inherit the EXACT
+`dmo.module.controlo-create` gate (`RequireAuthorization(ModuleAuthorizationPolicies.PolicyName(
+ModuleCatalog.ControloCreate))`) — no new capability, no approval capability, no availability
+registration (AUT1/AUT2/AUT4 + GD-I5 prove the gate incl. the approve-only denial). The
+Definições page gained ONE section ("Densidade do vidro (g/cm³)") rendering the two editable
+rows (step 0.0001, unit g/cm³ shown, save per processo, observed version carried on the input);
+fixed-desktop posture, breakpoint-free stylesheet and the D2 conflict/reload presentation are
+unchanged.
+
+### 16.6 Calculation-source change (the only calculation delta)
+
+- Glass density resolution switched source: at calculate/save/create/submit time the backend now
+  reads the CURRENT OPERATIONAL value of the anchor's processo from `glass_density_settings`
+  (through the new `IGlassDensitySettingsRepository`, the existing Definições repository
+  pattern) via the `cm_id -> tool_id -> processo -> settings row -> density_g_cm3` chain.
+- `IControloCalculationConfiguration.TryGetGlassDensity` was **removed** ("replaced by" the
+  operational-store read, correction §5.4): the seam is now WATER-only and
+  `ConfigurationCalculationConfiguration` no longer reads `Controlo:Calculation:GlassDensities`
+  **anywhere** (GD-S2 scans the whole of `src` for the section literal in CODE and finds zero
+  readers; the water override `Controlo:Calculation:WaterDensities` and the built-in 31-value
+  table are untouched). No dual source of truth.
+- **Freeze and immutability unchanged** (R4/R5/R6): the resolved value is written ONCE into
+  `pesos.glass_density_g_cm3` at the first successful calculate/save; edit-recalculation and
+  submit recompute-verify re-derive with the FROZEN value; no path rewrites a Peso's frozen
+  density or stored per-row results; later settings changes affect ONLY new Pesos; Pesos
+  created before the correction keep their frozen values untouched.
+
+### 16.7 Frozen-history proof
+
+- **Unit** (GD-U4/GD-U5): create freezes 2.4027 -> settings change (3.00) -> the SAME Peso's edit
+  keeps the frozen density and row results, submit recompute-verify passes ONLY with the frozen
+  value (a current-settings re-derive would mismatch), and a NEW Peso freezes the new 3.00;
+  4-dp values round-trip verbatim (2.4099).
+- **HTTP end-to-end** (GD-I6): real routes — save -> freeze 2.4027; PUT settings -> 3.00; the
+  existing Peso's sheet keeps `glassDensityGCm3` 2.4027 and its frozen rows through edit and
+  submit; a new Peso resolves 3.00. Water behavior unchanged in both generations (same
+  temperature -> same capacity).
+- **DB** (MES10 reworked): the real repositories over the disposable DB — the seeded row read
+  2.4027/version 1, the Definições-style settings write bumps to 3.00/version 2, the existing
+  Peso keeps the frozen 2.4027 and rows 2414.7135, a new Peso freezes 3.00 (rows 3015.0000).
+
+### 16.8 Tests added (focused correction)
+
+| Class | Rows |
+|---|---|
+| `GlassDensityCorrectionTests` (unit) | GD-U1 (resolution per processo, 2 cases) … GD-U6 = 7 cases: current-value resolution; per-processo independence; absent row -> fail-closed, nothing written; frozen-through-edit-and-submit; 4-dp exactness; water unchanged |
+| `ControloDefinicoesValidatorTests` (unit, +2) | GD-V1 `PROCESSO_UNKNOWN` (no alias/other processo), GD-V2 `DENSITY_NOT_POSITIVE` (0/−), positive accepted |
+| `GlassDensitySettingsEndpointsTests` (integration HTTP) | GD-I1 GET two rows/bootstrap; GD-I2 per-processo PUT independence both directions; GD-I3 stale -> 409 `stale-version`, nothing written; GD-I4 `PROCESSO_UNKNOWN`/`DENSITY_NOT_POSITIVE` exact tokens; GD-I5 approve-only 403 gate; GD-I6 frozen-history end-to-end |
+| `GlassDensityCorrectionRegressionTests` (integration S) | GD-S1 migration = exactly one table, one `Down`, two seed rows, no later-workstream vocabulary; GD-S2 removed config section has no code reader; GD-S3 no per-`tool_id` density anywhere; GD-S4 `CurrentBuildAvailable` stays `[]` + single canonical gate |
+| `Migration005GlassDensitySettingsTests` (DB) | GD-M1 fifth migration/20 tables (+1 only); GD-M2 source creates/drops exactly one table; GD-M3 physical shape/checks/PK/no extra index; GD-M4 exactly two seed rows NNPB 2.4027 / PS 2.4231 at version 1; GD-M5 DB CHECKs reject TOOL/0/−1; GD-M6 Down removes only the table (19 restored) + re-apply restores the exact two rows + no-op re-run |
+| `GlassDensitySettingsRepositoryIntegrationTests` (DB) | GD-DB1 seeded state readable; GD-DB2 version-guarded write (+1, stale throws, PS untouched); GD-DB3 service-level refusals over real repositories |
+| `dmo-controlo-adapter.behavior.mjs` (+2 scenarios) | S7 glass-density PUT stale-version -> conflict + recovery, exactly ONE request, observed version sent, comma decimal parsed; S8 validation-failed -> plain errors, no conflict marker/recovery |
+
+Updated pins (intentionally superseded to the exact correction extent, each documented in-file):
+`Migration003`/`Migration004` (four→five migrations, 19→20 public tables), `DatabaseConnectivity`
+(5 applied), `MigrationRunner` (modelled set +1), `ToolRestrictionTests.TOL17` (DbSet set +1
+settings entity), `BND5` (newest Designer declares the cm_contexts FK by type name),
+rendering rows (SIX sections / five settings scroll containers, rendered NNPB/PS values), access
+inventory (+routes 18/19), `P2T04ProductionScan` disclosed lists (+the two new persistence test
+files), the seed-row restore helper `GlassDensityTestState` (canonical two-row state is restored
+around every DB write test — the same discipline as the accepted settings-table clears).
+
+### 16.9 Exact test totals (this run, disposable PostgreSQL 16)
+
+| Suite | Passed | Failed | Skipped | Notes |
+|---|---|---|---|---|
+| `dotnet build` (src + both test projects) | — | 0 errors | — | 1 pre-existing pinned xUnit2029 warning (byte-identical protected `P2T02RegressionTests.cs`); 0 warnings in correction code |
+| Full unit suite | **586** | 0 | 0 | 535 closed baseline + 42 WDL + correction additions; green |
+| Full integration suite | **500** | 0 | **2** | green twice in a row (deterministic); the 2 skips are the pre-existing live-Supabase Auth rows |
+| Targeted P2-T05 (unit + integration, DB attached) | **207** | 0 | 0 | 77 unit + 130 integration |
+| Targeted correction (new rows only) | **28** | 0 | 0 | 9 unit (7 GD-U + 2 GD-V) + 19 integration (6 GD-I + 4 GD-S + 6 GD-M + 3 GD-DB) |
+| Water-density focused | **43** | 0 | 0 | 42 `WaterDensityLookupTests` + rendered `WDL1` — **unchanged and green** (every WDL row kept, glass fixtures re-pointed to the store) |
+| D1/D2 regression | **green** | 0 | 0 | S0–S8 behavioral scenarios (S7/S8 new for the glass-density PUT) + rendered D1 row |
+| Schema/migration verification | **manual + DB rows** | — | — | apply clean on a fresh disposable DB; exactly one new table; exactly two seed rows; constraints/PK correct; `Down` removes ONLY the correction table (19-table state restored); re-apply recreates the exact two rows; re-run no-op; **no unrelated schema drift** (manual `dotnet ef` down/up cycle on a second disposable DB) |
+| Negative scope / BND1–BND9 / LAY1 / AUT / TOL17 | green | — | — | inside the 500; the new sources carry no approval/PDF/email/Boquilhas/snapshot/legacy-identity vocabulary; adapter gains no width listener/breakpoint token |
+| `CurrentBuildAvailable` | **`[]`** | — | — | BND1 + GD-S4; `ModuleRegistrations.cs` untouched |
+| Working tree | CLEAN | — | — | at the close (only the correction commit pushed) |
+
+### 16.10 Confirmations required by the task
+
+- **Water-density behavior unchanged**: operator enters only the water temperature; the 31-value
+  built-in table (5–35 °C, `AwayFromZero` nearest whole degree, no interpolation) and the
+  `Controlo:Calculation:WaterDensities` override seam are byte-identical; glass and water
+  density remain separate facts (WDL2/WDL3/WDL6 + the water suite green).
+- **D3/D4 untouched**: no D3/D4 code or recorded decision was modified; both remain NON-BLOCKING
+  carry-forward.
+- **`CurrentBuildAvailable` remains `[]`**; no availability/destination/navigation registration.
+- **No later workstream started**: P2-T06 (approval), P2-T07 (Boquilhas), P2-T08 (PDF/email),
+  P2-T10 (availability) remain NOT AUTHORIZED and not implemented; GD-S1/BND2–BND4 scan the new
+  sources for their vocabulary and find none.
+- **Layer changes**: exactly one migration (005), one new table, two seed rows; `DmoDbContext.cs`
+  and migrations 001/002/003 (incl. Designers) byte-identical (BND8 pins hold); DI gains one
+  scoped registration; `Program.cs` unchanged.
+
+**STOP — this record performs the focused implementation only. NEXT GATE: independent
+verification of this focused correction, then the Architect implementation review.**

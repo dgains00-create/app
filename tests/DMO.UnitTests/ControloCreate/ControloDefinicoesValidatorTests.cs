@@ -261,6 +261,48 @@ public sealed class ControloDefinicoesValidatorTests
         Assert.Empty(ControloDefinicoesValidator.Validate(new SetPdfDirectoryCommand(rooted, 1)));
     }
 
+    /// <summary>
+    /// GD-V1 (correction contract §5.3) — the glass-density update accepts exactly the canonical
+    /// processo tokens: <c>NNPB</c> and <c>PS</c> validate clean; <c>npnb</c> (case), <c>TOOL</c>,
+    /// a blank and any other token are <c>PROCESSO_UNKNOWN</c>; there is no alias and no other
+    /// processo.
+    /// </summary>
+    [Fact]
+    public void GD_V1_GlassDensityUpdatesAcceptOnlyTheCanonicalProcessoTokens()
+    {
+        Assert.Empty(ControloDefinicoesValidator.Validate(
+            new UpdateGlassDensityCommand("NNPB", 2.4027m, 1)));
+        Assert.Empty(ControloDefinicoesValidator.Validate(
+            new UpdateGlassDensityCommand("PS", 2.4231m, 1)));
+
+        foreach (var rejected in new[] { "npnb", "Nnpb", "PSP", "TOOL", "", "   " })
+        {
+            Assert.Equal(
+                new[] { ControloDefinicoesValidationErrors.ProcessoUnknown },
+                ControloDefinicoesValidator.Validate(
+                    new UpdateGlassDensityCommand(rejected, 2.5m, 1)));
+        }
+    }
+
+    /// <summary>
+    /// GD-V2 (correction contract §5.3/R7) — the density must be strictly positive: zero and
+    /// negative values are <c>DENSITY_NOT_POSITIVE</c>; a positive value validates clean.
+    /// </summary>
+    [Fact]
+    public void GD_V2_GlassDensityUpdatesRequireAStrictlyPositiveDensity()
+    {
+        foreach (var rejected in new[] { 0m, -1m, -2.4027m })
+        {
+            Assert.Equal(
+                new[] { ControloDefinicoesValidationErrors.DensityNotPositive },
+                ControloDefinicoesValidator.Validate(
+                    new UpdateGlassDensityCommand("NNPB", rejected, 1)));
+        }
+
+        Assert.Empty(ControloDefinicoesValidator.Validate(
+            new UpdateGlassDensityCommand("NNPB", 0.0001m, 1)));
+    }
+
     // ---------------------------------------------------------------------------------------------
     // Fakes
     // ---------------------------------------------------------------------------------------------
@@ -272,6 +314,7 @@ public sealed class ControloDefinicoesValidatorTests
             new EmptyPdfDirectoryRepository(),
             emailLists,
             new EmptyEmailTemplateRepository(),
+            new EmptyGlassDensityRepository(),
             new OkDirectoryProbe());
 
     /// <summary>A repairer repository that is never consulted by these proofs.</summary>
@@ -318,6 +361,21 @@ public sealed class ControloDefinicoesValidatorTests
             PdfDirectorySettings settings,
             CancellationToken cancellationToken) =>
             Task.FromResult(settings);
+    }
+
+    /// <summary>A glass-density repository that is never consulted by these proofs.</summary>
+    private sealed class EmptyGlassDensityRepository : IGlassDensitySettingsRepository
+    {
+        public Task<GlassDensitySetting?> GetByProcessoAsync(string processo, CancellationToken cancellationToken) =>
+            Task.FromResult<GlassDensitySetting?>(null);
+
+        public Task<IReadOnlyList<GlassDensitySetting>> ListAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<GlassDensitySetting>>([]);
+
+        public Task<GlassDensitySetting> UpdatedAsync(
+            GlassDensitySetting setting,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(setting);
     }
 
     /// <summary>An email-template repository that is never consulted by these proofs.</summary>

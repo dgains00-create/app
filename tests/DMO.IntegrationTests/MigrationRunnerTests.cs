@@ -35,7 +35,9 @@ public sealed class MigrationRunnerTests
         // ApplyConfigurationsFromAssembly, so the exact modelled set necessarily grows by exactly
         // those six tables. P2-T05 (disclosed extension, P2-T05 contract §16/§25): the accepted
         // Controlo contract requires the eight Controlo tables to be mapped by the same single
-        // DbContext, so the exact modelled set grows by exactly those eight tables. The assertion
+        // DbContext, so the exact modelled set grows by exactly those eight tables. Post-closure
+        // glass-density correction (contract §5.1): the one approved settings table is mapped by
+        // the same single DbContext, growing the modelled set by exactly one table. The assertion
         // is not weakened — it still pins the complete modelled table set, and the forbidden-table
         // non-effect below is unchanged.
         var modelled = context.Model.GetEntityTypes()
@@ -47,8 +49,8 @@ public sealed class MigrationRunnerTests
             new[]
             {
                 "admin_accounts", "bq_contexts", "cm_contexts", "email_list_recipients", "email_lists",
-                "email_templates", "job_ons", "machine_repairer_assignments", "mf_contexts",
-                "pdf_directory_settings", "peso_measurement_rows", "pesos", "repairers",
+                "email_templates", "glass_density_settings", "job_ons", "machine_repairer_assignments",
+                "mf_contexts", "pdf_directory_settings", "peso_measurement_rows", "pesos", "repairers",
                 "template_modules", "templates", "tool_machines", "tools", "users",
             },
             modelled);

@@ -63,9 +63,9 @@ public sealed class MachineAndSettingsShapeTests
     /// <summary>
     /// SET10 (AC-F8, Q-SITE) — every Definições record is a site-wide configuration row: none of
     /// <c>Repairer</c>, <c>MachineRepairerAssignment</c>, <c>PdfDirectorySettings</c>,
-    /// <c>EmailList</c> or <c>EmailTemplate</c> declares a user/account member, and the two
-    /// collections the contract names are present: the list carries its complete recipient set and
-    /// the template its optional document type.
+    /// <c>EmailList</c>, <c>EmailTemplate</c> or <c>GlassDensitySetting</c> declares a
+    /// user/account member, and the two collections the contract names are present: the list
+    /// carries its complete recipient set and the template its optional document type.
     /// </summary>
     [Fact]
     public void SET10_SettingsRecordsAreSiteWideWithNoPerUserDimension()
@@ -77,6 +77,7 @@ public sealed class MachineAndSettingsShapeTests
             typeof(PdfDirectorySettings),
             typeof(EmailList),
             typeof(EmailTemplate),
+            typeof(GlassDensitySetting),
         };
 
         // Site-wide: no member on any settings record is even spelled as user/account/owner/session.
@@ -108,6 +109,18 @@ public sealed class MachineAndSettingsShapeTests
         var emailTemplate = typeof(EmailTemplate).GetProperties(DeclaredInstance)
             .ToDictionary(property => property.Name, property => property.PropertyType, StringComparer.Ordinal);
         Assert.Equal(typeof(EmailTemplateDocumentType?), emailTemplate["DocumentType"]);
+
+        // The glass-density setting carries exactly the five contracted facts (correction
+        // contract §5.1): the canonical processo token, the 4-dp density, the version and the
+        // timestamps — with NO tool/account/owner identity anywhere.
+        var glassDensity = typeof(GlassDensitySetting).GetProperties(DeclaredInstance)
+            .ToDictionary(property => property.Name, property => property.PropertyType, StringComparer.Ordinal);
+        Assert.Equal(
+            new[] { "CreatedAt", "DensityGCm3", "Processo", "UpdatedAt", "Version" },
+            glassDensity.Keys.OrderBy(name => name, StringComparer.Ordinal));
+        Assert.Equal(typeof(string), glassDensity["Processo"]);
+        Assert.Equal(typeof(decimal), glassDensity["DensityGCm3"]);
+        Assert.Equal(typeof(int), glassDensity["Version"]);
     }
 
     // ---------------------------------------------------------------------------------------------

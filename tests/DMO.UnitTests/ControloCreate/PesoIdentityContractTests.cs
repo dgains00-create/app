@@ -229,7 +229,8 @@ public sealed class PesoIdentityContractTests
             new FakePesoContextRead(),
             service,
             new FakeToolService(),
-            new EmptyCalculationConfiguration());
+            new EmptyCalculationConfiguration(),
+            new FakeGlassDensitySettingsRepository());
         var pesoCandidates = Assert.IsType<PesoResult.Candidates>(
             await controloService.ListAssociationCandidatesAsync(toolA, cancellationToken)).Value;
         var pesoCandidate = Assert.Single(pesoCandidates);
@@ -372,18 +373,12 @@ public sealed class PesoIdentityContractTests
             Task.FromResult<ToolResult>(new ToolResult.Created(Guid.NewGuid()));
     }
 
-    /// <summary>A calculation configuration that resolves nothing (never consulted here).</summary>
+    /// <summary>A WATER-only calculation configuration that resolves nothing (never consulted here).</summary>
     private sealed class EmptyCalculationConfiguration : IControloCalculationConfiguration
     {
         public bool TryGetWaterDensity(decimal waterTemperature, out decimal waterDensity)
         {
             waterDensity = default;
-            return false;
-        }
-
-        public bool TryGetGlassDensity(Processo? processo, out decimal density)
-        {
-            density = default;
             return false;
         }
     }

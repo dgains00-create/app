@@ -551,6 +551,10 @@ internal static class P2T04ProductionScan
         "ControloSettingsRepositoryIntegrationTests.cs",
         "Migration004ControloCreateDomainTests.cs",
         "PesoJobOnDependencyProbeIntegrationTests.cs",
+        // ---- P2-T05 post-closure glass-density correction (disclosed): the new env-gated
+        // persistence tests of the correction slice ---------------------------------------
+        "Migration005GlassDensitySettingsTests.cs",
+        "GlassDensitySettingsRepositoryIntegrationTests.cs",
     ];
 
     /// <summary>Returns whether a repository-relative test path belongs to the new P2-T04 surface.</summary>

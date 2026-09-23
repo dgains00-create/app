@@ -39,8 +39,10 @@ public sealed class DatabaseConnectivityTests
     /// four foundation tables plus the six contracted domain-core tables, nothing more. P2-T05
     /// (disclosed extension, P2-T05 contract §25): the run applies ALL four migrations (001, 002,
     /// ToolJobOnDomainCore, ControloCreateDomain) and the schema is exactly the 10 product tables
-    /// plus the eight contracted Controlo tables, nothing more. The idempotency evidence is
-    /// unchanged.
+    /// plus the eight contracted Controlo tables. Post-closure glass-density correction
+    /// (contract §5.6, Architect observation N-1): the run applies ALL FIVE migrations and the
+    /// schema is exactly those 19 tables plus the one approved correction table. The idempotency
+    /// evidence is unchanged.
     /// </summary>
     [SkippableFact]
     public async Task MigrationRun_Applies001Then002_AndCreatesOnlyTheFoundationTables()
@@ -66,9 +68,9 @@ public sealed class DatabaseConnectivityTests
         // Action: run the migration mechanism from the fresh schema.
         var first = await runner.ApplyPendingAsync();
 
-        // Assertions: the four migrations, in generation order (001, 002, P2-T04 domain core,
-        // P2-T05 Controlo domain).
-        Assert.Equal(4, first.AppliedCount);
+        // Assertions: the five migrations, in generation order (001, 002, P2-T04 domain core,
+        // P2-T05 Controlo domain, glass-density correction).
+        Assert.Equal(5, first.AppliedCount);
         Assert.Equal(
             new[]
             {
@@ -76,18 +78,19 @@ public sealed class DatabaseConnectivityTests
                 "20260922001757_TemplateModuleComposition",
                 "20260922232349_ToolJobOnDomainCore",
                 "20260923045054_ControloCreateDomain",
+                "20260923122429_GlassDensitySettings",
             },
             first.AppliedMigrations);
 
-        // The schema is exactly the ten product tables plus the eight contracted Controlo tables —
-        // nothing more.
+        // The schema is exactly the nineteen product tables plus the one approved correction
+        // table — nothing more.
         var tables = await ReadPublicTablesAsync(context);
         Assert.Equal(
             new[]
             {
                 "__EFMigrationsHistory", "admin_accounts", "bq_contexts", "cm_contexts",
-                "email_list_recipients", "email_lists", "email_templates", "job_ons",
-                "machine_repairer_assignments", "mf_contexts", "pdf_directory_settings",
+                "email_list_recipients", "email_lists", "email_templates", "glass_density_settings",
+                "job_ons", "machine_repairer_assignments", "mf_contexts", "pdf_directory_settings",
                 "peso_measurement_rows", "pesos", "repairers", "template_modules", "templates",
                 "tool_machines", "tools", "users",
             },

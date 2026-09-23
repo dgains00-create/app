@@ -17,18 +17,20 @@ namespace DMO.UnitTests.ControloCreate;
 /// automatically resolves the water density from the authoritative water-temperature table
 /// (per whole degree 5–35 °C, nearest whole degree by <c>MidpointRounding.AwayFromZero</c>, NO
 /// interpolation); capacity = water weight ÷ resolved water density; the glass-density lookup
-/// stays strictly independent; no manual water-density/divisor input exists in the
-/// request/UI contracts; an unresolvable lookup fails closed with
-/// <c>calculation-configuration-missing</c>; no invented/interpolated value is ever used;
-/// <c>RESULT_NON_POSITIVE</c> behavior stays intact.
+/// stays strictly independent (after the post-closure correction it resolves from the
+/// Definições settings store, never from the calculation configuration); no manual
+/// water-density/divisor input exists in the request/UI contracts; an unresolvable lookup fails
+/// closed with <c>calculation-configuration-missing</c>; no invented/interpolated value is ever
+/// used; <c>RESULT_NON_POSITIVE</c> behavior stays intact.
 /// </summary>
 /// <remarks>
-/// Every lookup proof runs against the REAL shipped configuration implementation
+/// Every WATER lookup proof runs against the REAL shipped configuration implementation
 /// (<see cref="ConfigurationCalculationConfiguration"/>) and its built-in authoritative table
 /// (<see cref="ConfigurationCalculationConfiguration.AuthoritativeWaterDensityByCelsius"/>), so
 /// the tests prove the application's automatic resolution itself — not a test double. The
-/// per-row formula proofs reuse the authoritative values end-to-end through
-/// <see cref="ControloCreateService"/>.
+/// per-row formula proofs reuse the authoritative water values end-to-end through
+/// <see cref="ControloCreateService"/>; the glass densities are store-seeded current operational
+/// values (fixture values 2.50/2.52 or the authoritative bootstrap, per test).
 /// </remarks>
 public sealed class WaterDensityLookupTests
 {
@@ -208,7 +210,9 @@ public sealed class WaterDensityLookupTests
     public async Task WDL4_CapacityIsWaterWeightDividedByTheResolvedAuthoritativeWaterDensity()
     {
         var toolId = Guid.NewGuid();
-        var (service, pesos) = BuildService(WithGlassDensities(), toolId, Processo.Nnpb);
+        var store = new FakeGlassDensitySettingsRepository(
+            new Dictionary<string, decimal> { ["NNPB"] = 2.50m });
+        var (service, pesos) = BuildService(EmptyConfiguration(), toolId, Processo.Nnpb, store);
 
         var result = await service.CalculateAsync(
             new CalculatePesoCommand(null, toolId, 20m, null, null, null, null, [997.17m]),
@@ -239,7 +243,9 @@ public sealed class WaterDensityLookupTests
     public async Task WDL5_ChangingTheTemperatureChangesTheResolvedDensityAndTheCapacity()
     {
         var toolId = Guid.NewGuid();
-        var (service, pesos) = BuildService(WithGlassDensities(), toolId, Processo.Nnpb);
+        var store = new FakeGlassDensitySettingsRepository(
+            new Dictionary<string, decimal> { ["NNPB"] = 2.50m });
+        var (service, pesos) = BuildService(EmptyConfiguration(), toolId, Processo.Nnpb, store);
 
         var at20 = await CalculateAsync(service, toolId, 20m, 1000m);
         var at25 = await CalculateAsync(service, toolId, 25m, 1000m);
@@ -265,14 +271,18 @@ public sealed class WaterDensityLookupTests
     /// <summary>
     /// WDL6 (requirement 5) — the two density lookups are separate facts: for the SAME
     /// temperature and water facts, the capacity (fed by water density) is identical while the
-    /// glass weight (fed by the processo→glass-density mapping) differs per processo.
+    /// glass weight (fed by the processo→glass-density CURRENT OPERATIONAL settings value)
+    /// differs per processo.
     /// </summary>
     [Fact]
     public async Task WDL6_GlassDensityLookupIsIndependentFromTheWaterDensityLookup()
     {
         var toolId = Guid.NewGuid();
-        var (npbService, _) = BuildService(WithGlassDensities(), toolId, Processo.Nnpb);
-        var (psService, _) = BuildService(WithGlassDensities(), toolId, Processo.Ps);
+        var store = new FakeGlassDensitySettingsRepository(
+            new Dictionary<string, decimal> { ["NNPB"] = 2.50m, ["PS"] = 2.52m });
+
+        var (npbService, _) = BuildService(EmptyConfiguration(), toolId, Processo.Nnpb, store);
+        var (psService, _) = BuildService(EmptyConfiguration(), toolId, Processo.Ps, store);
 
         var npb = await CalculateAsync(npbService, toolId, 20m, 997.17m);
         var ps = await CalculateAsync(psService, toolId, 20m, 997.17m);
@@ -293,23 +303,25 @@ public sealed class WaterDensityLookupTests
 
     /// <summary>
     /// WDL6 (requirement 5) — independence in BOTH directions: with the water table resolvable
-    /// but the glass mapping absent, the calculation is refused with
+    /// but the glass settings row absent, the calculation is refused with
     /// <c>calculation-configuration-missing</c> (nothing written, no invented glass density) —
     /// while the water-density lookup itself still resolves. The water lookup is never
-    /// contaminated by the glass mapping and vice versa.
+    /// contaminated by the glass settings and vice versa.
     /// </summary>
     [Fact]
     public async Task WDL6_GlassMappingAbsentRefusesTheCalculationWithoutAffectingTheWaterLookup()
     {
-        var configuration = EmptyConfiguration(); // built-in water table; NO glass densities
+        var configuration = EmptyConfiguration(); // built-in water table; NO glass settings row
         var toolId = Guid.NewGuid();
-        var (service, pesos) = BuildService(configuration, toolId, Processo.Nnpb);
+        var store = new FakeGlassDensitySettingsRepository();
+        store.Remove("NNPB");
+        var (service, pesos) = BuildService(configuration, toolId, Processo.Nnpb, store);
 
         // The water lookup itself fully resolves.
         Assert.True(configuration.TryGetWaterDensity(20m, out var waterDensity));
         Assert.Equal(0.99717m, waterDensity);
 
-        // The calculation cannot proceed without the glass mapping: typed refusal, nothing written.
+        // The calculation cannot proceed without the glass settings row: typed refusal, nothing written.
         var calculated = await service.CalculateAsync(
             new CalculatePesoCommand(null, toolId, 20m, null, null, null, null, [997.17m]),
             CancellationToken.None);
@@ -334,15 +346,15 @@ public sealed class WaterDensityLookupTests
         // Override table covers ONLY 20 °C (deployment calibration); 25 °C is absent.
         var configuration = ConfigurationWith(
             ("Controlo:Calculation:WaterDensities:0:Temperature", "20"),
-            ("Controlo:Calculation:WaterDensities:0:Density", "0.99717"),
-            ("Controlo:Calculation:GlassDensities:0:Processo", "NNPB"),
-            ("Controlo:Calculation:GlassDensities:0:Density", "2.5"));
+            ("Controlo:Calculation:WaterDensities:0:Density", "0.99717"));
 
         Assert.True(configuration.TryGetWaterDensity(20m, out _));
         Assert.False(configuration.TryGetWaterDensity(25m, out _)); // fail closed
 
         var toolId = Guid.NewGuid();
-        var (service, pesos) = BuildService(configuration, toolId, Processo.Nnpb);
+        var store = new FakeGlassDensitySettingsRepository(
+            new Dictionary<string, decimal> { ["NNPB"] = 2.50m });
+        var (service, pesos) = BuildService(configuration, toolId, Processo.Nnpb, store);
 
         var calculated = await service.CalculateAsync(
             new CalculatePesoCommand(null, toolId, 25m, null, null, null, null, [997.17m]),
@@ -416,7 +428,9 @@ public sealed class WaterDensityLookupTests
     public async Task WDL9_ResultNonPositiveBehaviorRemainsIntactWithTheShippedConfiguration()
     {
         var toolId = Guid.NewGuid();
-        var (service, pesos) = BuildService(WithGlassDensities(), toolId, Processo.Nnpb);
+        var store = new FakeGlassDensitySettingsRepository(
+            new Dictionary<string, decimal> { ["NNPB"] = 2.50m });
+        var (service, pesos) = BuildService(EmptyConfiguration(), toolId, Processo.Nnpb, store);
 
         var created = await service.CreateAsync(
             new CreatePesoCommand(null, toolId, 20m, 0m, 5000m, null, null, [1000m], Guid.NewGuid()),
@@ -447,7 +461,8 @@ public sealed class WaterDensityLookupTests
     private static (ControloCreateService Service, FakePesoRepository Pesos) BuildService(
         IControloCalculationConfiguration calculation,
         Guid cmToolId,
-        Processo processo)
+        Processo processo,
+        FakeGlassDensitySettingsRepository? glassDensities = null)
     {
         var pesos = new FakePesoRepository();
 
@@ -456,7 +471,8 @@ public sealed class WaterDensityLookupTests
             new NullPesoContextRead(),
             new UnusedJobOnService(),
             new FakeToolService(cmToolId, processo),
-            calculation);
+            calculation,
+            glassDensities ?? new FakeGlassDensitySettingsRepository());
 
         return (service, pesos);
     }
@@ -469,13 +485,6 @@ public sealed class WaterDensityLookupTests
         new(new ConfigurationBuilder()
             .AddInMemoryCollection(entries.Select(entry => new KeyValuePair<string, string?>(entry.Key, entry.Value)))
             .Build());
-
-    private static ConfigurationCalculationConfiguration WithGlassDensities() =>
-        ConfigurationWith(
-            ("Controlo:Calculation:GlassDensities:0:Processo", "NNPB"),
-            ("Controlo:Calculation:GlassDensities:0:Density", "2.5"),
-            ("Controlo:Calculation:GlassDensities:1:Processo", "PS"),
-            ("Controlo:Calculation:GlassDensities:1:Density", "2.52"));
 
     /// <summary>A Peso repository that records how many Pesos were ever written.</summary>
     private sealed class FakePesoRepository : IPesoRepository

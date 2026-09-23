@@ -265,7 +265,8 @@ public sealed class PesoJobOnDependencyProbeIntegrationTests
         new DmoPesoContextRead(context),
         new JobOnService(new JobOnRepository(context), new ToolRepository(context), []),
         new ToolService(new ToolRepository(context)),
-        new FixedCalculationConfiguration());
+        new FixedCalculationConfiguration(),
+        new GlassDensitySettingsRepository(context));
 
     private static ToolService Tools(DmoDbContext context) => new(new ToolRepository(context));
 

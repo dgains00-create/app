@@ -36,12 +36,14 @@ internal sealed class P2T05TestComposition :
     IPdfDirectorySettingsRepository,
     IEmailListRepository,
     IEmailTemplateRepository,
+    IGlassDensitySettingsRepository,
     IPesoContextRead
 {
     /// <summary>The accepted P2-T04 store backing the real Job On/Tool services.</summary>
     public P2T04TestStore JobOnToolStore { get; } = new();
 
-    /// <summary>The fixed calculation configuration of the composition (test-owned values).</summary>
+    /// <summary>The fixed WATER-only calculation configuration of the composition
+    /// (glass density lives in the settings store, correction contract §5.4).</summary>
     public FixedCalculationConfiguration Calculation { get; } = new();
 
     /// <summary>The fixed directory-probe verdict of the composition.</summary>
@@ -51,11 +53,27 @@ internal sealed class P2T05TestComposition :
     private readonly Dictionary<Guid, IReadOnlyList<PesoMeasurementRow>> _rows = [];
     private readonly Dictionary<Guid, Repairer> _repairers = [];
     private readonly Dictionary<string, MachineRepairerAssignment> _assignments = [];
+    private readonly Dictionary<string, GlassDensitySetting> _glassDensities;
     private PdfDirectorySettings? _pdfDirectory;
 
     public int PesoCount => _pesos.Count;
 
     public bool FailPesoCreate { get; set; }
+
+    /// <summary>
+    /// Creates the composition with the glass-density store seeded with the provenance-backed
+    /// bootstrap values (NNPB 2.4027 / PS 2.4231 g/cm³, version 1 — the sibling-settings
+    /// convention), mirroring the correction migration's initial operational state.
+    /// </summary>
+    public P2T05TestComposition()
+    {
+        var now = DateTimeOffset.UtcNow;
+        _glassDensities = new Dictionary<string, GlassDensitySetting>(StringComparer.Ordinal)
+        {
+            ["NNPB"] = new("NNPB", 2.4027m, Version: 1, now, now),
+            ["PS"] = new("PS", 2.4231m, Version: 1, now, now),
+        };
+    }
 
     // ---------------------------------------------------------------- arrangement helpers
 
@@ -357,6 +375,39 @@ internal sealed class P2T05TestComposition :
         return Task.FromResult(settings);
     }
 
+    // ------------------------------------------------------ IGlassDensitySettingsRepository
+
+    public Task<GlassDensitySetting?> GetByProcessoAsync(
+        string processo,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(_glassDensities.TryGetValue(processo, out var setting) ? setting : null);
+
+    Task<IReadOnlyList<GlassDensitySetting>> IGlassDensitySettingsRepository.ListAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<GlassDensitySetting>>(
+            _glassDensities.Values
+                .OrderBy(setting => setting.Processo, StringComparer.Ordinal)
+                .ToList());
+
+    public Task<GlassDensitySetting> UpdatedAsync(
+        GlassDensitySetting setting,
+        CancellationToken cancellationToken)
+    {
+        if (!_glassDensities.TryGetValue(setting.Processo, out var persisted))
+        {
+            throw new ConcurrencyConflictException("The glass-density setting no longer exists.");
+        }
+
+        if (persisted.Version != setting.Version)
+        {
+            throw new ConcurrencyConflictException("The glass-density setting was modified concurrently.");
+        }
+
+        var updated = setting with { Version = persisted.Version + 1, UpdatedAt = DateTimeOffset.UtcNow };
+        _glassDensities[updated.Processo] = updated;
+
+        return Task.FromResult(updated);
+    }
+
     // ----------------------------------------------------------------- IEmailListRepository
 
     private readonly Dictionary<Guid, EmailList> _emailLists = [];
@@ -519,9 +570,11 @@ internal sealed class P2T05TestComposition :
 }
 
 /// <summary>
-/// The fixed test calculation configuration (Q-CALC; Owner clarification
-/// WATER_TEMPERATURE_TO_WATER_DENSITY_LOOKUP): explicit water-density/glass-density mappings
-/// with an empty-variant for the configuration-missing paths.
+/// The fixed test WATER-only calculation configuration (Q-CALC; Owner clarification
+/// WATER_TEMPERATURE_TO_WATER_DENSITY_LOOKUP): explicit water-density mappings with an
+/// empty-variant for the configuration-missing paths. Since the post-closure glass-density
+/// correction, the glass density is NOT part of the calculation configuration: it resolves from
+/// the composition's glass-density settings store.
 /// </summary>
 /// <remarks>
 /// The fixture densities (20 °C → 0.9982, 25 °C → 0.9971) are ARBITRARY FIXED TEST VALUES used
@@ -535,20 +588,12 @@ internal sealed class P2T05TestComposition :
 internal sealed class FixedCalculationConfiguration : IControloCalculationConfiguration
 {
     private readonly IReadOnlyDictionary<decimal, decimal> _waterDensities;
-    private readonly IReadOnlyDictionary<string, decimal> _densities;
 
     public FixedCalculationConfiguration(
-        IReadOnlyDictionary<decimal, decimal>? waterDensities = null,
-        IReadOnlyDictionary<string, decimal>? densities = null)
+        IReadOnlyDictionary<decimal, decimal>? waterDensities = null)
     {
         _waterDensities = waterDensities
             ?? new Dictionary<decimal, decimal> { [20] = 0.9982m, [25] = 0.9971m };
-        _densities = densities
-            ?? new Dictionary<string, decimal>
-            {
-                ["NNPB"] = 2.50m,
-                ["PS"] = 2.52m,
-            };
     }
 
     public bool TryGetWaterDensity(decimal waterTemperature, out decimal waterDensity)
@@ -557,34 +602,14 @@ internal sealed class FixedCalculationConfiguration : IControloCalculationConfig
         return _waterDensities.TryGetValue(key, out waterDensity);
     }
 
-    public bool TryGetGlassDensity(Processo? processo, out decimal density)
-    {
-        if (processo is null)
-        {
-            density = default;
-            return false;
-        }
-
-        var token = processo switch
-        {
-            Processo.Nnpb => "NNPB",
-            Processo.Ps => "PS",
-            _ => throw new ArgumentOutOfRangeException(nameof(processo), processo, "Unknown processo."),
-        };
-
-        return _densities.TryGetValue(token, out density);
-    }
-
-    /// <summary>An empty configuration: every resolution is missing (Q-CALC refusal paths).</summary>
+    /// <summary>An empty configuration: every WATER resolution is missing (Q-CALC refusal paths).</summary>
     public static FixedCalculationConfiguration Empty { get; } = new(
-        new Dictionary<decimal, decimal>(),
-        new Dictionary<string, decimal>());
+        new Dictionary<decimal, decimal>());
 
     /// <summary>A configuration with an invalid (non-positive) water density (RESULT_NON_POSITIVE
     /// path).</summary>
     public static FixedCalculationConfiguration InvalidWaterDensity { get; } = new(
-        new Dictionary<decimal, decimal> { [20] = 0 },
-        new Dictionary<string, decimal> { ["NNPB"] = 2.50m });
+        new Dictionary<decimal, decimal> { [20] = 0 });
 }
 
 /// <summary>

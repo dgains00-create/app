@@ -6,11 +6,14 @@ using DMO.Domain.Tools;
 namespace DMO.Application.ControloCreate;
 
 /// <summary>
-/// The <c>Controlo_Create → Definições</c> settings service: the five operational configuration
-/// areas (repairers, machine assignments, PDF directory, email lists, email templates).
+/// The <c>Controlo_Create → Definições</c> settings service: the operational configuration
+/// areas (repairers, machine assignments, PDF directory, email lists, email templates and the
+/// current operational glass densities per processo).
 /// </summary>
 /// <remarks>
-/// Authority: P2-T05 contract §9–§14, §20.3.
+/// Authority: P2-T05 contract §9–§14, §20.3; post-closure glass-density correction contract
+/// §5.3 (the ONLY delta from the closed baseline: the processo→glass-density operational values
+/// live here, routes 18/19; every other Definições decision stays closed).
 /// <para>
 /// Settings are site-wide configuration data (Q-SITE): no per-user dimension exists; no setting
 /// value ever becomes a canonical identity, a join key, a document identity or production truth
@@ -21,6 +24,10 @@ namespace DMO.Application.ControloCreate;
 /// The PDF-directory check (Q-PDF ruling) executes against the <b>server host</b> filesystem
 /// through <see cref="IPdfDirectoryProbe"/> and returns only the typed §12.2 vocabulary; the
 /// browser only edits/submits the configuration.</para>
+/// <para>
+/// The glass-density rows carry the CURRENT operational value per processo (NNPB/PS). A changed
+/// density affects only NEW Pesos — the Peso freezes the value actually used
+/// (<c>pesos.glass_density_g_cm3</c>) and is never re-resolved or rewritten (Owner rule R3–R6).</para>
 /// </remarks>
 public sealed class ControloDefinicoesService : IControloDefinicoesService
 {
@@ -29,6 +36,7 @@ public sealed class ControloDefinicoesService : IControloDefinicoesService
     private readonly IPdfDirectorySettingsRepository _pdfDirectory;
     private readonly IEmailListRepository _emailLists;
     private readonly IEmailTemplateRepository _emailTemplates;
+    private readonly IGlassDensitySettingsRepository _glassDensities;
     private readonly IPdfDirectoryProbe _directoryProbe;
 
     /// <summary>Creates the settings service over its repositories and the directory probe.</summary>
@@ -38,6 +46,7 @@ public sealed class ControloDefinicoesService : IControloDefinicoesService
         IPdfDirectorySettingsRepository pdfDirectory,
         IEmailListRepository emailLists,
         IEmailTemplateRepository emailTemplates,
+        IGlassDensitySettingsRepository glassDensities,
         IPdfDirectoryProbe directoryProbe)
     {
         ArgumentNullException.ThrowIfNull(repairers);
@@ -45,12 +54,14 @@ public sealed class ControloDefinicoesService : IControloDefinicoesService
         ArgumentNullException.ThrowIfNull(pdfDirectory);
         ArgumentNullException.ThrowIfNull(emailLists);
         ArgumentNullException.ThrowIfNull(emailTemplates);
+        ArgumentNullException.ThrowIfNull(glassDensities);
         ArgumentNullException.ThrowIfNull(directoryProbe);
         _repairers = repairers;
         _assignments = assignments;
         _pdfDirectory = pdfDirectory;
         _emailLists = emailLists;
         _emailTemplates = emailTemplates;
+        _glassDensities = glassDensities;
         _directoryProbe = directoryProbe;
     }
 
@@ -587,6 +598,68 @@ public sealed class ControloDefinicoesService : IControloDefinicoesService
         catch (ControloPersistenceException exception)
         {
             return MapTemplate(exception, persisted.Name);
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Glass densities (correction contract §5.3) — routes 18/19
+    // ---------------------------------------------------------------------------------------------
+
+    /// <inheritdoc />
+    public async Task<SettingsResult> ListGlassDensitiesAsync(CancellationToken cancellationToken) =>
+        new SettingsResult.GlassDensitiesFound(await _glassDensities.ListAsync(cancellationToken));
+
+    /// <inheritdoc />
+    public async Task<SettingsResult> UpdateGlassDensityAsync(
+        UpdateGlassDensityCommand command,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        var errors = ControloDefinicoesValidator.Validate(command);
+        if (errors.Count > 0)
+        {
+            return new SettingsResult.ValidationFailed(errors);
+        }
+
+        var processo = command.Processo.Trim();
+
+        var persisted = await _glassDensities.GetByProcessoAsync(processo, cancellationToken);
+        if (persisted is null)
+        {
+            // Defensive only: both canonical rows are always seeded; never invent a row.
+            return new SettingsResult.NotFound(Guid.Empty);
+        }
+
+        var stale = AssertVersion(persisted.Version, command.ExpectedVersion, "glass-density setting");
+        if (stale is not null)
+        {
+            return stale;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var updated = persisted with
+        {
+            DensityGCm3 = command.DensityGCm3,
+            UpdatedAt = now,
+        };
+
+        try
+        {
+            var saved = await _glassDensities.UpdatedAsync(updated, cancellationToken);
+
+            // ONLY this processo's row changed; the other processo keeps its value and version.
+            return new SettingsResult.GlassDensityUpdated(saved.Processo, saved.DensityGCm3, saved.Version);
+        }
+        catch (ConcurrencyConflictException exception)
+        {
+            return Refuse(SettingsRefusalReason.StaleVersion, exception.Message);
+        }
+        catch (ControloPersistenceException exception)
+        {
+            // Defensive backstop (the validator pre-empts both CHECK violations): a typed
+            // refusal, never a generic 500.
+            return Map(exception);
         }
     }
 

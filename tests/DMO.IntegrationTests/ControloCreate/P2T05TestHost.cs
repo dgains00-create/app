@@ -80,6 +80,7 @@ internal static class P2T05TestHost
                 services.RemoveAll<IPdfDirectorySettingsRepository>();
                 services.RemoveAll<IEmailListRepository>();
                 services.RemoveAll<IEmailTemplateRepository>();
+                services.RemoveAll<IGlassDensitySettingsRepository>();
                 services.RemoveAll<IPesoContextRead>();
                 services.RemoveAll<IControloCalculationConfiguration>();
                 services.RemoveAll<IPdfDirectoryProbe>();
@@ -90,6 +91,7 @@ internal static class P2T05TestHost
                 services.AddSingleton<IPdfDirectorySettingsRepository>(store);
                 services.AddSingleton<IEmailListRepository>(store);
                 services.AddSingleton<IEmailTemplateRepository>(store);
+                services.AddSingleton<IGlassDensitySettingsRepository>(store);
                 services.AddSingleton<IPesoContextRead>(store);
                 services.AddSingleton<IControloCalculationConfiguration>(store.Calculation);
                 services.AddSingleton<IPdfDirectoryProbe>(store.DirectoryProbe);

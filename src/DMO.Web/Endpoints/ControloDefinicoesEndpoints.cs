@@ -8,7 +8,8 @@ namespace DMO.Web.Endpoints;
 
 /// <summary>
 /// Minimal API surface of <c>Controlo_Create → Definições</c> (P2-T05 contract §21.3 routes
-/// 13–17; route 12 is the Razor page <c>Pages/Controlo/Definicoes</c>).
+/// 13–17; route 12 is the Razor page <c>Pages/Controlo/Definicoes</c>; post-closure glass-density
+/// correction contract §5.3 routes 18–19).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -22,11 +23,24 @@ namespace DMO.Web.Endpoints;
 /// service and switch on the closed settings result set. Every persisted-state refusal is a 409
 /// distinguished by its reason token; no failure body contains a secret, a path beyond the
 /// configured directory value itself, a connection string or another user's data.</para>
+/// <para>
+/// Routes 18/19 (glass densities): <c>GET /glass-densities</c> returns the two current
+/// operational values (always exactly NNPB and PS, with versions); <c>PUT
+/// /glass-densities/{{processo}}</c> updates ONLY that processo's row, version-guarded
+/// (<c>stale-version</c> 409, nothing written), refusing unknown processos with
+/// <c>PROCESSO_UNKNOWN</c> and non-positive values with <c>DENSITY_NOT_POSITIVE</c>.</para>
 /// </remarks>
 public static class ControloDefinicoesEndpoints
 {
     /// <summary>Base path of the Definições surface inside Controlo Create.</summary>
     public const string DefinicoesBasePath = "/controlo/create/definicoes";
+
+    /// <summary>
+    /// The fixed canonical process entries of the glass-density surface (Owner rule): exactly
+    /// NNPB and PS, in the canonical order — the same tokens as <c>tools_processo_check</c> and
+    /// the domain <c>Processo</c> enum. No generic catalog and no other processo exists.
+    /// </summary>
+    public static readonly IReadOnlyList<string> CanonicalProcessos = ["NNPB", "PS"];
 
     /// <summary>Non-static logger category marker (static types cannot be generic arguments).</summary>
     public sealed class LoggerCategory;
@@ -444,6 +458,54 @@ public static class ControloDefinicoesEndpoints
                     : null);
         });
 
+        // Route 18/19 — glass densities (post-closure correction contract §5.3): GET returns the
+        // two CURRENT operational values (always exactly NNPB and PS, with versions); PUT updates
+        // ONLY the targeted processo's row, version-guarded.
+        group.MapGet("/glass-densities", async (
+            IControloDefinicoesService service,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await service.ListGlassDensitiesAsync(cancellationToken);
+
+            return result is SettingsResult.GlassDensitiesFound(var densities)
+                ? Results.Ok(new GlassDensitiesResponse(
+                    CanonicalProcessos
+                        .Select(processo => densities.FirstOrDefault(setting => setting.Processo == processo))
+                        .Where(setting => setting is not null)
+                        .Select(setting => new GlassDensityResponse(
+                            setting!.Processo,
+                            setting.DensityGCm3,
+                            setting.Version))
+                        .ToArray()))
+                : MapResult(result);
+        });
+
+        group.MapPut("/glass-densities/{processo}", async (
+            string processo,
+            UpdateGlassDensityRequest? body,
+            IControloDefinicoesService service,
+            ILogger<LoggerCategory> logger,
+            CancellationToken cancellationToken) =>
+        {
+            if (body is null)
+            {
+                return ValidationFailed(ControloDefinicoesValidationErrors.DensityNotPositive);
+            }
+
+            var command = new UpdateGlassDensityCommand(
+                processo,
+                body.DensityGcm3 ?? 0,
+                body.ExpectedVersion);
+
+            return await ExecuteAsync(
+                token => service.UpdateGlassDensityAsync(command, token),
+                logger,
+                cancellationToken,
+                success: result => result is SettingsResult.GlassDensityUpdated(var savedProcesso, var density, var version)
+                    ? Results.Ok(new GlassDensityResponse(savedProcesso, density, version))
+                    : null);
+        });
+
         return app;
     }
 
@@ -571,6 +633,19 @@ public static class ControloDefinicoesEndpoints
             new EmailTemplateUpdatedResponse(id, version)),
 
         SettingsResult.EmailTemplateDeleted => Results.NoContent(),
+
+        SettingsResult.GlassDensitiesFound(var densities) => Results.Ok(new GlassDensitiesResponse(
+            CanonicalProcessos
+                .Select(processo => densities.FirstOrDefault(setting => setting.Processo == processo))
+                .Where(setting => setting is not null)
+                .Select(setting => new GlassDensityResponse(
+                    setting!.Processo,
+                    setting.DensityGCm3,
+                    setting.Version))
+                .ToArray())),
+
+        SettingsResult.GlassDensityUpdated(var processo, var density, var version) =>
+            Results.Ok(new GlassDensityResponse(processo, density, version)),
 
         SettingsResult.ValidationFailed(var errors) => ValidationFailed(errors),
 
@@ -734,6 +809,17 @@ public static class ControloDefinicoesEndpoints
 
     /// <summary>Route 17 update response.</summary>
     public sealed record EmailTemplateUpdatedResponse(Guid EmailTemplateId, int Version);
+
+    /// <summary>Route 19 update-glass-density carrier (positive value, version-guarded). The
+    /// transport member is exactly <c>densityGcm3</c> (correction contract §5.3 vocabulary).</summary>
+    public sealed record UpdateGlassDensityRequest(decimal? DensityGcm3, int ExpectedVersion);
+
+    /// <summary>Route 18 list response: exactly the two current operational values (NNPB, PS);
+    /// the transport member is exactly <c>densityGcm3</c> (correction contract §5.3).</summary>
+    public sealed record GlassDensitiesResponse(IReadOnlyList<GlassDensityResponse> GlassDensities);
+
+    /// <summary>One current operational glass density of the surface (routes 18/19).</summary>
+    public sealed record GlassDensityResponse(string Processo, decimal DensityGcm3, int Version);
 
     /// <summary>Typed, actionable settings refusal response.</summary>
     public sealed record SettingsRefusalResponse(

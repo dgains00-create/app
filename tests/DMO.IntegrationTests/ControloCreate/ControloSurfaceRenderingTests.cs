@@ -60,12 +60,13 @@ public sealed class ControloSurfaceRenderingTests
     }
 
     /// <summary>
-    /// LAY2 (contract §26.4) — proves AC-N1: the rendered Definições page keeps the FIVE section
-    /// titles in their structural order, and the larger-desktop composition is preserved by the
+    /// LAY2 (contract §26.4; post-closure correction §5.3) — proves AC-N1: the rendered Definições
+    /// page keeps the SIX section titles in their structural order (the glass-density section is
+    /// the approved correction addition), and the larger-desktop composition is preserved by the
     /// static rule that the linked <c>dmo-controlo.css</c> carries no breakpoint rule.
     /// </summary>
     [Fact]
-    public async Task LAY2_DefinicoesPageRendersTheFiveSectionsInOrderAndLinksTheBreakpointFreeStylesheet()
+    public async Task LAY2_DefinicoesPageRendersTheSixSectionsInOrderAndLinksTheBreakpointFreeStylesheet()
     {
         var composition = new P2T05TestComposition();
 
@@ -82,7 +83,18 @@ public sealed class ControloSurfaceRenderingTests
             "Reparador por máquina",
             "Diretório de PDF/documentos",
             "Listas de email",
-            "Templates de email");
+            "Templates de email",
+            "Densidade do vidro (g/cm³)");
+
+        // The glass-density section renders exactly the two fixed canonical entries with the
+        // current operational values and the g/cm³ unit (correction contract §5.3).
+        Assert.Equal(2, Count(html, "data-dmo-glass-density-row=\""));
+        Assert.Contains("data-dmo-glass-density-row=\"NNPB\"", html, StringComparison.Ordinal);
+        Assert.Contains("data-dmo-glass-density-row=\"PS\"", html, StringComparison.Ordinal);
+        Assert.Equal(2, Count(html, ">g/cm³<"));
+        Assert.Contains("step=\"0.0001\"", html, StringComparison.Ordinal);
+        Assert.Contains("2.4027", html, StringComparison.Ordinal);
+        Assert.Contains("2.4231", html, StringComparison.Ordinal);
 
         // The rendered page links the P2-T05 stylesheet, and that stylesheet is breakpoint-free
         // (LAY1 covers the full static rule; this row proves the rendered page actually links it).
@@ -96,8 +108,9 @@ public sealed class ControloSurfaceRenderingTests
     }
 
     /// <summary>
-    /// LAY3 (contract §26.4) — proves AC-N1: the results table (Create markup) and the four
-    /// settings tables (Definições markup) are wrapped in keyboard-reachable local overflow
+    /// LAY3 (contract §26.4; post-closure correction §5.3) — proves AC-N1: the results table
+    /// (Create markup) and the FIVE settings tables (Definições markup — the glass-density table
+    /// is the approved correction addition) are wrapped in keyboard-reachable local overflow
     /// containers (<c>role="region"</c> + <c>tabindex="0"</c>), and no required column is hidden:
     /// every results heading is present in full.
     /// </summary>
@@ -122,7 +135,7 @@ public sealed class ControloSurfaceRenderingTests
             < createMarkup.IndexOf("data-dmo-results-table", StringComparison.Ordinal),
             "The results table must be rendered INSIDE its scroll container.");
 
-        // The four settings tables each sit inside a keyboard-reachable local scroll container, in
+        // The five settings tables each sit inside a keyboard-reachable local scroll container, in
         // the same sequence as their regions.
         var settingsScrolls = Regex.Matches(
                 definicoesMarkup,
@@ -131,7 +144,7 @@ public sealed class ControloSurfaceRenderingTests
             .Cast<Match>()
             .ToArray();
 
-        Assert.Equal(4, settingsScrolls.Length);
+        Assert.Equal(5, settingsScrolls.Length);
         Assert.All(settingsScrolls, scroll =>
         {
             Assert.Contains("role=\"region\"", scroll.Value, StringComparison.Ordinal);
@@ -144,6 +157,7 @@ public sealed class ControloSurfaceRenderingTests
             "data-dmo-assignments-table",
             "data-dmo-lists-table",
             "data-dmo-templates-table",
+            "data-dmo-glass-densities-table",
         };
 
         for (var index = 0; index < settingsTables.Length; index++)

@@ -98,6 +98,20 @@ public sealed record DeleteEmailListCommand(Guid EmailListId, int ExpectedVersio
 public sealed record EmailListListItem(Guid EmailListId, string Name, int RecipientCount, int Version);
 
 // ---------------------------------------------------------------------------------------------
+// Glass densities (correction contract §5.3) — routes 18/19
+// ---------------------------------------------------------------------------------------------
+
+/// <summary>
+/// Updates the CURRENT operational glass density of ONE canonical processo, version-guarded.
+/// </summary>
+/// <remarks>
+/// Owner rule: the Tool does NOT own an editable glass density; <c>Controlo → Definições</c>
+/// keeps the current operational value per processo (NNPB/PS only). This write touches exactly
+/// that one processo's row — never the other one (MAC2–MAC4 posture). A changed density affects
+/// only NEW Pesos; every existing Peso keeps its frozen value.</remarks>
+public sealed record UpdateGlassDensityCommand(string Processo, decimal DensityGCm3, int ExpectedVersion);
+
+// ---------------------------------------------------------------------------------------------
 // Email templates (§14)
 // ---------------------------------------------------------------------------------------------
 
@@ -204,6 +218,15 @@ public abstract record SettingsResult
 
     /// <summary>The template was deleted after explicit confirmation.</summary>
     public sealed record EmailTemplateDeleted(Guid EmailTemplateId) : SettingsResult;
+
+    /// <summary>Both current operational glass densities (exactly NNPB and PS; correction contract §5.3).</summary>
+    public sealed record GlassDensitiesFound(IReadOnlyList<GlassDensitySetting> GlassDensities) : SettingsResult;
+
+    /// <summary>
+    /// ONE processo's current operational glass density was updated (its row only; version
+    /// incremented; the other processo untouched).
+    /// </summary>
+    public sealed record GlassDensityUpdated(string Processo, decimal DensityGCm3, int Version) : SettingsResult;
 
     /// <summary>The exact contracted validation codes; nothing was written.</summary>
     public sealed record ValidationFailed(IReadOnlyList<string> Errors) : SettingsResult;

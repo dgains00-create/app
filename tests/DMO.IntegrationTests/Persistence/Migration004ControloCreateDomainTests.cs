@@ -35,22 +35,25 @@ public sealed class Migration004ControloCreateDomainTests
         "pdf_directory_settings", "peso_measurement_rows", "pesos", "repairers",
     ];
 
-    /// <summary>The complete public product-table register after all four migrations (order-insensitive).</summary>
+    /// <summary>The complete public product-table register after all five migrations (order-insensitive;
+    /// the post-closure correction adds exactly the one approved table).</summary>
     private static readonly string[] PublicProductTables =
     [
         "admin_accounts", "bq_contexts", "cm_contexts", "email_list_recipients", "email_lists",
-        "email_templates", "job_ons", "machine_repairer_assignments", "mf_contexts",
-        "pdf_directory_settings", "peso_measurement_rows", "pesos", "repairers", "template_modules",
-        "templates", "tool_machines", "tools", "users",
+        "email_templates", "glass_density_settings", "job_ons", "machine_repairer_assignments",
+        "mf_contexts", "pdf_directory_settings", "peso_measurement_rows", "pesos", "repairers",
+        "template_modules", "templates", "tool_machines", "tools", "users",
     ];
 
-    /// <summary>The four migrations, in generation order (§25.1).</summary>
+    /// <summary>The five migrations, in generation order (§25.1; the correction migration 005 is
+    /// the FIFTH overall — Architect review observation N-1).</summary>
     private static readonly string[] AllMigrationIds =
     [
         "20260922001736_AccountAndTemplateFoundation",
         "20260922001757_TemplateModuleComposition",
         "20260922232349_ToolJobOnDomainCore",
         "20260923045054_ControloCreateDomain",
+        "20260923122429_GlassDensitySettings",
     ];
 
     /// <summary>The 22 contracted CHECK constraints of the eight tables (§17.1).</summary>
@@ -122,11 +125,12 @@ public sealed class Migration004ControloCreateDomainTests
     ];
 
     /// <summary>
-    /// MIG-X1: applying all migrations to a reset schema leaves exactly the four contracted
-    /// migrations in <c>__EFMigrationsHistory</c> and exactly the 19 public tables.
+    /// MIG-X1: applying all migrations to a reset schema leaves exactly the five contracted
+    /// migrations in <c>__EFMigrationsHistory</c> and exactly the 20 public product tables (the
+    /// post-closure correction adds exactly the one approved table to the closed 19-table state).
     /// </summary>
     [SkippableFact]
-    public async Task MIG_X1_ApplyingAllMigrationsLeavesFourMigrationsAndTheNineteenPublicTables()
+    public async Task MIG_X1_ApplyingAllMigrationsLeavesFiveMigrationsAndTheTwentyPublicTables()
     {
         PersistenceTestDatabase.SkipIfNotConfigured();
 
@@ -144,7 +148,7 @@ public sealed class Migration004ControloCreateDomainTests
             "SELECT table_name FROM information_schema.tables " +
             "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"));
 
-        Assert.Equal(19, tables.Count);
+        Assert.Equal(20, tables.Count);
         Assert.Equal(Sorted([.. PublicProductTables, MigrationHistoryTable]), tables);
     }
 
@@ -338,8 +342,10 @@ public sealed class Migration004ControloCreateDomainTests
     }
 
     /// <summary>
-    /// MIG-X9: after applying all migrations to a reset schema, every Controlo table is empty —
-    /// the migration seeds no reference/config rows.
+    /// MIG-X9: after applying all migrations to a reset schema, every CONTROL migration table
+    /// (migration 004's eight) is empty — migration 004 seeds no rows. The post-closure
+    /// correction's exactly two provenance-backed initial rows are the documented exception,
+    /// proven by <c>Migration005GlassDensitySettingsTests</c>.
     /// </summary>
     [SkippableFact]
     public async Task MIG_X9_TheMigrationSeedsNoRowsIntoAnyOfTheEightTables()
@@ -369,13 +375,13 @@ public sealed class Migration004ControloCreateDomainTests
         await using var context = PersistenceTestDatabase.CreateContext();
         await PersistenceTestDatabase.ApplyMigrationsAsync(context);
 
-        Assert.Equal(4, (await context.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(5, (await context.Database.GetAppliedMigrationsAsync()).Count());
 
         // The second application is a complete no-op: it must not throw and leaves nothing pending.
         await PersistenceTestDatabase.ApplyMigrationsAsync(context);
 
         Assert.Empty(await context.Database.GetPendingMigrationsAsync());
-        Assert.Equal(4, (await context.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(5, (await context.Database.GetAppliedMigrationsAsync()).Count());
     }
 
     private static IReadOnlyList<string> Sorted(IReadOnlyList<string> values) =>

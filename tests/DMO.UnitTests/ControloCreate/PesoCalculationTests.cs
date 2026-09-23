@@ -24,11 +24,17 @@ public sealed class PesoCalculationTests
     /// <summary>The fixed values of the Q-CALC configuration used by the formula proofs:
     /// arbitrary test-fixture water density 25 °C → 0.9971 g/cm³ (NOT the authoritative table —
     /// that table is proven in <c>WaterDensityLookupTests</c> against
-    /// <c>ConfigurationCalculationConfiguration.AuthoritativeWaterDensityByCelsius</c>);
-    /// glass densities NNPB → 2.50, PS → 2.52.</summary>
+    /// <c>ConfigurationCalculationConfiguration.AuthoritativeWaterDensityByCelsius</c>).
+    /// <para>Glass densities are the CURRENT OPERATIONAL values of the settings store (the
+    /// post-closure correction moved glass out of the calculation configuration): these proofs
+    /// use the arbitrary fixture values NNPB → 2.50, PS → 2.52 via
+    /// <see cref="FixtureGlassDensities"/>.</para></summary>
     private static readonly FixedCalculationConfiguration StandardConfiguration = new(
-        new Dictionary<decimal, decimal> { [25m] = 0.9971m },
-        new Dictionary<Processo, decimal> { [Processo.Nnpb] = 2.50m, [Processo.Ps] = 2.52m });
+        new Dictionary<decimal, decimal> { [25m] = 0.9971m });
+
+    /// <summary>The arbitrary fixture glass densities of the formula proofs (store-seeded).</summary>
+    private static IReadOnlyDictionary<string, decimal> FixtureGlassDensities { get; } =
+        new Dictionary<string, decimal> { ["NNPB"] = 2.50m, ["PS"] = 2.52m };
 
     /// <summary>
     /// MES3 (AC-M3) — capacity = water weight ÷ resolved water density, computed by the backend:
@@ -101,10 +107,9 @@ public sealed class PesoCalculationTests
     {
         var toolId = Guid.NewGuid();
         var (service, pesos) = BuildService(
-            new FixedCalculationConfiguration(
-                new Dictionary<decimal, decimal>(),
-                new Dictionary<Processo, decimal>()),
-            toolId);
+            new FixedCalculationConfiguration(new Dictionary<decimal, decimal>()),
+            toolId,
+            EmptyGlassStore());
 
         var calculated = await service.CalculateAsync(
             new CalculatePesoCommand(null, toolId, 25m, null, null, null, null, [997.1m]),
@@ -137,10 +142,9 @@ public sealed class PesoCalculationTests
         // (a) Invalid water-density configuration: the entered combination yields no derivable capacity.
         var toolId = Guid.NewGuid();
         var (zeroDivisorService, zeroDivisorPesos) = BuildService(
-            new FixedCalculationConfiguration(
-                new Dictionary<decimal, decimal> { [25m] = 0m },
-                new Dictionary<Processo, decimal> { [Processo.Nnpb] = 1m }),
-            toolId);
+            new FixedCalculationConfiguration(new Dictionary<decimal, decimal> { [25m] = 0m }),
+            toolId,
+            StoreWith("NNPB", 1m));
 
         var zeroDivisor = await zeroDivisorService.CreateAsync(
             new CreatePesoCommand(null, toolId, 25m, null, null, null, null, [1000m], Guid.NewGuid()),
@@ -151,10 +155,9 @@ public sealed class PesoCalculationTests
 
         // (b) Punção/PU above capacity + Marisa/BQ: capacity 1000, glass (1000 − 5000) × 1 = −4000.
         var (service, pesos) = BuildService(
-            new FixedCalculationConfiguration(
-                new Dictionary<decimal, decimal> { [25m] = 1m },
-                new Dictionary<Processo, decimal> { [Processo.Nnpb] = 1m }),
-            toolId);
+            new FixedCalculationConfiguration(new Dictionary<decimal, decimal> { [25m] = 1m }),
+            toolId,
+            StoreWith("NNPB", 1m));
 
         var calculated = await service.CalculateAsync(
             new CalculatePesoCommand(null, toolId, 25m, 0m, 5000m, null, null, [1000m]),
@@ -181,10 +184,9 @@ public sealed class PesoCalculationTests
     {
         var toolId = Guid.NewGuid();
         var (service, pesos) = BuildService(
-            new FixedCalculationConfiguration(
-                new Dictionary<decimal, decimal> { [25m] = 1m },
-                new Dictionary<Processo, decimal> { [Processo.Nnpb] = 1m }),
-            toolId);
+            new FixedCalculationConfiguration(new Dictionary<decimal, decimal> { [25m] = 1m }),
+            toolId,
+            StoreWith("NNPB", 1m));
 
         var result = await service.CalculateAsync(
             new CalculatePesoCommand(null, toolId, 25m, null, null, null, null, [1.23456m]),
@@ -289,7 +291,8 @@ public sealed class PesoCalculationTests
 
     private static (ControloCreateService Service, FakePesoRepository Pesos) BuildService(
         IControloCalculationConfiguration calculation,
-        Guid cmToolId)
+        Guid cmToolId,
+        FakeGlassDensitySettingsRepository? glassDensities = null)
     {
         var pesos = new FakePesoRepository();
 
@@ -298,9 +301,26 @@ public sealed class PesoCalculationTests
             new NullPesoContextRead(),
             new UnusedJobOnService(),
             new FakeToolService(cmToolId),
-            calculation);
+            calculation,
+            glassDensities ?? new FakeGlassDensitySettingsRepository(FixtureGlassDensities));
 
         return (service, pesos);
+    }
+
+    /// <summary>A glass store with NO row (every resolution fails closed).</summary>
+    private static FakeGlassDensitySettingsRepository EmptyGlassStore()
+    {
+        var store = new FakeGlassDensitySettingsRepository();
+        store.Remove("NNPB");
+        store.Remove("PS");
+        return store;
+    }
+
+    /// <summary>A glass store with exactly the supplied current density for one processo.</summary>
+    private static FakeGlassDensitySettingsRepository StoreWith(string processo, decimal density)
+    {
+        var store = new FakeGlassDensitySettingsRepository(new Dictionary<string, decimal> { [processo] = density });
+        return store;
     }
 
     /// <summary>A Peso repository that records how many Pesos were ever written.</summary>
@@ -408,35 +428,21 @@ public sealed class PesoCalculationTests
             Task.FromResult<JobOnResult>(new JobOnResult.AssociationCandidates([]));
     }
 
-    /// <summary>A calculation configuration with fixed water-density/glass-density mappings.</summary>
+    /// <summary>A WATER-only calculation configuration with fixed water-density mappings (the glass
+    /// density lives in the settings store after the post-closure correction).</summary>
     private sealed class FixedCalculationConfiguration : IControloCalculationConfiguration
     {
         private readonly IReadOnlyDictionary<decimal, decimal> _waterDensities;
-        private readonly IReadOnlyDictionary<Processo, decimal> _densities;
 
-        public FixedCalculationConfiguration(
-            IReadOnlyDictionary<decimal, decimal> waterDensities,
-            IReadOnlyDictionary<Processo, decimal> densities)
+        public FixedCalculationConfiguration(IReadOnlyDictionary<decimal, decimal> waterDensities)
         {
             _waterDensities = waterDensities;
-            _densities = densities;
         }
 
         public bool TryGetWaterDensity(decimal waterTemperature, out decimal waterDensity)
         {
             var key = (int)Math.Round(waterTemperature, MidpointRounding.AwayFromZero);
             return _waterDensities.TryGetValue(key, out waterDensity);
-        }
-
-        public bool TryGetGlassDensity(Processo? processo, out decimal density)
-        {
-            if (processo is { } known && _densities.TryGetValue(known, out density))
-            {
-                return true;
-            }
-
-            density = default;
-            return false;
         }
     }
 }
