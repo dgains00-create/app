@@ -264,7 +264,7 @@ normal path), and the values remain operator-editable from then on.
 | Item | Value |
 |---|---|
 | Contract file | `plans/contracts/P2-T05_CONTROLO_CREATE_GLASS_DENSITY_CORRECTION_CONTRACT.md` (this file) |
-| Authoring commit | `9e1e211` (this commit; full SHA recorded on DMO-MODULAR remote `main`) |
+| Authoring commit | `1c3f36e3e456084ba1bbf8d7934951dfadf53712` (DMO-MODULAR remote `main`) |
 | Owner-rule record | dmo-work `dev/rulings/P2_T05_GLASS_DENSITY_CONFIGURATION_OWNER_RULE.md` @ `409ac24…` |
 | Baseline | accepted contract `b38993f`; CLOSED implementation `9fbfcf4`; closure `3491097…` |
 | DMO-MODULAR remote `main` before this task | `f5ab56d28fffb22541907f396d8eff06215a99f4` |
