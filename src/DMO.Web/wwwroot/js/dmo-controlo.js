@@ -84,6 +84,8 @@ if (!window.dmoControlo) {
       if (messages.length === 0) { messages = ["A operação não foi concluída."]; }
       region.hidden = false;
       region.setAttribute("role", "alert");
+      // A later non-conflict failure must never leave a stale conflict marker behind.
+      region.removeAttribute("data-dmo-conflict");
       region.textContent = "";
       var list = document.createElement("ul");
       messages.forEach(function (message) {
@@ -138,6 +140,58 @@ if (!window.dmoControlo) {
       region.textContent = message;
     }
 
+    /**
+     * Binds an event listener ONLY when the target element exists (D1 correction). Absence of an
+     * element is a VALID state — e.g. the submitted Peso view deliberately renders no editable
+     * actions (only the disabled submit) — so the adapter must initialize normally and never throw
+     * on a missing control; the bindings that DO exist still work.
+     */
+    function on(root, selector, event, handler) {
+      var element = root.querySelector(selector);
+      if (element) { element.addEventListener(event, handler); }
+    }
+
+    /**
+     * The page-owned failure presentation of a mutation response (D2 correction): a typed
+     * <c>stale-version</c> refusal enters the accepted conflict state with an explicit recovery
+     * action (reload the authoritative current server state) — never an automatic retry, never a
+     * silent merge, never an overwrite of the newer server version. Every other typed failure keeps
+     * the existing <see cref="renderErrors"/> behavior exactly.
+     */
+    function renderMutationFailure(root, response) {
+      var payload = response && response.body ? response.body : null;
+      if (payload && payload.reason === "stale-version") {
+        renderConflict(root, payload.message);
+      } else {
+        renderErrors(root, payload);
+      }
+    }
+
+    /**
+     * The conflict presentation (freeze §4 <c>conflict</c>): a clear message plus supplied recovery
+     * choices — one explicit reload action that fetches the authoritative current server state.
+     */
+    function renderConflict(root, message) {
+      var region = root.querySelector("[data-dmo-controlo-state]");
+      if (!region) { return; }
+      region.hidden = false;
+      region.setAttribute("role", "alert");
+      region.setAttribute("data-dmo-conflict", "true");
+      region.textContent = "";
+      var heading = document.createElement("strong");
+      heading.textContent = "Conflito — os dados foram alterados por outra ação; nada foi guardado.";
+      region.appendChild(heading);
+      var detail = document.createElement("p");
+      detail.textContent = message || "Recarregue para obter o estado atual do servidor.";
+      region.appendChild(detail);
+      var recover = document.createElement("button");
+      recover.type = "button";
+      recover.textContent = "Recarregar estado atual";
+      recover.setAttribute("data-dmo-conflict-reload", "true");
+      recover.addEventListener("click", function () { window.location.reload(); });
+      region.appendChild(recover);
+    }
+
     function withPending(root, key) {
       var buttons = root.querySelectorAll("[data-dmo-action='" + key + "']");
       var originals = [];
@@ -159,17 +213,17 @@ if (!window.dmoControlo) {
     function wireCreate(root) {
       var anchorsBox = anchors(root);
 
-      root.querySelector("[data-dmo-action='calculate']").addEventListener("click", function () {
+      on(root, "[data-dmo-action='calculate']", "click", function () {
         var release = withPending(root, "calculate");
         var state = formState(root);
         api(basePath + "/calculate", "POST", { cmId: anchorsBox.cmId, pendingToolId: anchorsBox.toolId, waterTemperature: state.waterTemperature, volumeMarisaBq: state.volumeMarisaBq, volumePuncaoPu: state.volumePuncaoPu, previousProductionEndReference: state.previousProductionEndReference, previousAverageWeightReference: state.previousAverageWeightReference, rows: state.rows }).then(function (response) {
           release();
           if (response.ok) { renderResults(root, response.body); }
-          else { renderErrors(root, response.body); }
+          else { renderMutationFailure(root, response); }
         });
       });
 
-      root.querySelector("[data-dmo-action='save']").addEventListener("click", function () {
+      on(root, "[data-dmo-action='save']", "click", function () {
         var release = withPending(root, "save");
         var state = formState(root);
         var payload = { cmId: anchorsBox.cmId, pendingToolId: anchorsBox.toolId, waterTemperature: state.waterTemperature, volumeMarisaBq: state.volumeMarisaBq, volumePuncaoPu: state.volumePuncaoPu, previousProductionEndReference: state.previousProductionEndReference, previousAverageWeightReference: state.previousAverageWeightReference, rows: state.rows };
@@ -183,12 +237,12 @@ if (!window.dmoControlo) {
             anchorsBox = anchors(root);
             showSaved(root, anchorsBox.pesoId ? "Controlo guardado (versão " + anchorsBox.version + ")." : "Controlo criado.");
           } else {
-            renderErrors(root, response.body);
+            renderMutationFailure(root, response);
           }
         });
       });
 
-      root.querySelector("[data-dmo-action='submit']").addEventListener("click", function () {
+      on(root, "[data-dmo-action='submit']", "click", function () {
         if (!anchorsBox.pesoId) { renderErrors(root, { errors: ["Guarde o controlo antes de submeter para aprovação."] }); return; }
         var release = withPending(root, "submit");
         api(basePath + "/pesos/" + anchorsBox.pesoId + "/submit", "POST", { expectedVersion: anchorsBox.version }).then(function (response) {
@@ -196,31 +250,30 @@ if (!window.dmoControlo) {
           if (response.ok) {
             window.location.reload();
           } else {
-            renderErrors(root, response.body);
+            renderMutationFailure(root, response);
           }
         });
       });
 
-      root.querySelector("[data-dmo-action='cancel']").addEventListener("click", function () {
+      on(root, "[data-dmo-action='cancel']", "click", function () {
         window.location.href = "/controlo/create";
       });
 
-      var associate = root.querySelector("[data-dmo-associate]");
-      if (associate) {
-        associate.addEventListener("click", function () {
-          if (!anchorsBox.pesoId) { renderErrors(root, { errors: ["Guarde o controlo antes de associar."] }); return; }
-          var select = root.querySelector("[data-dmo-associate-candidate]");
-          var option = select.options[select.selectedIndex];
-          var cmId = option ? option.getAttribute("data-dmo-candidate-id") : null;
-          if (!cmId) { return; }
-          var release = withPending(root, "associate");
-          api(basePath + "/pesos/" + anchorsBox.pesoId + "/associate", "POST", { cmId: cmId, expectedVersion: anchorsBox.version }).then(function (response) {
-            release();
-            if (response.ok) { window.location.reload(); }
-            else { renderErrors(root, response.body); }
-          });
+      // The associate action exists only in the truthful pending case; the guard keeps the binding
+      // optional (D1: absence is valid, initialization must never throw).
+      on(root, "[data-dmo-associate]", "click", function () {
+        if (!anchorsBox.pesoId) { renderErrors(root, { errors: ["Guarde o controlo antes de associar."] }); return; }
+        var select = root.querySelector("[data-dmo-associate-candidate]");
+        var option = select.options[select.selectedIndex];
+        var cmId = option ? option.getAttribute("data-dmo-candidate-id") : null;
+        if (!cmId) { return; }
+        var release = withPending(root, "associate");
+        api(basePath + "/pesos/" + anchorsBox.pesoId + "/associate", "POST", { cmId: cmId, expectedVersion: anchorsBox.version }).then(function (response) {
+          release();
+          if (response.ok) { window.location.reload(); }
+          else { renderMutationFailure(root, response); }
         });
-      }
+      });
 
       // MeasurementRows add/remove focus rules are managed by the shared dmo-measurement-rows.js;
       // this adapter only reads back the rendered rows.
@@ -228,11 +281,11 @@ if (!window.dmoControlo) {
 
     // ---------------------------------------------------------------- definicoes surface
     function wireRepairers(root) {
-      root.querySelector("[data-dmo-repairer-add]").addEventListener("click", function () {
+      on(root, "[data-dmo-repairer-add]", "click", function () {
         var name = value(root, "[data-dmo-repairer-new-name]");
         api("/controlo/create/definicoes/repairers", "POST", { name: name }).then(function (response) {
           if (response.ok) { window.location.reload(); }
-          else { renderErrors(root, response.body); }
+          else { renderMutationFailure(root, response); }
         });
       });
 
@@ -242,7 +295,7 @@ if (!window.dmoControlo) {
           var input = root.querySelector("[data-dmo-repairer-rename='" + id + "']");
           api("/controlo/create/definicoes/repairers/" + id, "PUT", { expectedVersion: parseInt(input.getAttribute("data-dmo-repairer-version") || "1", 10), name: input.value }).then(function (response) {
             if (response.ok) { window.location.reload(); }
-            else { renderErrors(root, response.body); }
+            else { renderMutationFailure(root, response); }
           });
         });
       });
@@ -256,7 +309,7 @@ if (!window.dmoControlo) {
           var version = parseInt(select.getAttribute("data-dmo-assignment-version") || "1", 10);
           api("/controlo/create/definicoes/machine-assignments/" + machine, "PUT", { repairerId: select.value ? select.value : null, expectedVersion: version }).then(function (response) {
             if (response.ok) { window.location.reload(); }
-            else { renderErrors(root, response.body); }
+            else { renderMutationFailure(root, response); }
           });
         });
       });
@@ -268,14 +321,14 @@ if (!window.dmoControlo) {
           var version = parseInt(select.getAttribute("data-dmo-assignment-version") || "1", 10);
           api("/controlo/create/definicoes/machine-assignments/" + machine, "PUT", { repairerId: null, expectedVersion: version }).then(function (response) {
             if (response.ok) { window.location.reload(); }
-            else { renderErrors(root, response.body); }
+            else { renderMutationFailure(root, response); }
           });
         });
       });
     }
 
     function wirePdfDirectory(root) {
-      root.querySelector("[data-dmo-pdf-save]").addEventListener("click", function () {
+      on(root, "[data-dmo-pdf-save]", "click", function () {
         var input = root.querySelector("[data-dmo-pdf-directory]");
         var configured = input.getAttribute("data-dmo-pdf-configured") === "true";
         var version = parseInt(input.getAttribute("data-dmo-pdf-version") || "0", 10);
@@ -284,11 +337,11 @@ if (!window.dmoControlo) {
             input.setAttribute("data-dmo-pdf-configured", "true");
             input.setAttribute("data-dmo-pdf-version", String(response.body.version));
             showSaved(root, "Diretório base guardado (versão " + response.body.version + ").");
-          } else { renderErrors(root, response.body); }
+          } else { renderMutationFailure(root, response); }
         });
       });
 
-      root.querySelector("[data-dmo-pdf-check]").addEventListener("click", function () {
+      on(root, "[data-dmo-pdf-check]", "click", function () {
         api("/controlo/create/definicoes/pdf-directory/check", "POST").then(function (response) {
           var region = root.querySelector("[data-dmo-pdf-result]");
           region.hidden = false;
@@ -310,12 +363,12 @@ if (!window.dmoControlo) {
     }
 
     function wireEmailLists(root) {
-      root.querySelector("[data-dmo-list-create]").addEventListener("click", function () {
+      on(root, "[data-dmo-list-create]", "click", function () {
         var name = value(root, "[data-dmo-list-new-name]");
         var recipients = recipientsFromTextarea(value(root, "[data-dmo-list-new-recipients]"));
         api("/controlo/create/definicoes/email-lists", "POST", { name: name, recipients: recipients }).then(function (response) {
           if (response.ok) { window.location.reload(); }
-          else { renderErrors(root, response.body); }
+          else { renderMutationFailure(root, response); }
         });
       });
 
@@ -327,7 +380,7 @@ if (!window.dmoControlo) {
           if (!window.confirm("Eliminar a lista de email \"" + name + "\"? (ação explícita)")) { return; }
           api("/controlo/create/definicoes/email-lists/" + id + "?expectedVersion=" + version + "&deleteConfirmed=true", "DELETE").then(function (response) {
             if (response.ok) { window.location.reload(); }
-            else { renderErrors(root, response.body); }
+            else { renderMutationFailure(root, response); }
           });
         });
       });
@@ -347,28 +400,28 @@ if (!window.dmoControlo) {
         });
       });
 
-      root.querySelector("[data-dmo-list-update]").addEventListener("click", function () {
+      on(root, "[data-dmo-list-update]", "click", function () {
         var id = root.querySelector("[data-dmo-list-edit-id]").value;
         var version = parseInt(root.querySelector("[data-dmo-list-edit-version]").value || "1", 10);
         var name = value(root, "[data-dmo-list-new-name]");
         var recipients = recipientsFromTextarea(value(root, "[data-dmo-list-new-recipients]"));
         api("/controlo/create/definicoes/email-lists/" + id, "PUT", { expectedVersion: version, name: name, recipients: recipients }).then(function (response) {
           if (response.ok) { window.location.reload(); }
-          else { renderErrors(root, response.body); }
+          else { renderMutationFailure(root, response); }
         });
       });
 
-      root.querySelector("[data-dmo-list-edit-cancel]").addEventListener("click", function () {
+      on(root, "[data-dmo-list-edit-cancel]", "click", function () {
         window.location.reload();
       });
     }
 
     function wireEmailTemplates(root) {
-      root.querySelector("[data-dmo-template-create]").addEventListener("click", function () {
+      on(root, "[data-dmo-template-create]", "click", function () {
         var payload = templatePayload(root);
         api("/controlo/create/definicoes/email-templates", "POST", payload).then(function (response) {
           if (response.ok) { window.location.reload(); }
-          else { renderErrors(root, response.body); }
+          else { renderMutationFailure(root, response); }
         });
       });
 
@@ -380,7 +433,7 @@ if (!window.dmoControlo) {
           if (!window.confirm("Eliminar o template \"" + name + "\"? (ação explícita)")) { return; }
           api("/controlo/create/definicoes/email-templates/" + id + "?expectedVersion=" + version + "&deleteConfirmed=true", "DELETE").then(function (response) {
             if (response.ok) { window.location.reload(); }
-            else { renderErrors(root, response.body); }
+            else { renderMutationFailure(root, response); }
           });
         });
       });
@@ -402,18 +455,18 @@ if (!window.dmoControlo) {
         });
       });
 
-      root.querySelector("[data-dmo-template-update]").addEventListener("click", function () {
+      on(root, "[data-dmo-template-update]", "click", function () {
         var id = root.querySelector("[data-dmo-template-edit-id]").value;
         var version = parseInt(root.querySelector("[data-dmo-template-edit-version]").value || "1", 10);
         var payload = templatePayload(root);
         payload.expectedVersion = version;
         api("/controlo/create/definicoes/email-templates/" + id, "PUT", payload).then(function (response) {
           if (response.ok) { window.location.reload(); }
-          else { renderErrors(root, response.body); }
+          else { renderMutationFailure(root, response); }
         });
       });
 
-      root.querySelector("[data-dmo-template-edit-cancel]").addEventListener("click", function () {
+      on(root, "[data-dmo-template-edit-cancel]", "click", function () {
         window.location.reload();
       });
     }

@@ -376,3 +376,120 @@ All independent copies agree on the exact 31 values (g/cm³, per whole degree):
 No route, policy, availability entry or destination registration changed. `CurrentBuildAvailable`
 stays `[]`. P2-T10 still owns availability registration. Negative-scope pins (BND1–BND9) are
 unaffected (verified by the untouched-file set and the full suites).
+
+---
+
+## 15. Focused correction — D1 (submitted-view adapter crash) + D2 (stale-version recovery)
+
+Applied after the independent verification (`reports/P2_T05_INDEPENDENT_VERIFICATION.md`, verdict
+**NOT VERIFIED** with D1/D2 BLOCKING and D3/D4 NON-BLOCKING). This correction is **limited to the
+page-owned JS adapter** (`src/DMO.Web/wwwroot/js/dmo-controlo.js`) and its regression tests; the
+verification's other findings (D3 — dead `CALCULATION_CONFIGURATION_MISSING` region/typo; D4 —
+blank Desvio cells in the calculate preview) are recorded as NON-BLOCKING and are **explicitly left
+untouched by this task**.
+
+### 15.1 D1 — root cause and fix
+
+**Root cause (as verified):** `wireCreate` bound the `calculate`/`save`/`cancel` handlers with
+unconditional `root.querySelector(...).addEventListener(...)` calls. The valid submitted Peso view
+deliberately renders NO editable actions — only the disabled `submit` (decision bar
+`Create.cshtml.cs` `BuildDraftRegions` submitted branch) — so loading/reloading a submitted Peso
+threw `TypeError: Cannot read properties of null` on the missing elements and killed **every**
+subsequent binding on that view (submit re-wire, cancel, associate). No test executed the adapter
+JS, so the green suites could not see it.
+
+**Fix:** a page-owned null-safe binding helper
+`on(root, selector, event, handler)` — binds only when the target element exists — now used by
+**every** single-element binding in the adapter (`wireCreate` calculate/save/submit/cancel/
+associate and the Definições binders `wireRepairers` add, `wirePdfDirectory` save/check,
+`wireEmailLists` create/update/edit-cancel, `wireEmailTemplates` create/update/edit-cancel). The
+`forEach`-based bindings (rename/delete/cell rows) were already collection-safe. Absence of
+editable controls in the submitted state stays VALID (nothing was restored to satisfy JS); the
+`forEach` typed refusals and the fixed-desktop/no-breakpoint posture are untouched.
+
+### 15.2 D1 — regression proof
+
+1. **Rendered proof** (new, `ControloSurfaceRenderingTests.D1_SubmittedViewOmitsEditableActionsAndKeepsTheDisabledSubmit`):
+   a real Peso is created and submitted through the REAL routes, then the page is opened in the
+   submitted state: `data-dmo-action="calculate"`/`"save"`/`"cancel"` are ABSENT, exactly the
+   disabled `submit` remains ("Submetido" + associated reason span), and the adapter's state
+   region (`data-dmo-controlo-state`, `data-dmo-peso-id`,
+   `data-dmo-submitted="true"`) is still rendered — the exact pre-fix crash condition, proven at
+   the markup level.
+2. **Behavioral proof** (new, node harness `dmo-controlo-adapter.behavior.mjs` executed by
+   `DmoControloAdapterBehaviorTests` with a real JS engine over the REAL shipped adapter and a
+   minimal DOM/fetch stub): scenario S1 loads the submitted view (editable actions absent,
+   disabled submit, pending associate present) — the adapter **initializes without throwing**,
+   the disabled submit never fires, and the still-present submitted-state controls (associate)
+   keep working and surface the typed `already-submitted` refusal. Scenario S0 guards the normal
+   draft surface (calculate + create-save success) against the refactor.
+3. **Regression sensitivity (proven):** the same harness run against the PRE-fix adapter fails S1
+   with exactly the reported TypeError ("Cannot read properties of null (reading
+   'addEventListener')") — the test is a genuine regression, not a tautology.
+
+### 15.3 D2 — root cause, recovery behavior and fix
+
+**Root cause (as verified):** every guarded-mutation failure path called only
+`renderErrors(root, response.body)`; the anchor `version` was refreshed only on success, so a 409
+`stale-version` repeated forever on re-save with no reload/recovery affordance — violating §8.4
+("`stale-version` → `conflict` presentation with reload/recovery"), §19.3 ("a refused mutation
+reports the typed reason and **the surface reloads** (`conflict` presentation)") and freeze §4
+(`conflict` = clear message + supplied recovery choices).
+
+**Recovery behavior (as built, page-owned):**
+- `renderMutationFailure(root, response)` — the single page-owned failure presentation of every
+  mutation path: a typed `payload.reason === "stale-version"` enters `renderConflict`; every other
+  typed failure (validation-failed, already-submitted, calculation-configuration-missing, …) keeps
+  the existing `renderErrors` behavior **exactly** (verified: S6).
+- `renderConflict(root, message)` — the conflict presentation on the page's own state region:
+  clear heading ("Conflito — os dados foram alterados por outra ação; nada foi guardado."), the
+  typed server message, and ONE explicit recovery action — a "Recarregar estado atual" button
+  (`data-dmo-conflict-reload`) that reloads the authoritative current server state. **No
+  automatic retry, no auto-merge, no overwrite of the newer server version, no silent replacement
+  of local state** (the observed version is only refreshed on success, unchanged).
+- Applied **consistently to every guarded mutation** the adapter handles that can receive
+  `stale-version`: draft save (PUT), submit, associate, repairer rename, machine-assignment
+  set/clear, PDF-directory save, email-list update **and** delete, email-template update **and**
+  delete — all route through the same page-owned `renderMutationFailure`.
+- `renderErrors` now removes any stale `data-dmo-conflict` marker so a later non-conflict failure
+  never leaves a false conflict presentation behind.
+
+### 15.4 D2 — regression proof (behavioral, node harness)
+
+The harness drives the REAL adapter handlers with the REAL response shapes and proves, per guarded
+mutation: (S2) save → 409 `stale-version` → conflict state visible (`data-dmo-conflict="true"`,
+clear message, typed server message), exactly ONE request issued (no auto-retry), the observed
+`data-dmo-version` is NOT overwritten, and the recovery control exists; clicking it calls
+`location.reload()` (recovery reloads authoritative state). (S3) submit → same conflict/recovery.
+(S4) machine-assignment set → same (settings surface). (S5) email-list update → same. (S6)
+non-stale typed failures (400 `validation-failed` with token list; 409 `already-submitted`) keep
+the existing `renderErrors` presentation — no conflict marker, no recovery control. S1 additionally
+proves the D1 submitted-view behavior (§15.2).
+
+### 15.5 Test totals after the correction (this run)
+
+| Suite | Passed | Failed | Skipped | Notes |
+|---|---|---|---|---|
+| `dotnet build DMO.slnx -c Debug` | — | 0 errors | — | 1 pre-existing pinned xUnit2029 warning (byte-identical protected `P2T02RegressionTests.cs`); 0 warnings in correction code |
+| Full unit suite (`DMO.UnitTests`) | **577** | 0 | 0 | unchanged (no unit changes needed) |
+| Full integration suite (disposable PostgreSQL 16) | **481** | 0 | **2** | baseline 479 + the 2 new D1/D2 regression tests (rendered D1 + node harness wrapper); the 2 skips are the pre-existing live-Supabase Auth tests |
+| Targeted P2-T05 (unit + integration, DB attached) | **164** | 0 | 0 | 68 unit + 96 integration (baseline 162 + 2 new) |
+| D1 focused regression | **2/2** | 0 | 0 | rendered `D1_SubmittedView…` + behavioral S0/S1 scenarios (inside the wrapper) |
+| D2 focused regression | **5/5 behavioral scenarios** | 0 | 0 | S2/S3/S4/S5 (conflict+recovery) + S6 (non-stale preservation) |
+| Water-density focused | **43** | 0 | 0 | 42 `WaterDensityLookupTests` + rendered `WDL1` — unchanged, green |
+| Schema | UNCHANGED | — | — | no migration/model/config file touched; one-migration/8-table contract intact |
+| Negative scope / BND1–BND9 / LAY1 | green | — | — | inside the 481; the adapter gains no width listener/breakpoint token |
+| `CurrentBuildAvailable` | `[]` | — | — | `ModuleRegistrations.cs` untouched |
+| Working tree | CLEAN | — | — | at the close (only the correction commit pushed) |
+
+### 15.6 Unchanged invariants (confirmed by the diff)
+
+No domain code, no schema/migration, no route, no identity, no authorization, no water-density
+behavior (31-value table, `AwayFromZero`, no interpolation, glass-density lookup), no fixed-desktop
+structure, no availability registration was touched by this correction. The diff is exactly:
+`src/DMO.Web/wwwroot/js/dmo-controlo.js` (adapter), the two new regression tests
+(`ControloSurfaceRenderingTests` rendered D1 row; `DmoControloAdapterBehaviorTests` + the
+`dmo-controlo-adapter.behavior.mjs` harness) and this response. P2-T05 remains
+**NOT CLOSED**; D3/D4 remain recorded as NON-BLOCKING; the next gate is the quick independent
+re-verification limited to D1/D2 + regression preservation, then the Architect implementation
+review. P2-T06 / P2-T07 / P2-T08 / P2-T10 remain NOT AUTHORIZED.

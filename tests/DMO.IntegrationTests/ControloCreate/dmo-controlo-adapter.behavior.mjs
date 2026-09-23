@@ -1,0 +1,613 @@
+// P2-T05 focused correction (D1 + D2) — BEHAVIORAL regression harness for the page-owned
+// adapter `src/DMO.Web/wwwroot/js/dmo-controlo.js` (the REAL shipped file, loaded from disk).
+//
+// It runs the adapter against a minimal document/window/fetch stub and drives the actual click
+// handlers, proving:
+//   D1 — the submitted Peso view (editable actions absent) initializes safely (no TypeError) and
+//        the bindings that DO exist (submit, associate) still work;
+//   D2 — a typed 409 `stale-version` on any guarded mutation enters the conflict state with the
+//        explicit recovery action (reload the authoritative state), exactly ONE request is issued
+//        (no automatic retry, no auto-merge, no overwrite of the newer version), the recovery
+//        control reloads, and NON-stale typed failures keep the existing renderErrors behavior.
+//
+// Usage: node dmo-controlo-adapter.behavior.mjs <absolute-path-to-dmo-controlo.js>
+// Exit code 0 = all scenarios passed; 1 = a scenario failed (details on stdout).
+
+import assert from "node:assert/strict";
+import fs from "node:fs";
+
+const adapterPath = process.argv[2];
+if (!adapterPath) {
+  console.error("Usage: node dmo-controlo-adapter.behavior.mjs <path-to-dmo-controlo.js>");
+  process.exit(2);
+}
+
+const adapterSource = fs.readFileSync(adapterPath, "utf8");
+
+// ---------------------------------------------------------------------------------------------
+// Minimal DOM stub (only the APIs the adapter uses; selectors are attribute selectors only).
+// ---------------------------------------------------------------------------------------------
+
+function matches(element, selector) {
+  const tag = selector.match(/^[a-zA-Z][a-zA-Z0-9-]*$/);
+  if (tag) {
+    return element.tagName === selector;
+  }
+  const match = selector.match(/^\[([a-zA-Z0-9_-]+)(?:='([^']*)'|="([^"]*)")?\]$/);
+  if (!match) {
+    throw new Error(`Unsupported selector "${selector}" in harness (attribute/tag selectors only).`);
+  }
+  const name = match[1];
+  const expected = match[2] !== undefined ? match[2] : match[3];
+  if (!Object.prototype.hasOwnProperty.call(element.attributes, name)) {
+    return false;
+  }
+  return expected === undefined ? true : element.attributes[name] === expected;
+}
+
+function toNodeList(array) {
+  array.forEach = function (callback) {
+    for (let index = 0; index < this.length; index++) {
+      callback(this[index], index, this);
+    }
+  };
+  return array;
+}
+
+class Element {
+  constructor(tag, attributes = {}) {
+    this.tagName = tag;
+    this.attributes = {};
+    this.children = [];
+    this.listeners = {};
+    this._textContent = null;
+    this.value = "";
+    this.hidden = false;
+    this.disabled = false;
+    this.options = [];
+    this.selectedIndex = 0;
+    for (const [name, value] of Object.entries(attributes)) {
+      this.attributes[name] = String(value);
+    }
+  }
+
+  // Standard DOM semantics: the setter replaces the children with a text value; the getter
+  // concatenates the descendants' text, falling back to the direct text value.
+  get textContent() {
+    if (this.children.length > 0) {
+      return this.children.map((child) => child.textContent).join("");
+    }
+    return this._textContent ?? "";
+  }
+
+  set textContent(value) {
+    this._textContent = String(value);
+    this.children = [];
+  }
+
+  getAttribute(name) {
+    return Object.prototype.hasOwnProperty.call(this.attributes, name)
+      ? this.attributes[name]
+      : null;
+  }
+
+  setAttribute(name, value) {
+    this.attributes[name] = String(value);
+  }
+
+  removeAttribute(name) {
+    delete this.attributes[name];
+  }
+
+  addEventListener(event, handler) {
+    (this.listeners[event] ||= []).push(handler);
+  }
+
+  click() {
+    for (const handler of this.listeners["click"] || []) {
+      handler.call(this);
+    }
+  }
+
+  // Simulates the platform behavior: a disabled control never fires its click listeners.
+  fireClick() {
+    if (this.disabled) {
+      return false;
+    }
+    this.click();
+    return true;
+  }
+
+  appendChild(child) {
+    child.parent = this;
+    this.children.push(child);
+    return child;
+  }
+
+  // Standard DOM semantics: matches this element AND its descendants.
+  querySelectorAll(selector) {
+    const found = [];
+    const walk = (node) => {
+      if (matches(node, selector)) {
+        found.push(node);
+      }
+      for (const child of node.children) {
+        walk(child);
+      }
+    };
+    walk(this);
+    return toNodeList(found);
+  }
+
+  querySelector(selector) {
+    return this.querySelectorAll(selector)[0] ?? null;
+  }
+}
+
+let lastWindow = null;
+
+function createDocument() {
+  const documentStub = {
+    readyState: "complete",
+    addEventListener() {},
+    createElement: (tag) => new Element(tag),
+    roots: [],
+    querySelectorAll(selector) {
+      const found = [];
+      for (const root of this.roots) {
+        for (const node of root.querySelectorAll(selector)) {
+          found.push(node);
+        }
+      }
+      return toNodeList(found);
+    },
+  };
+  return documentStub;
+}
+
+function createFetch(routes) {
+  const calls = [];
+  const fetchStub = (path, options) => {
+    calls.push({ path, method: options.method, body: options.body ? JSON.parse(options.body) : null });
+    const route = (fetchStub.routes ?? []).find(
+      (entry) => entry.method === options.method && path.startsWith(entry.pathPrefix));
+    const outcome = route ? route.response : { status: 500, body: { reason: "unexpected-route" } };
+    return Promise.resolve({
+      ok: outcome.status >= 200 && outcome.status < 300,
+      status: outcome.status,
+      json: () => Promise.resolve(outcome.body),
+    });
+  };
+  fetchStub.calls = calls;
+  fetchStub.routes = routes;
+  return fetchStub;
+}
+
+function createWindow() {
+  lastWindow = {
+    dmoControlo: undefined,
+    reloadCalls: 0,
+    location: {
+      reload() {
+        lastWindow.reloadCalls += 1;
+      },
+    },
+    confirm: () => true,
+  };
+  return lastWindow;
+}
+
+function loadAdapter(windowStub, documentStub, fetchStub) {
+  // The adapter's only free variables are window/document/fetch; everything else is self-contained.
+  const factory = new Function("window", "document", "fetch", adapterSource);
+  factory(windowStub, documentStub, fetchStub);
+}
+
+async function flush() {
+  await Promise.resolve();
+  await Promise.resolve();
+  await new Promise((resolve) => setImmediate(resolve));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Scenario builders
+// ---------------------------------------------------------------------------------------------
+
+function createSurface(overrides = {}) {
+  const root = new Element("section", { "data-dmo-controlo-root": "true", "data-dmo-controlo-surface": "create" });
+
+  const state = new Element("div", { "data-dmo-peso-id": overrides.pesoId ?? "", "data-dmo-version": String(overrides.version ?? 1), "data-dmo-submitted": overrides.submitted ? "true" : "false" });
+  root.appendChild(state);
+
+  const stateRegion = new Element("div", { "data-dmo-controlo-state": "true" });
+  stateRegion.hidden = true;
+  root.appendChild(stateRegion);
+
+  const temperature = new Element("input", { "data-dmo-field-temperature": "true" });
+  temperature.value = "20";
+  const marisa = new Element("input", { "data-dmo-field-marisa": "true" });
+  const puncao = new Element("input", { "data-dmo-field-puncao": "true" });
+  const sapEnd = new Element("input", { "data-dmo-field-sap-end": "true" });
+  const sapWeight = new Element("input", { "data-dmo-field-sap-weight": "true" });
+  for (const input of [temperature, marisa, puncao, sapEnd, sapWeight]) {
+    root.appendChild(input);
+  }
+
+  const actions = new Element("div", { "data-dmo-controlo-region": "actions" });
+  for (const key of overrides.draftActions ?? ["calculate", "save", "submit", "cancel"]) {
+    const button = new Element("button", { "data-dmo-action": key });
+    button.textContent = key;
+    actions.appendChild(button);
+  }
+  root.appendChild(actions);
+
+  const results = new Element("div", { "data-dmo-controlo-region": "results" });
+  const table = new Element("table", { "data-dmo-results-table": "true" });
+  const tbody = new Element("tbody", { "data-dmo-tbody": "true" });
+  table.appendChild(tbody);
+  const hint = new Element("p", { "data-dmo-results-hint": "true" });
+  hint.hidden = true;
+  const missing = new Element("div", { "data-dmo-calculation-missing": "true" });
+  missing.hidden = true;
+  const summary = new Element("dl", { "data-dmo-results-summary": "true" });
+  for (const name of ["water", "capacity", "glass", "density"]) {
+    summary.appendChild(new Element("dd", { [`data-dmo-summary-${name}`]: "true" }));
+  }
+  for (const child of [table, hint, missing, summary]) {
+    results.appendChild(child);
+  }
+  root.appendChild(results);
+
+  if (overrides.pendingAssociate) {
+    const select = new Element("select", { "data-dmo-associate-candidate": "true" });
+    const option = new Element("option", { "data-dmo-candidate-id": "candidate-cm-1" });
+    option.textContent = "REF — 1000 (B1)";
+    select.options = [option];
+    root.appendChild(select);
+    const associateButton = new Element("button", { "data-dmo-associate": "true" });
+    associateButton.textContent = "Associar";
+    root.appendChild(associateButton);
+  }
+
+  return root;
+}
+
+function definicoesAssignmentsSurface() {
+  const root = new Element("section", { "data-dmo-controlo-root": "true", "data-dmo-controlo-surface": "definicoes" });
+  const stateRegion = new Element("div", { "data-dmo-controlo-state": "true" });
+  stateRegion.hidden = true;
+  root.appendChild(stateRegion);
+  const select = new Element("select", { "data-dmo-assignment-repairer": "B1", "data-dmo-assignment-version": "2" });
+  root.appendChild(select);
+  const setButton = new Element("button", { "data-dmo-assignment-set": "B1" });
+  setButton.textContent = "Guardar";
+  root.appendChild(setButton);
+  return root;
+}
+
+function definicoesListsSurface() {
+  const root = new Element("section", { "data-dmo-controlo-root": "true", "data-dmo-controlo-surface": "definicoes" });
+  const stateRegion = new Element("div", { "data-dmo-controlo-state": "true" });
+  stateRegion.hidden = true;
+  root.appendChild(stateRegion);
+  const editId = new Element("input", { "data-dmo-list-edit-id": "true" });
+  editId.value = "list-1";
+  const editVersion = new Element("input", { "data-dmo-list-edit-version": "true" });
+  editVersion.value = "4";
+  const name = new Element("input", { "data-dmo-list-new-name": "true" });
+  const recipients = new Element("textarea", { "data-dmo-list-new-recipients": "true" });
+  const updateButton = new Element("button", { "data-dmo-list-update": "true" });
+  for (const child of [editId, editVersion, name, recipients, updateButton]) {
+    root.appendChild(child);
+  }
+  return root;
+}
+
+const results = [];
+function scenario(name, fn) {
+  return Promise.resolve()
+    .then(fn)
+    .then(() => {
+      results.push(`PASS ${name}`);
+    })
+    .catch((error) => {
+      results.push(`FAIL ${name}: ${error && error.message ? error.message : String(error)}`);
+    });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Scenarios
+// ---------------------------------------------------------------------------------------------
+
+// S0 — control: the normal draft surface still wires and works after the refactor (calculate +
+//      create-save success paths, non-stale failures keep the existing behavior).
+await scenario("S0 normal draft surface still works", async () => {
+  const documentStub = createDocument();
+  const root = createSurface({});
+  documentStub.roots.push(root);
+  const windowStub = createWindow();
+  const fetchStub = createFetch([
+    {
+      method: "POST",
+      pathPrefix: "/controlo/create/calculate",
+      response: {
+        status: 200,
+        body: {
+          cmId: null,
+          pendingToolId: "tool-1",
+          waterTemperature: 20,
+          waterDensityGCm3: 0.9982,
+          glassDensityGCm3: 2.5,
+          rows: [{ rowPosition: 1, waterWeightG: 500, capacityCm3: 500.9016, glassWeightG: 1252.254 }],
+        },
+      },
+    },
+    {
+      method: "POST",
+      pathPrefix: "/controlo/create/pesos",
+      response: { status: 201, body: { pesoId: "p-1", version: 1 } },
+    },
+  ]);
+
+  loadAdapter(windowStub, documentStub, fetchStub); // must not throw
+
+  root.querySelector("[data-dmo-action='calculate']").click();
+  await flush();
+
+  const tbody = root.querySelector("[data-dmo-results-table]").querySelector("[data-dmo-tbody]");
+  assert.equal(tbody.children.length, 1, "calculate preview must render the result row");
+  assert.equal(root.querySelector("[data-dmo-results-hint]").hidden, true, "hint must hide after results");
+
+  root.querySelector("[data-dmo-action='save']").click();
+  await flush();
+
+  const createCall = fetchStub.calls.find(
+    (call) => call.method === "POST" && call.path === "/controlo/create/pesos");
+  assert.ok(createCall, "create-save must POST /controlo/create/pesos");
+  assert.equal(createCall.body.expectedVersion, undefined, "create carries no expectedVersion");
+  const region = root.querySelector("[data-dmo-controlo-state]");
+  assert.equal(region.hidden, false, "saved state must be shown");
+  assert.match(region.textContent, /Controlo guardado \(versão 1\)/, "create-save success message with fresh version");
+  assert.equal(region.getAttribute("data-dmo-conflict"), null, "no conflict marker on success");
+});
+
+// S1 — D1 regression: the submitted Peso view (editable actions ABSENT) initializes safely and the
+//      existing bindings (disabled submit, pending associate) still work.
+await scenario("S1 submitted view initializes safely and its bindings still work", async () => {
+  const documentStub = createDocument();
+  const root = createSurface({
+    pesoId: "p-1",
+    version: 2,
+    submitted: true,
+    draftActions: ["submit"], // the ONLY action of the submitted state
+    pendingAssociate: true,
+  });
+  root.querySelector("[data-dmo-action='submit']").disabled = true; // server-rendered disabled
+  documentStub.roots.push(root);
+  const windowStub = createWindow();
+  const fetchStub = createFetch([
+    {
+      method: "POST",
+      pathPrefix: "/controlo/create/pesos/p-1/submit",
+      response: { status: 409, body: { reason: "already-submitted", message: "already submitted." } },
+    },
+    {
+      method: "POST",
+      pathPrefix: "/controlo/create/pesos/p-1/associate",
+      response: { status: 409, body: { reason: "already-submitted", message: "already submitted." } },
+    },
+  ]);
+
+  // D1 core: before the correction the unguarded calculate/save/cancel bindings threw a TypeError
+  // here, killing every subsequent binding on this view.
+  loadAdapter(windowStub, documentStub, fetchStub);
+
+  // The submitted-state bindings that DO exist work: the disabled submit never fires (platform
+  // behavior), and the pending associate control still posts and surfaces the typed refusal.
+  const submitFired = root.querySelector("[data-dmo-action='submit']").fireClick();
+  assert.equal(submitFired, false, "disabled submit must not fire in the submitted state");
+  assert.equal(fetchStub.calls.length, 0, "disabled submit must issue no request");
+
+  root.querySelector("[data-dmo-associate]").click();
+  await flush();
+
+  assert.equal(
+    fetchStub.calls[0].path,
+    "/controlo/create/pesos/p-1/associate",
+    "the associate binding must still be wired on the submitted+pending view");
+  assert.equal(fetchStub.calls[0].body.expectedVersion, 2, "associate sends the observed version");
+  const region = root.querySelector("[data-dmo-controlo-state]");
+  assert.equal(region.hidden, false, "typed refusal must be surfaced");
+  assert.match(region.textContent, /already-submitted/, "non-stale typed refusal keeps the existing presentation");
+  assert.equal(region.getAttribute("data-dmo-conflict"), null, "no conflict marker for a non-stale refusal");
+});
+
+// S2 — D2 regression: draft save → 409 stale-version → conflict state + recovery action; exactly
+//      one request (no auto-retry), nothing overwritten, recovery reloads the authoritative state.
+await scenario("S2 save stale-version enters conflict with recovery and no auto-retry", async () => {
+  const documentStub = createDocument();
+  const root = createSurface({ pesoId: "p-1", version: 3 });
+  documentStub.roots.push(root);
+  const windowStub = createWindow();
+  const fetchStub = createFetch([
+    {
+      method: "PUT",
+      pathPrefix: "/controlo/create/pesos/p-1",
+      response: { status: 409, body: { reason: "stale-version", message: "The Peso changed after it was observed." } },
+    },
+  ]);
+
+  loadAdapter(windowStub, documentStub, fetchStub);
+
+  root.querySelector("[data-dmo-action='save']").click();
+  await flush();
+
+  assert.equal(fetchStub.calls.length, 1, "exactly ONE request — no automatic retry");
+  assert.equal(fetchStub.calls[0].body.expectedVersion, 3, "the observed version is sent");
+
+  const region = root.querySelector("[data-dmo-controlo-state]");
+  assert.equal(region.hidden, false, "conflict region must be visible");
+  assert.equal(region.getAttribute("data-dmo-conflict"), "true", "conflict marker set");
+  assert.match(region.textContent, /Conflito/, "clear conflict message");
+  assert.match(region.textContent, /The Peso changed after it was observed/, "typed message surfaced");
+
+  const recover = region.querySelector("[data-dmo-conflict-reload]");
+  assert.ok(recover, "recovery action must exist");
+  assert.match(recover.textContent, /Recarregar estado atual/, "recovery action labelled");
+
+  const versionNode = root.querySelector("[data-dmo-peso-id]");
+  assert.equal(
+    versionNode.getAttribute("data-dmo-version"),
+    "3",
+    "the newer server version is never overwritten locally (no setAnchor on refusal)");
+
+  recover.click();
+  assert.equal(windowStub.reloadCalls, 1, "recovery reloads the authoritative current state");
+});
+
+// S3 — D2 regression: submit → 409 stale-version → same conflict + recovery.
+await scenario("S3 submit stale-version enters conflict with recovery and no auto-retry", async () => {
+  const documentStub = createDocument();
+  const root = createSurface({ pesoId: "p-1", version: 3 });
+  documentStub.roots.push(root);
+  const windowStub = createWindow();
+  const fetchStub = createFetch([
+    {
+      method: "POST",
+      pathPrefix: "/controlo/create/pesos/p-1/submit",
+      response: { status: 409, body: { reason: "stale-version", message: "stale during submit." } },
+    },
+  ]);
+
+  loadAdapter(windowStub, documentStub, fetchStub);
+
+  root.querySelector("[data-dmo-action='submit']").click();
+  await flush();
+
+  assert.equal(fetchStub.calls.length, 1, "exactly ONE request — no automatic retry");
+  const region = root.querySelector("[data-dmo-controlo-state]");
+  assert.equal(region.getAttribute("data-dmo-conflict"), "true", "conflict marker set");
+  assert.match(region.textContent, /stale during submit/, "typed message surfaced");
+  root.querySelector("[data-dmo-conflict-reload]").click();
+  assert.equal(windowStub.reloadCalls, 1, "recovery reloads the authoritative current state");
+});
+
+// S4 — D2 regression: Definições guarded mutation (machine-assignment set) → same conflict +
+//      recovery (the page-owned handling is shared by every guarded mutation).
+await scenario("S4 settings guarded mutation stale-version enters conflict with recovery", async () => {
+  const documentStub = createDocument();
+  const root = definicoesAssignmentsSurface();
+  documentStub.roots.push(root);
+  const windowStub = createWindow();
+  const fetchStub = createFetch([
+    {
+      method: "PUT",
+      pathPrefix: "/controlo/create/definicoes/machine-assignments/B1",
+      response: { status: 409, body: { reason: "stale-version", message: "assignment changed." } },
+    },
+  ]);
+
+  loadAdapter(windowStub, documentStub, fetchStub);
+
+  root.querySelector("[data-dmo-assignment-set]").click();
+  await flush();
+
+  assert.equal(fetchStub.calls.length, 1, "exactly ONE request — no automatic retry");
+  assert.equal(fetchStub.calls[0].body.expectedVersion, 2, "the observed version is sent");
+  const region = root.querySelector("[data-dmo-controlo-state]");
+  assert.equal(region.getAttribute("data-dmo-conflict"), "true", "conflict marker set");
+  assert.match(region.textContent, /assignment changed/, "typed message surfaced");
+  root.querySelector("[data-dmo-conflict-reload]").click();
+  assert.equal(windowStub.reloadCalls, 1, "recovery reloads the authoritative current state");
+});
+
+// S5 — D2 regression: email-list update (second settings guarded mutation) → same conflict.
+await scenario("S5 email-list update stale-version enters conflict with recovery", async () => {
+  const documentStub = createDocument();
+  const root = definicoesListsSurface();
+  documentStub.roots.push(root);
+  const windowStub = createWindow();
+  const fetchStub = createFetch([
+    {
+      method: "PUT",
+      pathPrefix: "/controlo/create/definicoes/email-lists/list-1",
+      response: { status: 409, body: { reason: "stale-version", message: "list changed." } },
+    },
+  ]);
+
+  loadAdapter(windowStub, documentStub, fetchStub);
+
+  root.querySelector("[data-dmo-list-update]").click();
+  await flush();
+
+  assert.equal(fetchStub.calls.length, 1, "exactly ONE request — no automatic retry");
+  const region = root.querySelector("[data-dmo-controlo-state]");
+  assert.equal(region.getAttribute("data-dmo-conflict"), "true", "conflict marker set");
+  assert.match(region.textContent, /list changed/, "typed message surfaced");
+  root.querySelector("[data-dmo-conflict-reload]").click();
+  assert.equal(windowStub.reloadCalls, 1, "recovery reloads the authoritative current state");
+});
+
+// S6 — D2 regression: NON-stale typed failures keep the existing behavior (validation-failed 400
+//      and already-submitted 409 → plain typed errors, no conflict state, no recovery control).
+await scenario("S6 non-stale typed failures keep the existing presentation", async () => {
+  const documentStub = createDocument();
+  const root = createSurface({ pesoId: "p-1", version: 3 });
+  documentStub.roots.push(root);
+  const windowStub = createWindow();
+  const fetchStub = createFetch([
+    {
+      method: "PUT",
+      pathPrefix: "/controlo/create/pesos/p-1",
+      response: {
+        status: 400,
+        body: { reason: "validation-failed", errors: ["ROW_WEIGHT_INVALID"] },
+      },
+    },
+  ]);
+
+  loadAdapter(windowStub, documentStub, fetchStub);
+
+  root.querySelector("[data-dmo-action='save']").click();
+  await flush();
+
+  let region = root.querySelector("[data-dmo-controlo-state]");
+  assert.equal(region.hidden, false, "typed validation failure must be surfaced");
+  assert.match(region.textContent, /ROW_WEIGHT_INVALID/, "validation token listed");
+  assert.equal(region.getAttribute("data-dmo-conflict"), null, "no conflict marker for validation-failed");
+  assert.equal(region.querySelector("[data-dmo-conflict-reload]"), null, "no recovery control for validation-failed");
+
+  fetchStub.calls.length = 0;
+  // Re-point the stub: replace routes with the already-submitted refusal.
+  fetchStub.routes = [
+    {
+      method: "PUT",
+      pathPrefix: "/controlo/create/pesos/p-1",
+      response: { status: 409, body: { reason: "already-submitted", message: "closed." } },
+    },
+  ];
+
+  root.querySelector("[data-dmo-action='save']").click();
+  await flush();
+
+  region = root.querySelector("[data-dmo-controlo-state]");
+  assert.match(region.textContent, /already-submitted/, "non-stale 409 keeps the existing presentation");
+  assert.equal(region.getAttribute("data-dmo-conflict"), null, "no conflict marker for already-submitted");
+  assert.equal(region.querySelector("[data-dmo-conflict-reload]"), null, "no recovery control for already-submitted");
+  assert.equal(fetchStub.calls.length, 1, "exactly ONE request for the second mutation");
+});
+
+// ---------------------------------------------------------------------------------------------
+// Summary
+// ---------------------------------------------------------------------------------------------
+
+const failures = results.filter((line) => line.startsWith("FAIL"));
+for (const line of results) {
+  console.log(line);
+}
+if (failures.length > 0) {
+  console.error(`${failures.length} scenario(s) failed.`);
+  process.exit(1);
+}
+console.log(`ALL ${results.length} BEHAVIORAL SCENARIOS PASSED (${adapterPath})`);
+process.exit(0);

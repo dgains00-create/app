@@ -1,6 +1,8 @@
 using System.Net;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using DMO.Application.Access;
+using DMO.Domain.JobOn;
 using DMO.Domain.Tools;
 using DMO.IntegrationTests.JobOn;
 
@@ -236,6 +238,89 @@ public sealed class ControloSurfaceRenderingTests
         Assert.DoesNotContain("name=\"divisor\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Densidade da água", html, StringComparison.Ordinal);
         Assert.DoesNotContain("dmo-controlo-density", html, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// D1 focused regression (RENDERED proof of the pre-fix crash condition) — opening a SUBMITTED
+    /// Peso renders the valid read-only state that the pre-fix adapter crashed on: the editable
+    /// actions (calculate/save/cancel) are intentionally ABSENT, the submitted-state decision bar
+    /// keeps exactly the disabled <c>submit</c> action ("Submetido" + visible reason), and the
+    /// adapter state region the JS must initialize against is still rendered. The behavioral half
+    /// of the D1 regression (the adapter initializing safely over this markup) is proven by
+    /// <see cref="DmoControloAdapterBehaviorTests"/>.
+    /// </summary>
+    /// <remarks>
+    /// Authority: independent verification report §11 D1; contract §8.6 (submitted-only
+    /// presentation) and §8.4/§8.5 (non-ready state behavior). Editable controls being absent is a
+    /// VALID state — they must never be restored merely to satisfy JavaScript.
+    /// </remarks>
+    [Fact]
+    public async Task D1_SubmittedViewOmitsEditableActionsAndKeepsTheDisabledSubmit()
+    {
+        var composition = new P2T05TestComposition();
+        var tool = composition.SeedTool(ToolType.Cm, "5447T173", "LOTE-D1", Processo.Nnpb);
+        var jobOn = composition.SeedJobOnWithCmContext(
+            "D1-TEST", "1000", "B1", tool.ToolId.Value, ToolType.Cm, tool.Reference, tool.Lot);
+        var cmId = jobOn.Contexts.Single(context => context.ContextType == ToolContextType.Cm).ContextId;
+
+        using var factory = P2T05TestHost.ForUser(P2T05TestHost.AllGranted(), composition);
+        using var client = factory.CreateClient();
+
+        // Arrange the submitted Peso through the REAL routes (create → submit).
+        Guid pesoId;
+        using (var createResponse = await P2T05TestHost.SendJsonAsync(
+                   client,
+                   HttpMethod.Post,
+                   "/controlo/create/pesos",
+                   P2T05TestHost.Json(new
+                   {
+                       cmId,
+                       pendingToolId = (Guid?)null,
+                       waterTemperature = 20m,
+                       volumeMarisaBq = (decimal?)null,
+                       volumePuncaoPu = (decimal?)null,
+                       previousProductionEndReference = (string?)null,
+                       previousAverageWeightReference = (string?)null,
+                       rows = new[] { new { waterWeightG = 500m } },
+                   })))
+        {
+            Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+            using var created = JsonDocument.Parse(await createResponse.Content.ReadAsStringAsync());
+            pesoId = created.RootElement.GetProperty("pesoId").GetGuid();
+        }
+
+        using (var submitResponse = await P2T05TestHost.SendJsonAsync(
+                   client,
+                   HttpMethod.Post,
+                   $"/controlo/create/pesos/{pesoId}/submit",
+                   P2T05TestHost.Json(new { expectedVersion = 1 })))
+        {
+            Assert.Equal(HttpStatusCode.OK, submitResponse.StatusCode);
+        }
+
+        // Open the submitted draft: the surface renders the read-only submitted state.
+        using var pageResponse = await P2T05TestHost.GetAsync(client, $"{CreatePath}?pesoId={pesoId}");
+        Assert.Equal(HttpStatusCode.OK, pageResponse.StatusCode);
+
+        var html = await pageResponse.Content.ReadAsStringAsync();
+
+        // The pre-fix crash condition: the editable actions are ABSENT (valid state).
+        Assert.Equal(0, Count(html, "data-dmo-action=\"calculate\""));
+        Assert.Equal(0, Count(html, "data-dmo-action=\"save\""));
+        Assert.Equal(0, Count(html, "data-dmo-action=\"cancel\""));
+
+        // The submitted-state UI keeps exactly the disabled submit action with its visible reason
+        // (Razor renders the non-ASCII reason text HTML-encoded, e.g. j&#xE1; — assert the encoded
+        // rendering, which is what the browser displays).
+        Assert.Equal(1, Count(html, "data-dmo-action=\"submit\""));
+        Assert.Contains("Submetido", html, StringComparison.Ordinal);
+        Assert.Contains("data-dmo-action-reason=\"submit\"", html, StringComparison.Ordinal);
+        Assert.Contains("foi submetido para aprova", html, StringComparison.Ordinal);
+
+        // The adapter state region (the JS initialization target) is still rendered.
+        Assert.Contains("data-dmo-controlo-state", html, StringComparison.Ordinal);
+        Assert.Contains("data-dmo-peso-id", html, StringComparison.Ordinal);
+        Assert.Contains("data-dmo-submitted=\"true\"", html, StringComparison.Ordinal);
     }
 
     // ---- arrangement helpers -------------------------------------------------------------
