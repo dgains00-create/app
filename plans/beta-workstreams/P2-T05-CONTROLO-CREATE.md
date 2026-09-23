@@ -118,6 +118,39 @@ document base-directory setting and its accessibility check, the named email lis
 representation, and the email template representation. It must **not** invent repairer fields
 beyond name, a machine grouping rule, a placeholder syntax, or exact email routing rules.
 
+### 5.1 Contract status (recorded)
+
+**P2-T05: CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW.**
+**B2: AWAITING PLAN ACCEPT.**
+
+The B2 contract was authored at `plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md`
+(contract SHA and response: `dev/responses/P2_T05_CONTRACT_AUTHORING_RESPONSE.md`) and fixes,
+over the real closed P2-T04 seams: the Peso identity/anchoring model (production `cm_id` |
+truthful pending `tool_id`, DB-enforced exclusive anchor, `Job On por associar`, no
+`production_id`/duplicate identity chain), the weight **and** capacity registration (per-row
+`water_weight_g` plus backend-derived persisted `capacity_cm3`/`glass_weight_g`, formulas
+exactly, 5–35 °C, `numeric(18,4)` storage, ≤ 2 dp presentation), the measurement-row model
+(variable, ≥ 1, dense positional ordering), the historical snapshot model (frozen: CM-context
+triple via `cm_id`, Peso inputs, density used, per-row results, attribution; Job-On labels
+remain documented traversal), the create/edit/submit transactions on one `peso_id` with the
+minimal P2-T06 handoff carrier and no delete path, missing-CM creation composed through
+`IJobOnService` Set under the Controlo_Create gate, the `PesoJobOnDependencyProbe`, the five
+`Definições` surfaces (name-only repairer register; independent B1..C3 assignments, current-state
+only; PDF base directory; named email lists; email templates), an 8-table physical schema, ONE
+migration contract, the 17-route matrix (each exactly `controlo-create`; Definições never a
+destination), the failure/result vocabulary and published Peso read-model shapes, and a complete
+test-to-acceptance matrix (64 AC). It records **1 BLOCKING** authority question
+(**Q-PDF** — the PDF-directory accessibility-check deployment semantics mandated by the task;
+the setting's persistence/change surface is fixed regardless) and **26 NON-BLOCKING** questions
+with pinned defaults, including **Q-SCOPE**: Comparação, Pegamentos, Folha, Resumo and the
+read-model *rendering* remain part of this workstream's handoff but are **not** authored by this
+contract and require a follow-on authored contract before implementation.
+
+The contract is **not** self-accepted: it awaits the Architect plan review per
+`dmo-beta-master/WORKFLOW.md` step 6. Implementation is **NOT STARTED — NOT AUTHORIZED**.
+`ModuleRegistrations.CurrentBuildAvailable` remains `[]`. **P2-T05 is not marked started and no
+workstream after P2-T05 is authorized.**
+
 ## 6. Explicit non-scope
 
 - Approval/rejection/reopen decisions (P2-T06).
