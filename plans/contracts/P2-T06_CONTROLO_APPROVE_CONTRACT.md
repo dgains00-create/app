@@ -1868,6 +1868,17 @@ working tree (application code)                  : clean before and after author
 build/tests                                      : not modified (authoring only; no build claimed)
 ```
 
+### D.4 Planning-gate record (authoring commit)
+
+| Item | Value |
+|---|---|
+| Contract file | `plans/contracts/P2-T06_CONTROLO_APPROVE_CONTRACT.md` (this file) |
+| Authoring commit | `dd0e16390e46d49c811d1597de674dcc68023813` (DMO-MODULAR remote `main`) |
+| Authoring response | `dev/responses/P2_T06_CONTRACT_AUTHORING_RESPONSE.md` (same commit) |
+| DMO-MODULAR remote `main` before this task | `7afcb0079ab2ee84ad2a0356d1f3576e832646e7` |
+| Implementation performed | **NONE** (docs-only planning commit; 4 files: contract + response + master-plan/workstream status records) |
+| Status | **AUTHORED — AWAITING ARCHITECT PLAN REVIEW** (PLAN ACCEPT / corrections / reject) |
+
 ---
 
 ## Appendix E — PLAN REVIEW gate
