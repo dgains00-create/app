@@ -1,0 +1,791 @@
+using DMO.Application.JobOn;
+using DMO.Application.Persistence;
+using DMO.Application.Repositories;
+using DMO.Application.Tools;
+using DMO.Domain.Controlo;
+using DMO.Domain.Tools;
+
+namespace DMO.Application.ControloCreate;
+
+/// <summary>
+/// The Peso create/measurement/submission service: validation, anchor resolution, the authoritative
+/// calculations and the create/edit/submit/associate transactions on ONE <c>peso_id</c>.
+/// </summary>
+/// <remarks>
+/// Authority: P2-T05 contract §7 (create §7.1, calculate §7.2, edit §7.3, submit §7.4), §5.3
+/// (formulas), §20.3.
+/// <para>
+/// The backend is the <b>only</b> calculation authority: the formulas are never redefined on the
+/// frontend and the persisted per-row results always equal the authoritative formula
+/// (§5.1, JRC7 — no preview/persist drift). The service composes the P2-T04 application contracts
+/// (<see cref="IJobOnService"/>, <see cref="IToolService"/>) for selection/context reads; the
+/// contracted anchor traversal <c>cm_id → tool_id → jobon_id</c> (§6.1/§7.2/§26.3) is resolved
+/// through <see cref="IPesoContextRead"/>.</para>
+/// <para>
+/// Historical immutability (§6): stored results are never recomputed from current Tool/Job On
+/// state and the frozen density is never refreshed by later config changes (§6.3.3); the submit
+/// path re-derives and <b>verifies</b> the stored results with the authoritative formula, refusing
+/// anything non-positive (C2) or non-derivable — nothing is silently rewritten and nothing is
+/// invented.</para>
+/// </remarks>
+public sealed class ControloCreateService : IControloCreateService
+{
+    private readonly IPesoRepository _pesos;
+    private readonly IPesoContextRead _contextRead;
+    private readonly IJobOnService _jobOns;
+    private readonly IToolService _tools;
+    private readonly IControloCalculationConfiguration _calculation;
+
+    /// <summary>Creates the service over its repositories and the composed P2-T04 contracts.</summary>
+    public ControloCreateService(
+        IPesoRepository pesos,
+        IPesoContextRead contextRead,
+        IJobOnService jobOns,
+        IToolService tools,
+        IControloCalculationConfiguration calculation)
+    {
+        ArgumentNullException.ThrowIfNull(pesos);
+        ArgumentNullException.ThrowIfNull(contextRead);
+        ArgumentNullException.ThrowIfNull(jobOns);
+        ArgumentNullException.ThrowIfNull(tools);
+        ArgumentNullException.ThrowIfNull(calculation);
+        _pesos = pesos;
+        _contextRead = contextRead;
+        _jobOns = jobOns;
+        _tools = tools;
+        _calculation = calculation;
+    }
+
+    /// <inheritdoc />
+    public async Task<PesoResult> CalculateAsync(
+        CalculatePesoCommand command,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        var errors = ControloCreateValidator.Validate(command);
+        if (errors.Count > 0)
+        {
+            return new PesoResult.ValidationFailed(errors);
+        }
+
+        var anchor = await ResolveAnchorAsync(command.CmId, command.PendingToolId, cancellationToken);
+        if (anchor.ValidationErrors.Count > 0)
+        {
+            return new PesoResult.ValidationFailed(anchor.ValidationErrors);
+        }
+
+        if (!TryResolveCalculationFacts(
+                anchor.Processo,
+                command.WaterTemperature,
+                out var divisor,
+                out var density))
+        {
+            return Refuse(
+                PesoRefusalReason.CalculationConfigurationMissing,
+                "The water-temperature divisor or the glass-density mapping for this calculation is not " +
+                "configured; no value is invented and nothing is written. Configure the calculation and retry.");
+        }
+
+        var rows = ComputeRows(
+            command.RowWaterWeightsG,
+            divisor,
+            density,
+            command.VolumeMarisaBq,
+            command.VolumePuncaoPu,
+            out var resultErrors);
+        if (rows is null)
+        {
+            return new PesoResult.ValidationFailed(resultErrors);
+        }
+
+        return new PesoResult.Calculation(new PesoCalculation(
+            command.CmId,
+            command.PendingToolId,
+            command.WaterTemperature,
+            divisor,
+            density,
+            rows));
+    }
+
+    /// <inheritdoc />
+    public async Task<PesoResult> CreateAsync(
+        CreatePesoCommand command,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        var errors = ControloCreateValidator.Validate(command);
+        if (errors.Count > 0)
+        {
+            return new PesoResult.ValidationFailed(errors);
+        }
+
+        var anchor = await ResolveAnchorAsync(command.CmId, command.PendingToolId, cancellationToken);
+        if (anchor.ValidationErrors.Count > 0)
+        {
+            return new PesoResult.ValidationFailed(anchor.ValidationErrors);
+        }
+
+        if (!TryResolveCalculationFacts(
+                anchor.Processo,
+                command.WaterTemperature,
+                out var divisor,
+                out var density))
+        {
+            return Refuse(
+                PesoRefusalReason.CalculationConfigurationMissing,
+                "The water-temperature divisor or the glass-density mapping for this Peso is not " +
+                "configured; no value is invented and nothing is written. Configure the calculation and retry.");
+        }
+
+        var rows = ComputeRows(
+            command.RowWaterWeightsG,
+            divisor,
+            density,
+            command.VolumeMarisaBq,
+            command.VolumePuncaoPu,
+            out var resultErrors);
+        if (rows is null)
+        {
+            return new PesoResult.ValidationFailed(resultErrors);
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var pesoId = PesoId.New();
+
+        var peso = new Peso(
+            pesoId,
+            command.CmId is { } cm && cm != Guid.Empty ? cm : null,
+            command.PendingToolId is { } tool && tool != Guid.Empty ? tool : null,
+            PesoStatus.Pendente,
+            SubmittedAt: null,
+            SubmittedByUserId: null,
+            command.WaterTemperature,
+            command.VolumeMarisaBq,
+            command.VolumePuncaoPu,
+            density,
+            TrimToNull(command.PreviousProductionEndReference),
+            TrimToNull(command.PreviousAverageWeightReference),
+            Version: 1,
+            command.CreatedByUserId,
+            now,
+            now,
+            Rows: ToRows(pesoId, rows, now));
+
+        try
+        {
+            var created = await _pesos.CreatedAsync(peso, peso.Rows, cancellationToken);
+
+            return new PesoResult.Created(created.PesoId.Value, created.Version);
+        }
+        catch (ControloPersistenceException exception)
+        {
+            return Map(exception);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<PesoResult> GetAsync(Guid pesoId, CancellationToken cancellationToken)
+    {
+        var peso = await _pesos.GetByIdAsync(pesoId, cancellationToken);
+        if (peso is null)
+        {
+            return new PesoResult.NotFound(pesoId);
+        }
+
+        return new PesoResult.Found(await BuildSheetAsync(peso, cancellationToken));
+    }
+
+    /// <inheritdoc />
+    public async Task<PesoResult> UpdateAsync(
+        UpdatePesoCommand command,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        var errors = ControloCreateValidator.Validate(command);
+        if (errors.Count > 0)
+        {
+            return new PesoResult.ValidationFailed(errors);
+        }
+
+        var persisted = await _pesos.GetByIdAsync(command.PesoId, cancellationToken);
+        if (persisted is null)
+        {
+            return new PesoResult.NotFound(command.PesoId);
+        }
+
+        var stale = AssertCurrentVersion(persisted, command.ExpectedVersion);
+        if (stale is not null)
+        {
+            return stale;
+        }
+
+        if (persisted.SubmittedAt is not null)
+        {
+            return Refuse(
+                PesoRefusalReason.AlreadySubmitted,
+                "This Peso was already submitted for approval; Create-side edits are closed after " +
+                "submission (correction belongs to the approval reopen workflow).");
+        }
+
+        var anchor = await ResolveAnchorAsync(persisted.CmId, persisted.ToolId, cancellationToken);
+        if (anchor.ValidationErrors.Count > 0)
+        {
+            return new PesoResult.ValidationFailed(anchor.ValidationErrors);
+        }
+
+        // The divisor for the edit recompute comes from the current calculation configuration; the
+        // glass DENSITY is the Peso's FROZEN density — written once at the first successful
+        // calculate/save and never refreshed by later config changes (§6.3.3; a later
+        // density-mapping change affects NEW Peso calculations only, MES10).
+        if (!_calculation.TryGetWaterDivisor(command.WaterTemperature, out var divisor))
+        {
+            return Refuse(
+                PesoRefusalReason.CalculationConfigurationMissing,
+                "The water-temperature divisor for this edit is not available; no value is invented " +
+                "and nothing was written.");
+        }
+
+        if (persisted.GlassDensityGCm3 is not { } frozenDensity)
+        {
+            return Refuse(
+                PesoRefusalReason.CalculationConfigurationMissing,
+                "This Peso carries no frozen glass density; the draft cannot be recalculated. " +
+                "Nothing was written.");
+        }
+
+        var rows = ComputeRows(
+            command.RowWaterWeightsG,
+            divisor,
+            frozenDensity,
+            command.VolumeMarisaBq,
+            command.VolumePuncaoPu,
+            out var resultErrors);
+        if (rows is null)
+        {
+            return new PesoResult.ValidationFailed(resultErrors);
+        }
+
+        var updated = persisted with
+        {
+            WaterTemperature = command.WaterTemperature,
+            VolumeMarisaBq = command.VolumeMarisaBq,
+            VolumePuncaoPu = command.VolumePuncaoPu,
+            // The frozen density is retained verbatim (never refreshed, §6.3.3).
+            PreviousProductionEndReference = TrimToNull(command.PreviousProductionEndReference),
+            PreviousAverageWeightReference = TrimToNull(command.PreviousAverageWeightReference),
+            Rows = ToRows(persisted.PesoId, rows, persisted.CreatedAt),
+        };
+
+        try
+        {
+            var saved = await _pesos.UpdatedAsync(updated, updated.Rows, cancellationToken);
+
+            return new PesoResult.Updated(saved.PesoId.Value, saved.Version);
+        }
+        catch (ControloPersistenceException exception)
+        {
+            return Map(exception);
+        }
+        catch (ConcurrencyConflictException exception)
+        {
+            return Refuse(PesoRefusalReason.StaleVersion, exception.Message);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<PesoResult> SubmitAsync(
+        SubmitPesoCommand command,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        var persisted = await _pesos.GetByIdAsync(command.PesoId, cancellationToken);
+        if (persisted is null)
+        {
+            return new PesoResult.NotFound(command.PesoId);
+        }
+
+        var stale = AssertCurrentVersion(persisted, command.ExpectedVersion);
+        if (stale is not null)
+        {
+            return stale;
+        }
+
+        if (persisted.SubmittedAt is not null)
+        {
+            return Refuse(
+                PesoRefusalReason.AlreadySubmitted,
+                "This Peso was already submitted; double submission is refused and no second record " +
+                "is created.");
+        }
+
+        // Step 4: the full current state is re-validated with the closed §5.5 set.
+        var stateErrors = ControloCreateValidator.ValidateState(
+            persisted.WaterTemperature,
+            persisted.VolumeMarisaBq,
+            persisted.VolumePuncaoPu,
+            persisted.RowWaterWeightsG);
+        if (stateErrors.Count > 0)
+        {
+            return new PesoResult.ValidationFailed(stateErrors);
+        }
+
+        // Step 5: recompute and verify — the stored results must equal the authoritative formula
+        // (no preview/persist drift; frozen density per §6.3.3, current divisor configuration), and
+        // every per-row result must be strictly positive (C2). Nothing is silently rewritten.
+        var verification = VerifyStoredResults(persisted);
+        if (verification is not null)
+        {
+            return verification;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var submitted = persisted with
+        {
+            SubmittedAt = now,
+            SubmittedByUserId = command.SubmittedByUserId,
+        };
+
+        try
+        {
+            var saved = await _pesos.SubmittedAsync(submitted, cancellationToken);
+
+            return new PesoResult.Submitted(
+                saved.PesoId.Value,
+                saved.Version,
+                saved.SubmittedAt ?? now);
+        }
+        catch (ControloPersistenceException exception)
+        {
+            return Map(exception);
+        }
+        catch (ConcurrencyConflictException exception)
+        {
+            return Refuse(PesoRefusalReason.StaleVersion, exception.Message);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<PesoResult> AssociateAsync(
+        AssociatePesoCommand command,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        var errors = ControloCreateValidator.Validate(command);
+        if (errors.Count > 0)
+        {
+            return new PesoResult.ValidationFailed(errors);
+        }
+
+        var persisted = await _pesos.GetByIdAsync(command.PesoId, cancellationToken);
+        if (persisted is null)
+        {
+            return new PesoResult.NotFound(command.PesoId);
+        }
+
+        var stale = AssertCurrentVersion(persisted, command.ExpectedVersion);
+        if (stale is not null)
+        {
+            return stale;
+        }
+
+        if (persisted.SubmittedAt is not null)
+        {
+            return Refuse(
+                PesoRefusalReason.AlreadySubmitted,
+                "This Peso was already submitted; Create-side mutations are closed after submission.");
+        }
+
+        if (!persisted.IsPending)
+        {
+            return Refuse(
+                PesoRefusalReason.AlreadyAssociated,
+                "This Peso is already production-bound; association is offered only while pending.");
+        }
+
+        // The target cm_id must exist (CM_CONTEXT_NOT_FOUND) and must resolve to the Peso's anchor
+        // tool_id (ASSOCIATION_MISMATCH) — the anchor is the truthful Tool; the application never
+        // guesses (§4.4 rules 2–3).
+        var target = await _contextRead.GetCmContextAsync(command.CmId, cancellationToken);
+        if (target is null)
+        {
+            return new PesoResult.ValidationFailed([ControloCreateValidationErrors.CmContextNotFound]);
+        }
+
+        if (target.ToolId != persisted.ToolId)
+        {
+            return Refuse(
+                PesoRefusalReason.AssociationMismatch,
+                "The candidate cm_id does not resolve to this Peso's anchor tool_id; association is " +
+                "refused (the application never guesses).");
+        }
+
+        var associated = persisted with { CmId = command.CmId, ToolId = null };
+
+        try
+        {
+            var saved = await _pesos.AssociatedAsync(associated, cancellationToken);
+
+            return new PesoResult.Associated(saved.PesoId.Value, saved.Version, saved.CmId!.Value);
+        }
+        catch (ControloPersistenceException exception)
+        {
+            return Map(exception);
+        }
+        catch (ConcurrencyConflictException exception)
+        {
+            return Refuse(PesoRefusalReason.StaleVersion, exception.Message);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<PesoResult> ListAssociationCandidatesAsync(
+        Guid toolId,
+        CancellationToken cancellationToken)
+    {
+        if (toolId == Guid.Empty)
+        {
+            return new PesoResult.ValidationFailed([ControloCreateValidationErrors.ToolNotFound]);
+        }
+
+        var result = await _jobOns.ListPesoAssociationCandidatesAsync(toolId, cancellationToken);
+
+        // The Job On read only ever surfaces the accepted candidates carrier for this query.
+        return result is JobOnResult.AssociationCandidates(var candidates)
+            ? new PesoResult.Candidates(candidates)
+            : new PesoResult.ValidationFailed([ControloCreateValidationErrors.ToolNotFound]);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Anchor resolution and calculations
+    // ---------------------------------------------------------------------------------------------
+
+    private sealed record AnchorResolution(IReadOnlyList<string> ValidationErrors, Processo? Processo);
+
+    private async Task<AnchorResolution> ResolveAnchorAsync(
+        Guid? cmId,
+        Guid? pendingToolId,
+        CancellationToken cancellationToken)
+    {
+        if (pendingToolId is { } toolId && toolId != Guid.Empty)
+        {
+            var tool = await _tools.GetAsync(toolId, cancellationToken);
+
+            if (tool is not ToolResult.Found(var pendingFicha))
+            {
+                return new AnchorResolution([ControloCreateValidationErrors.ToolNotFound], null);
+            }
+
+            if (pendingFicha.Type != ToolType.Cm)
+            {
+                return new AnchorResolution([ControloCreateValidationErrors.ToolTypeMismatch], null);
+            }
+
+            return new AnchorResolution([], pendingFicha.Processo);
+        }
+
+        if (cmId is { } cm && cm != Guid.Empty)
+        {
+            var context = await _contextRead.GetCmContextAsync(cm, cancellationToken);
+            if (context is null)
+            {
+                return new AnchorResolution([ControloCreateValidationErrors.CmContextNotFound], null);
+            }
+
+            var tool = await _tools.GetAsync(context.ToolId, cancellationToken);
+
+            if (tool is not ToolResult.Found(var cmFicha))
+            {
+                return new AnchorResolution([ControloCreateValidationErrors.ToolNotFound], null);
+            }
+
+            if (cmFicha.Type != ToolType.Cm)
+            {
+                return new AnchorResolution([ControloCreateValidationErrors.ToolTypeMismatch], null);
+            }
+
+            return new AnchorResolution([], cmFicha.Processo);
+        }
+
+        return new AnchorResolution([ControloCreateValidationErrors.PesoAnchorRequired], null);
+    }
+
+    /// <summary>
+    /// Resolves the calculation configuration (Q-CALC): the divisor for the entered temperature and
+    /// the glass density for the anchor's processo. Missing configuration is the typed
+    /// <c>calculation-configuration-missing</c> refusal — never an invented value and never a
+    /// silent zero (MES9/AC-M9).
+    /// </summary>
+    private bool TryResolveCalculationFacts(
+        Processo? processo,
+        decimal waterTemperature,
+        out decimal divisor,
+        out decimal density)
+    {
+        divisor = default;
+        density = default;
+
+        return _calculation.TryGetWaterDivisor(waterTemperature, out divisor)
+            && _calculation.TryGetGlassDensity(processo, out density);
+    }
+
+    /// <summary>
+    /// Computes every per-row result with the authoritative §5.3 formulas
+    /// (<c>Capacidade = Peso de água ÷ valor da tabela de temperatura</c>;
+    /// <c>Peso do vidro = (Capacidade + Volume Marisa/BQ − Volume Punção/PU) × Densidade do vidro</c>).
+    /// A computed per-row result that is not strictly positive is refused BEFORE any write with the
+    /// typed <c>RESULT_NON_POSITIVE</c> token (C2) — never a 500.
+    /// </summary>
+    private IReadOnlyList<PesoRowCalculation>? ComputeRows(
+        IReadOnlyList<decimal> waterWeightsG,
+        decimal divisor,
+        decimal density,
+        decimal? volumeMarisaBq,
+        decimal? volumePuncaoPu,
+        out IReadOnlyList<string> errors)
+    {
+        errors = [];
+
+        // An invalid divisor/density configuration can never fabricate a result (MES11): a
+        // non-positive divisor or density means the entered combination yields no strictly
+        // positive derived result — the typed RESULT_NON_POSITIVE refusal, nothing written.
+        if (divisor <= 0 || density <= 0)
+        {
+            errors = [ControloCreateValidationErrors.ResultNonPositive];
+            return null;
+        }
+
+        var rows = new List<PesoRowCalculation>(waterWeightsG.Count);
+
+        for (var index = 0; index < waterWeightsG.Count; index++)
+        {
+            var capacity = decimal.Round(waterWeightsG[index] / divisor, 4, MidpointRounding.AwayFromZero);
+            var glass = decimal.Round(
+                (capacity + (volumeMarisaBq ?? 0) - (volumePuncaoPu ?? 0)) * density,
+                4,
+                MidpointRounding.AwayFromZero);
+
+            if (capacity <= 0 || glass <= 0)
+            {
+                errors = [ControloCreateValidationErrors.ResultNonPositive];
+                return null;
+            }
+
+            rows.Add(new PesoRowCalculation(index + 1, waterWeightsG[index], capacity, glass));
+        }
+
+        return rows;
+    }
+
+    /// <summary>
+    /// The submit recompute-and-verify (contract §7.4 step 5): re-derives every per-row result from
+    /// the persisted facts with the authoritative formula — the Peso's FROZEN density (never
+    /// refreshed, §6.3.3) and the current divisor configuration — verifying that every re-derived
+    /// result is strictly positive (C2) and equals the stored result (no preview/persist drift).
+    /// Returns the typed refusal, or <c>null</c> when the stored facts verify cleanly.
+    /// </summary>
+    private PesoResult? VerifyStoredResults(Peso peso)
+    {
+        if (!_calculation.TryGetWaterDivisor(peso.WaterTemperature, out var divisor))
+        {
+            return Refuse(
+                PesoRefusalReason.CalculationConfigurationMissing,
+                "The water-temperature divisor for this Peso is not available; the stored results " +
+                "cannot be verified. Nothing was written.");
+        }
+
+        if (peso.GlassDensityGCm3 is not { } frozenDensity)
+        {
+            return Refuse(
+                PesoRefusalReason.CalculationConfigurationMissing,
+                "This Peso carries no frozen glass density; the stored results cannot be verified. " +
+                "Nothing was written.");
+        }
+
+        foreach (var row in peso.Rows.OrderBy(row => row.RowPosition))
+        {
+            var capacity = decimal.Round(row.WaterWeightG / divisor, 4, MidpointRounding.AwayFromZero);
+            var glass = decimal.Round(
+                (capacity + (peso.VolumeMarisaBq ?? 0) - (peso.VolumePuncaoPu ?? 0)) * frozenDensity,
+                4,
+                MidpointRounding.AwayFromZero);
+
+            if (capacity <= 0 || glass <= 0)
+            {
+                return new PesoResult.ValidationFailed([ControloCreateValidationErrors.ResultNonPositive]);
+            }
+
+            if (capacity != row.CapacityCm3 || glass != row.GlassWeightG)
+            {
+                return Refuse(
+                    PesoRefusalReason.CalculationConfigurationMissing,
+                    "The stored per-row results cannot be re-derived from the current calculation " +
+                    "configuration; recalculate the draft before submitting. Nothing was written.");
+            }
+        }
+
+        return null;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Read-model composition (§26.3)
+    // ---------------------------------------------------------------------------------------------
+
+    private async Task<PesoSheetReadModel> BuildSheetAsync(
+        Peso peso,
+        CancellationToken cancellationToken)
+    {
+        if (peso.IsProductionBound && peso.CmId is { } cmId)
+        {
+            var context = await _contextRead.GetCmContextAsync(cmId, cancellationToken)
+                ?? throw new InvalidOperationException(
+                    $"Peso '{peso.PesoId}' anchors cm_id '{cmId}' which no longer exists in " +
+                    "cm_contexts; the persisted anchor cannot be explained truthfully.");
+
+            var ficha = await _jobOns.GetAsync(context.JobOnId, cancellationToken);
+
+            if (ficha is JobOnResult.Ficha(var value))
+            {
+                var cmContext = value.Contexts.FirstOrDefault(contextEntry =>
+                    contextEntry.ContextType == ToolContextType.Cm && contextEntry.ContextId == cmId);
+
+                if (cmContext is not null)
+                {
+                    var contextProjection = new PesoContextProjection(
+                        cmId,
+                        context.ToolId,
+                        context.FrozenToolType,
+                        context.FrozenToolReference,
+                        context.FrozenToolLot,
+                        cmContext.Tool);
+
+                    var production = new PesoProductionProjection(
+                        value.Reference,
+                        value.ProductionNumber,
+                        value.Machine);
+
+                    return Compose(peso, contextProjection, pending: null, production);
+                }
+            }
+        }
+
+        if (peso.IsPending && peso.ToolId is { } toolId)
+        {
+            var tool = await _tools.GetAsync(toolId, cancellationToken);
+
+            if (tool is ToolResult.Found(var ficha))
+            {
+                var pending = new PesoPendingProjection(
+                    toolId,
+                    new ToolSummaryProjection(
+                        ficha.ToolId,
+                        ficha.Type,
+                        ficha.Reference,
+                        ficha.Lot,
+                        ficha.Processo,
+                        ficha.Quantity,
+                        ficha.CompatibleMachines));
+
+                return Compose(peso, context: null, pending, production: null);
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"Peso '{peso.PesoId}' cannot be composed: its anchor is not resolvable through the " +
+            "accepted application contracts.");
+    }
+
+    private static PesoSheetReadModel Compose(
+        Peso peso,
+        PesoContextProjection? context,
+        PesoPendingProjection? pending,
+        PesoProductionProjection? production) =>
+        new(
+            peso.PesoId.Value,
+            peso.Version,
+            PesoStatusTokens.ToToken(peso.Status),
+            peso.CmId,
+            peso.ToolId,
+            context,
+            pending,
+            production,
+            peso.CreatedByUserId,
+            peso.CreatedAt,
+            peso.SubmittedByUserId,
+            peso.SubmittedAt,
+            peso.WaterTemperature,
+            peso.VolumeMarisaBq,
+            peso.VolumePuncaoPu,
+            peso.GlassDensityGCm3,
+            peso.PreviousProductionEndReference,
+            peso.PreviousAverageWeightReference,
+            peso.Rows
+                .OrderBy(row => row.RowPosition)
+                .Select(row => new PesoRowReadModel(
+                    row.PesoMeasurementRowId.Value,
+                    row.RowPosition,
+                    row.WaterWeightG,
+                    row.CapacityCm3,
+                    row.GlassWeightG))
+                .ToList());
+
+    // ---------------------------------------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------------------------------------
+
+    private PesoResult? AssertCurrentVersion(Peso peso, int expectedVersion)
+    {
+        if (peso.Version != expectedVersion)
+        {
+            return Refuse(
+                PesoRefusalReason.StaleVersion,
+                $"The Peso changed after it was observed (expected version {expectedVersion}, " +
+                $"current version {peso.Version}); nothing was written.");
+        }
+
+        return null;
+    }
+
+    private static IReadOnlyList<PesoMeasurementRow> ToRows(
+        PesoId pesoId,
+        IReadOnlyList<PesoRowCalculation> rows,
+        DateTimeOffset createdAt) =>
+        rows
+            .Select(row => new PesoMeasurementRow(
+                PesoMeasurementRowId.New(),
+                pesoId,
+                row.RowPosition,
+                row.WaterWeightG,
+                row.CapacityCm3,
+                row.GlassWeightG,
+                createdAt))
+            .ToList();
+
+    private static string? TrimToNull(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static PesoResult Refuse(PesoRefusalReason reason, string message) =>
+        new PesoResult.Refused(reason, message);
+
+    private static PesoResult Map(ControloPersistenceException exception) => exception.Reason switch
+    {
+        ControloPersistenceFailureReason.ResultNonPositive => new PesoResult.ValidationFailed(
+            [ControloCreateValidationErrors.ResultNonPositive]),
+
+        ControloPersistenceFailureReason.CmContextNotFound => new PesoResult.ValidationFailed(
+            [ControloCreateValidationErrors.CmContextNotFound]),
+
+        ControloPersistenceFailureReason.ToolNotFound => new PesoResult.ValidationFailed(
+            [ControloCreateValidationErrors.ToolNotFound]),
+
+        ControloPersistenceFailureReason.DependencyExists => Refuse(
+            PesoRefusalReason.DependencyExists,
+            exception.Message),
+
+        _ => throw exception,
+    };
+}

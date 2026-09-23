@@ -1,0 +1,285 @@
+/* P2-T05 Controlo Create + Definições surface styles.
+ *
+ * DMO FIXED DESKTOP LAYOUT POLICY (binding): the canonical design/validation viewport is 1366 × 768
+ * with compact operational density. This file contains NO breakpoint rule — no @media, no
+ * @container, no @supports — no width listener, no table→card conversion, no required-column
+ * hiding and no action relocation anywhere (LAY1/LAY3/AC-N1). Smaller windows scroll: over-wide
+ * regions use the keyboard-reachable local overflow containers below.
+ */
+.dmo-controlo {
+  display: block;
+  padding: 0.5rem 0.75rem 1rem;
+  min-width: 0;
+}
+
+.dmo-controlo__region {
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--dmo-border, #c9c9c9);
+  padding-top: 0.5rem;
+}
+
+.dmo-controlo .dmo-controlo__region:first-child {
+  margin-top: 0;
+  border-top: 0;
+  padding-top: 0;
+}
+
+/* R1 — production context strip (read-only header region). */
+.dmo-controlo__strip {
+  background: var(--dmo-surface-strong, #f2f2f2);
+  padding: 0.375rem 0.5rem;
+}
+
+.dmo-controlo__strip-facts {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 1rem;
+  margin: 0;
+}
+
+.dmo-controlo__strip-fact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.dmo-controlo__strip-fact dt {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  color: var(--dmo-text-muted, #5a5a5a);
+}
+
+.dmo-controlo__strip-fact dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.dmo-controlo__strip-empty {
+  margin: 0;
+  color: var(--dmo-text-muted, #5a5a5a);
+}
+
+/* R2 — production selection. */
+.dmo-controlo__lookup {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.dmo-controlo__label {
+  display: block;
+  font-size: 0.8125rem;
+  margin-bottom: 0.125rem;
+}
+
+.dmo-controlo__input {
+  height: 1.875rem;
+  padding: 0 0.375rem;
+  border: 1px solid #8a8a8a;
+  background: #ffffff;
+  font-size: 0.875rem;
+  min-width: 12rem;
+}
+
+.dmo-controlo__input--compact {
+  min-width: 7rem;
+  width: 9rem;
+}
+
+.dmo-controlo__input--select {
+  min-width: 12rem;
+}
+
+.dmo-controlo__input--textarea {
+  height: auto;
+  min-height: 4.5rem;
+  font-family: monospace;
+  font-size: 0.8125rem;
+}
+
+.dmo-controlo__button {
+  height: 1.875rem;
+  padding: 0 0.75rem;
+  border: 1px solid #5a6b7c;
+  background: #eef2f6;
+  color: #1f2b36;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.dmo-controlo__button:hover {
+  background: #dfe6ee;
+}
+
+.dmo-controlo__button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.dmo-controlo__errors {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+  color: #8a1f1f;
+  font-size: 0.8125rem;
+}
+
+/* R3 — CM context: determined / pending / missing-context recovery. */
+.dmo-controlo__pending,
+.dmo-controlo__missing-context {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.375rem 0.5rem;
+  background: var(--dmo-surface-strong, #f2f2f2);
+  font-size: 0.8125rem;
+}
+
+.dmo-controlo__pending strong,
+.dmo-controlo__missing-context strong {
+  font-size: 0.875rem;
+}
+
+.dmo-controlo__frozen-triple {
+  margin: 0 0 0.25rem;
+  font-size: 0.8125rem;
+}
+
+.dmo-controlo__associate {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+/* R4 — Peso inputs: compact fixed-desktop density. */
+.dmo-controlo__facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(10rem, 1fr));
+  gap: 0.5rem 0.75rem;
+  align-items: end;
+}
+
+/* R5 — results: individual results first-class; local keyboard-reachable overflow. */
+.dmo-controlo__results-scroll,
+.dmo-controlo__settings-scroll {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 18rem;
+  border: 1px solid var(--dmo-border, #c9c9c9);
+}
+
+.dmo-controlo__results-scroll:focus,
+.dmo-controlo__settings-scroll:focus {
+  outline: 2px solid #2a5d8f;
+  outline-offset: 1px;
+}
+
+.dmo-controlo__results-table,
+.dmo-controlo__settings-table {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  font-size: 0.8125rem;
+}
+
+.dmo-controlo__results-table th,
+.dmo-controlo__results-table td,
+.dmo-controlo__settings-table th,
+.dmo-controlo__settings-table td {
+  border: 1px solid var(--dmo-border, #c9c9c9);
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.dmo-controlo__results-table th,
+.dmo-controlo__settings-table th {
+  background: var(--dmo-surface-strong, #f2f2f2);
+  font-weight: 600;
+}
+
+.dmo-controlo__summary {
+  display: flex;
+  gap: 1.25rem;
+  margin: 0.375rem 0 0;
+}
+
+.dmo-controlo__summary div {
+  display: flex;
+  flex-direction: column;
+}
+
+.dmo-controlo__summary dt {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  color: var(--dmo-text-muted, #5a5a5a);
+}
+
+.dmo-controlo__summary dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.dmo-controlo__results-hint,
+.dmo-controlo__hint {
+  margin: 0.375rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--dmo-text-muted, #5a5a5a);
+}
+
+.dmo-controlo__calculation-missing {
+  margin-top: 0.375rem;
+  padding: 0.375rem 0.5rem;
+  background: #fff3e0;
+  border: 1px solid #c96a00;
+  color: #6b3800;
+  font-size: 0.8125rem;
+}
+
+/* R7 — status region + adapter state region. */
+.dmo-controlo__state {
+  margin-top: 0.375rem;
+  font-size: 0.8125rem;
+  color: #1f2b36;
+}
+
+.dmo-controlo__state[role="alert"] {
+  color: #8a1f1f;
+}
+
+/* R8 — document seam region (reserved; no generation action, no availability lookup). */
+.dmo-controlo__documents-seam {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--dmo-text-muted, #5a5a5a);
+}
+
+/* Definições: one page, five sections; compact density; sections keep their structural order. */
+.dmo-controlo--definicoes .dmo-controlo__section-title {
+  margin: 0 0 0.375rem;
+  font-size: 1rem;
+}
+
+.dmo-controlo__settings-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.dmo-controlo__settings-form .dmo-controlo__label {
+  min-width: 9rem;
+}
+
+.dmo-controlo__pdf-result {
+  margin: 0.375rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.dmo-controlo__settings-table td[data-dmo-list-name],
+.dmo-controlo__settings-table td[data-dmo-template-name] {
+  cursor: pointer;
+  text-decoration: underline dotted;
+}

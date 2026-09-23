@@ -33,8 +33,11 @@ public sealed class MigrationRunnerTests
         // P2-T04 (disclosed extension, contract §3 and §16.5): the accepted contract requires the
         // six domain-core tables to be mapped by the SAME single DbContext, discovered through
         // ApplyConfigurationsFromAssembly, so the exact modelled set necessarily grows by exactly
-        // those six tables. The assertion is not weakened — it still pins the complete modelled
-        // table set, and the forbidden-table non-effect below is unchanged.
+        // those six tables. P2-T05 (disclosed extension, P2-T05 contract §16/§25): the accepted
+        // Controlo contract requires the eight Controlo tables to be mapped by the same single
+        // DbContext, so the exact modelled set grows by exactly those eight tables. The assertion
+        // is not weakened — it still pins the complete modelled table set, and the forbidden-table
+        // non-effect below is unchanged.
         var modelled = context.Model.GetEntityTypes()
             .Select(e => e.GetTableName())
             .OrderBy(name => name, StringComparer.Ordinal)
@@ -43,7 +46,9 @@ public sealed class MigrationRunnerTests
         Assert.Equal(
             new[]
             {
-                "admin_accounts", "bq_contexts", "cm_contexts", "job_ons", "mf_contexts",
+                "admin_accounts", "bq_contexts", "cm_contexts", "email_list_recipients", "email_lists",
+                "email_templates", "job_ons", "machine_repairer_assignments", "mf_contexts",
+                "pdf_directory_settings", "peso_measurement_rows", "pesos", "repairers",
                 "template_modules", "templates", "tool_machines", "tools", "users",
             },
             modelled);
@@ -60,7 +65,7 @@ public sealed class MigrationRunnerTests
         // P2-T04 non-effect: no seventh domain-core table and no machine registry exist.
         foreach (var absent in new[]
                  {
-                     "machines", "machine_registry", "repairers", "tool_references", "documents",
+                     "machines", "machine_registry", "tool_references", "documents",
                  })
         {
             Assert.DoesNotContain(absent, modelled);

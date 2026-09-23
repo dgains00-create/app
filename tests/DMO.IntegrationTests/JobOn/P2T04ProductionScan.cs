@@ -503,13 +503,21 @@ internal static class P2T04ProductionScan
 
     // ================= test-file scanning (BND10–BND12) =================================
 
-    /// <summary>The new P2-T04 test folders excluded from the "existing test" scans.</summary>
+    /// <summary>
+    /// The new P2-T04 test folders excluded from the "existing test" scans, plus the P2-T05 new
+    /// test folders (disclosed P2-T05 extension, P2-T05 response): P2-T05's own test surface is
+    /// excluded here exactly like P2-T04's own was, so the P2-T04 "existing tests never carry
+    /// vocabulary" rows keep scanning only the pre-existing surface.
+    /// </summary>
     public static IReadOnlyList<string> NewP2T04TestFolders { get; } =
     [
         "tests/DMO.UnitTests/Tools/",
         "tests/DMO.UnitTests/JobOn/",
         "tests/DMO.IntegrationTests/Tools/",
         "tests/DMO.IntegrationTests/JobOn/",
+        // ---- P2-T05 (disclosed): the new Controlo test surface -----------------------------
+        "tests/DMO.UnitTests/ControloCreate/",
+        "tests/DMO.IntegrationTests/ControloCreate/",
     ];
 
     /// <summary>
@@ -538,6 +546,11 @@ internal static class P2T04ProductionScan
         // persistence test, deliberately outside the 155-row contract matrix (see the response
         // file correction section).
         "JobOnSaveTimeConcurrencyTests.cs",
+        // ---- P2-T05 (disclosed): the new env-gated Controlo persistence tests --------------
+        "PesoRepositoryIntegrationTests.cs",
+        "ControloSettingsRepositoryIntegrationTests.cs",
+        "Migration004ControloCreateDomainTests.cs",
+        "PesoJobOnDependencyProbeIntegrationTests.cs",
     ];
 
     /// <summary>Returns whether a repository-relative test path belongs to the new P2-T04 surface.</summary>

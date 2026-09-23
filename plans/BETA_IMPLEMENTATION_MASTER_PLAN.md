@@ -440,7 +440,7 @@ document completes.
 | Blocker | Status |
 |---|---|
 | **B1** (P2-T04 Tool/Job On/context contract) | **RESOLVED — PLAN ACCEPT `7d7a7c564027945a5c9a73cb798e9c226ee7f013`.** Contract `plans/contracts/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT.md` at `58c6c1e8b4c9617daefc4ed02f7e65fb450bdada`; Architect plan review `dev/reviews/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT_PLAN_REVIEW.md` (in `diogo-o/dmo-work`) returned **PLAN ACCEPT** with 22 ACCEPT DEFAULT / 0 REQUIRES CORRECTION / 0 BLOCKING, stated **B1 → RESOLVED** and **P2-T04 implementation → AUTHORIZED**. P2-T04 is implemented against that contract and **CLOSED** (Architect focused re-review ACCEPT `b6f7a01c99fc8c517cca5cab335af5d47fb9e2f9` on the §15.1 correction, superseding the prior REJECT). |
-| **B2** (P2-T05/P2-T06 Controlo contract) | **CORRECTED — AWAITING ARCHITECT RE-REVIEW.** Contract `plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md` (status **P2-T05 CONTRACT CORRECTED — AWAITING ARCHITECT RE-REVIEW**; Architect plan review `256081fae43d4192b879b65fca0bb43efe8cdbca` = PLAN REJECT — C1–C4 only; **Q-PDF resolved**: ACCEPT DEFAULT — server-host filesystem configuration with server-side accessibility check; 27 ACCEPT DEFAULT / 0 BLOCKING; corrections C1–C4 applied; 66 AC / 84 matrix rows). Requires Architect `PLAN ACCEPT` before P2-T05/P2-T06 execution. |
+| **B2** (P2-T05/P2-T06 Controlo contract) | **RESOLVED — PLAN ACCEPT + IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW.** Contract `plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md` (status **P2-T05 CONTRACT ACCEPTED**; Architect plan review `256081fae43d4192b879b65fca0bb43efe8cdbca` = PLAN REJECT — C1–C4 only; **Q-PDF resolved**: ACCEPT DEFAULT — server-host filesystem configuration with server-side accessibility check; 27 ACCEPT DEFAULT / 0 BLOCKING; corrections C1–C4 applied; 66 AC / 84 matrix rows; re-review ACCEPT `f54ac15a96797a0dd0c51cf85b9b179e16be4da3`/`ceb9ee9…`). P2-T05 implemented against it (implementation response `dev/responses/P2_T05_IMPLEMENTATION_RESPONSE.md`); P2-T06 remains NOT AUTHORIZED. |
 | **B3**, **B4** | **UNCHANGED / OPEN** — no contract authored. P2-T07 and P2-T08 remain **NOT AUTHORIZED**. |
 
 ---
@@ -960,9 +960,10 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   consumed by P2-T06.
 - **Downstream dependents:** P2-T06, P2-T08, P2-T10.
 
-- **CONTRACT STATUS: CORRECTED — AWAITING ARCHITECT RE-REVIEW.** The B2 contract is
-  `plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md`, status
-  **P2-T05 CONTRACT CORRECTED — AWAITING ARCHITECT RE-REVIEW** and **B2 AWAITING PLAN ACCEPT**.
+- **CONTRACT STATUS: ACCEPTED.** The B2 contract is
+  `plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md`, status **P2-T05 CONTRACT ACCEPTED**
+  (Architect correction re-review ACCEPT `f54ac15a96797a0dd0c51cf85b9b179e16be4da3` /
+  `ceb9ee9…`, dmo-work).
   It fixes — over the real, closed P2-T04 seams — the Peso identity/anchoring model (`peso_id → cm_id` production | `tool_id` truthful pending with `Job On por associar`; no `production_id`,
   no duplicate identity chain, DB-enforced exclusive anchor), the weight **and** capacity
   registration (per-row `water_weight_g` entered + backend-derived `capacity_cm3` and
@@ -994,9 +995,21 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   handoff items authored by a follow-on contract). The Architect plan review returned
   **PLAN REJECT — C1–C4 only**; corrections C1 (matrix repair), C2 (`RESULT_NON_POSITIVE`),
   C3 (calculate-route identity pin) and C4 (Appendix D.3 provenance) were applied by the
-  correction task at the corrected contract commit. `ModuleRegistrations.CurrentBuildAvailable`
-  is still `[]`, no route is registered, and no application code was changed by the
-  authoring/correction tasks. P2-T05 implementation remains **NOT AUTHORIZED**.
+  correction task at the corrected contract commit; the correction re-review returned
+  **PLAN ACCEPT**.
+
+- **IMPLEMENTATION STATUS: IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT
+  IMPLEMENTATION REVIEW.** P2-T05 was authorized by the Architect correction re-review ACCEPT
+  (`f54ac15a96797a0dd0c51cf85b9b179e16be4da3`/`ceb9ee9…`) and is implemented against the accepted
+  contract: the Peso domain core (identity/anchoring, measurements, frozen facts), the stateless
+  calculate route, the create/edit/submit/associate transactions on one `peso_id`, the five
+  Definições surfaces, the PesoJobOnDependencyProbe, the two Controlo endpoint surfaces, the
+  fixed-desktop pages (`Pages/Controlo/Create` + `Definicoes`), the published Peso read-model
+  shapes, exactly ONE new migration (`ControloCreateDomain`: 8 tables, 22 CHECKs, 7 RESTRICT FKs),
+  and the complete 66-AC/84-row test-to-acceptance matrix (evidence in
+  `dev/responses/P2_T05_IMPLEMENTATION_RESPONSE.md`). `ModuleRegistrations.CurrentBuildAvailable`
+  remains `[]` and no destination route is registered: P2-T10 owns availability/navigation
+  registration. P2-T05 is **not** closed; P2-T06 and later remain **NOT AUTHORIZED**.
 
 ### P2-T06 — Controlo Approve
 
@@ -1562,6 +1575,6 @@ Investigated during this planning run and determined **not** to require implemen
 | 11 canonical order | AMBIGUITY | ALREADY SATISFIED | — |
 | 11 Peso vocabulary | AMBIGUITY | RESOLVED | P2-T05/P2-T06 |
 | **B1** Tool/Job On/context backend contract | BLOCKER | **RESOLVED — PLAN ACCEPT `7d7a7c564027945a5c9a73cb798e9c226ee7f013`** (contract `58c6c1e8b4c9617daefc4ed02f7e65fb450bdada`); P2-T04 implemented against it and **CLOSED** (Architect re-review ACCEPT `b6f7a01c99fc8c517cca5cab335af5d47fb9e2f9`) | P2-T04 |
-| **B2** Peso/Definições backend contract | BLOCKER | **CORRECTED — AWAITING ARCHITECT RE-REVIEW** (`plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md`; **P2-T05 CONTRACT CORRECTED — AWAITING ARCHITECT RE-REVIEW**; Architect plan review `256081fae…` PLAN REJECT — C1–C4 only; Q-PDF resolved — ACCEPT DEFAULT server-host filesystem configuration with server-side accessibility check; 27 ACCEPT DEFAULT / 0 BLOCKING; 66 AC / 84 matrix rows) | P2-T05, P2-T06 |
+| **B2** Peso/Definições backend contract | BLOCKER | **RESOLVED — PLAN ACCEPT + IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW** (`plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md`; **P2-T05 CONTRACT ACCEPTED**; Architect plan review `256081fae…` PLAN REJECT — C1–C4 only; Q-PDF resolved — ACCEPT DEFAULT server-host filesystem configuration with server-side accessibility check; 27 ACCEPT DEFAULT / 0 BLOCKING; 66 AC / 84 matrix rows; correction re-review ACCEPT `f54ac15a…`/`ceb9ee9…`; implementation response `dev/responses/P2_T05_IMPLEMENTATION_RESPONSE.md`; P2-T06 remains NOT AUTHORIZED) | P2-T05 (implemented), P2-T06 (authorization still required) |
 
-**Counts.** PARTIAL items dispositioned: **4/4**. MISSING items mapped: **17/17**. Ambiguities resolved: **7/7** (HISTÓRICO GLOBAL scope, missing design plan, P1-T07 status, canonical order, Peso vocabulary, plus the section-10 wiring set as three DO-NOT-IMPLEMENT resolutions). Ambiguities remaining BLOCKED BY AUTHORITY: **0**. Intra-workstream contract-authoring gaps (B1–B4): **B1 RESOLVED — PLAN ACCEPT; B2 CORRECTED — AWAITING ARCHITECT RE-REVIEW (Q-PDF resolved; 27 ACCEPT DEFAULT / 0 BLOCKING); B3/B4 OPEN** — none blocks planning.
+**Counts.** PARTIAL items dispositioned: **4/4**. MISSING items mapped: **17/17**. Ambiguities resolved: **7/7** (HISTÓRICO GLOBAL scope, missing design plan, P1-T07 status, canonical order, Peso vocabulary, plus the section-10 wiring set as three DO-NOT-IMPLEMENT resolutions). Ambiguities remaining BLOCKED BY AUTHORITY: **0**. Intra-workstream contract-authoring gaps (B1–B4): **B1 RESOLVED — PLAN ACCEPT (CLOSED); B2 RESOLVED — PLAN ACCEPT (implemented, awaiting verification/review); B3/B4 OPEN** — none blocks planning.

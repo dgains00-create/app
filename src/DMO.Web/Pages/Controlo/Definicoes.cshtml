@@ -1,0 +1,226 @@
+@page "/controlo/create/definicoes"
+@model DMO.Web.Pages.Controlo.DefinicoesModel
+@using DMO.Web.Frontend.Shared.Contracts
+@{
+    ViewData["Title"] = "Definições";
+}
+<partial name="~/Pages/Shared/Components/_SharedComponentAssets.cshtml" />
+<link rel="stylesheet" href="~/css/dmo-controlo.css" asp-append-version="true" />
+<script src="~/js/dmo-controlo.js" defer></script>
+
+@*
+    P2-T05 Definições surface (contract §9, §8.7; routes 12–17).
+
+    One page, five sections (Q-SURF default), inside the Controlo Create working area — NOT a
+    destination, NOT a Module, NOT registered anywhere. Gated by exactly the same `controlo-create`
+    policy as every P2-T05 route; only the backend decides (AUT1/AUT2/AC-G1/AC-G2).
+
+    Fixed desktop composition at the binding 1366 × 768 viewport (§24): the sections keep their
+    structural order at every desktop width; over-wide tables use local keyboard-reachable
+    overflow; no breakpoint variant, no card conversion, no required-column hiding and no action
+    relocation exists anywhere in this surface (LAY1/LAY3/AC-N1).
+
+    Every fact is a real backend read; the page-owned adapter (dmo-controlo.js) executes the
+    accepted settings routes. No recipient address is hardcoded anywhere (SET8/AC-F6); the PDF
+    check executes server-side with the typed vocabulary only (Q-PDF).
+*@
+<section class="dmo-controlo dmo-controlo--definicoes" data-dmo-controlo-surface="definicoes" data-dmo-controlo-root="true">
+    @if (Model.LookupFailed)
+    {
+        <partial name="~/Pages/Shared/Components/_CommonStateRegion.cshtml"
+                 model="@CommonStateRegionPresentation.LookupFailed(
+                     "Não foi possível obter as definições operacionais.",
+                     "Definições")" />
+    }
+
+    @* ---- Section 1 — Reparadores (register: name only; add / rename / select; NO delete) ---- *@
+    <div class="dmo-controlo__region" data-dmo-controlo-region="repairers" aria-label="Reparadores">
+        <h2 class="dmo-controlo__section-title">Reparadores</h2>
+        <div class="dmo-controlo__settings-scroll" role="region" tabindex="0" aria-label="Lista de reparadores">
+            <table class="dmo-controlo__settings-table" data-dmo-repairers-table="true">
+                <thead>
+                    <tr><th>Nome</th><th>Versão</th><th>Renomear</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var repairer in Model.Repairers)
+                    {
+                        <tr data-dmo-repairer-row="@repairer.RepairerId">
+                            <td data-dmo-repairer-name="@repairer.RepairerId">@repairer.Name</td>
+                            <td>@repairer.Version</td>
+                            <td>
+                                <input class="dmo-controlo__input dmo-controlo__input--compact"
+                                       type="text"
+                                       value="@repairer.Name"
+                                       data-dmo-repairer-rename="@repairer.RepairerId"
+                                       data-dmo-repairer-version="@repairer.Version"
+                                       aria-label="Novo nome do reparador" />
+                                <button class="dmo-controlo__button" type="button" data-dmo-repairer-rename-save="@repairer.RepairerId">Renomear</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="dmo-controlo__settings-form" data-dmo-repairer-add-region="true">
+            <label class="dmo-controlo__label" for="dmo-controlo-repairer-name">Novo reparador</label>
+            <input class="dmo-controlo__input" id="dmo-controlo-repairer-name" type="text" data-dmo-repairer-new-name="true" />
+            <button class="dmo-controlo__button" type="button" data-dmo-repairer-add="true">Adicionar</button>
+        </div>
+    </div>
+
+    @* ---- Section 2 — Reparador por máquina (B1 B2 B3 C1 C2 C3, independent; no grouping) ---- *@
+    <div class="dmo-controlo__region" data-dmo-controlo-region="machine-assignments" aria-label="Reparador por máquina">
+        <h2 class="dmo-controlo__section-title">Reparador por máquina</h2>
+        <div class="dmo-controlo__settings-scroll" role="region" tabindex="0" aria-label="Atribuições por máquina">
+            <table class="dmo-controlo__settings-table" data-dmo-assignments-table="true">
+                <thead>
+                    <tr><th>Máquina</th><th>Reparador</th><th>Guardar</th><th>Limpar</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var machine in Model.MachineAssignments)
+                    {
+                        var assignedName = Model.Repairers.FirstOrDefault(repairer => repairer.RepairerId.Value == machine.RepairerId)?.Name ?? "—";
+                        <tr data-dmo-assignment-row="@machine.Machine">
+                            <td>@machine.Machine</td>
+                            <td>
+                                <select class="dmo-controlo__input dmo-controlo__input--select"
+                                        data-dmo-assignment-repairer="@machine.Machine"
+                                        data-dmo-assignment-version="@machine.Version"
+                                        aria-label="Reparador da máquina @machine.Machine">
+                                    <option value="" selected="@(machine.RepairerId is null)">— sem reparador —</option>
+                                    @foreach (var repairer in Model.Repairers)
+                                    {
+                                        <option value="@repairer.RepairerId.Value"
+                                                selected="@(machine.RepairerId == repairer.RepairerId.Value)">@repairer.Name</option>
+                                    }
+                                </select>
+                            </td>
+                            <td><button class="dmo-controlo__button" type="button" data-dmo-assignment-set="@machine.Machine">Guardar</button></td>
+                            <td><button class="dmo-controlo__button" type="button" data-dmo-assignment-clear="@machine.Machine">Limpar</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p class="dmo-controlo__hint">Cada máquina tem a sua própria atribuição; não existe agrupamento por linha, e alterar uma máquina não altera as outras.</p>
+    </div>
+
+    @* ---- Section 3 — Diretório de PDF/documentos (server-host path; configure/change/check, Q-PDF) ---- *@
+    <div class="dmo-controlo__region" data-dmo-controlo-region="pdf-directory" aria-label="Diretório de PDF/documentos">
+        <h2 class="dmo-controlo__section-title">Diretório de PDF/documentos</h2>
+        <form class="dmo-controlo__settings-form" data-dmo-pdf-form="true">
+            <label class="dmo-controlo__label" for="dmo-controlo-pdf-directory">Diretório base (caminho absoluto no servidor)</label>
+            <input class="dmo-controlo__input"
+                   id="dmo-controlo-pdf-directory"
+                   type="text"
+                   value="@Model.PdfDirectory?.BaseDirectory"
+                   data-dmo-pdf-directory="true"
+                   data-dmo-pdf-version="@(Model.PdfDirectory?.Version ?? 0)"
+                   data-dmo-pdf-configured="@(Model.PdfDirectory is null ? "false" : "true")" />
+            <button class="dmo-controlo__button" type="button" data-dmo-pdf-save="true">Guardar</button>
+            <button class="dmo-controlo__button" type="button" data-dmo-pdf-check="true">Verificar acesso</button>
+        </form>
+        <p class="dmo-controlo__pdf-result" data-dmo-pdf-result="true" hidden></p>
+    </div>
+
+    @* ---- Section 4 — Listas de email (named lists; complete recipient sets; never hardcoded) ---- *@
+    <div class="dmo-controlo__region" data-dmo-controlo-region="email-lists" aria-label="Listas de email">
+        <h2 class="dmo-controlo__section-title">Listas de email</h2>
+        <div class="dmo-controlo__settings-scroll" role="region" tabindex="0" aria-label="Listas de email">
+            <table class="dmo-controlo__settings-table" data-dmo-lists-table="true">
+                <thead>
+                    <tr><th>Nome</th><th>Destinatários</th><th>Versão</th><th>Eliminar</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var list in Model.EmailLists)
+                    {
+                        <tr data-dmo-list-row="@list.EmailListId">
+                            <td data-dmo-list-name="@list.EmailListId">@list.Name</td>
+                            <td>@list.RecipientCount</td>
+                            <td data-dmo-list-version="@list.EmailListId">@list.Version</td>
+                            <td>
+                                <button class="dmo-controlo__button" type="button"
+                                        data-dmo-list-delete="@list.EmailListId"
+                                        data-dmo-list-delete-name="@list.Name"
+                                        data-dmo-list-delete-version="@list.Version">Eliminar</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <form class="dmo-controlo__settings-form" data-dmo-list-form="true">
+            <label class="dmo-controlo__label" for="dmo-controlo-list-name">Nome da lista</label>
+            <input class="dmo-controlo__input" id="dmo-controlo-list-name" type="text" data-dmo-list-new-name="true" />
+            <label class="dmo-controlo__label" for="dmo-controlo-list-recipients">Destinatários (um por linha)</label>
+            <textarea class="dmo-controlo__input dmo-controlo__input--textarea"
+                      id="dmo-controlo-list-recipients"
+                      rows="4"
+                      data-dmo-list-new-recipients="true"></textarea>
+            <button class="dmo-controlo__button" type="button" data-dmo-list-create="true">Criar lista</button>
+            @* The edit region is populated by the adapter with the full recipient set (replace-all). *@
+            <div data-dmo-list-edit-region="true" hidden>
+                <input type="hidden" data-dmo-list-edit-id="true" />
+                <input type="hidden" data-dmo-list-edit-version="true" />
+                <button class="dmo-controlo__button" type="button" data-dmo-list-update="true">Guardar alterações</button>
+                <button class="dmo-controlo__button" type="button" data-dmo-list-edit-cancel="true">Cancelar edição</button>
+            </div>
+        </form>
+    </div>
+
+    @* ---- Section 5 — Templates de email (subject/body/document type; text verbatim, Q-PLACE) ---- *@
+    <div class="dmo-controlo__region" data-dmo-controlo-region="email-templates" aria-label="Templates de email">
+        <h2 class="dmo-controlo__section-title">Templates de email</h2>
+        <div class="dmo-controlo__settings-scroll" role="region" tabindex="0" aria-label="Templates de email">
+            <table class="dmo-controlo__settings-table" data-dmo-templates-table="true">
+                <thead>
+                    <tr><th>Nome</th><th>Assunto</th><th>Tipo de documento</th><th>Versão</th><th>Eliminar</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var template in Model.EmailTemplates)
+                    {
+                        <tr data-dmo-template-row="@template.EmailTemplateId">
+                            <td data-dmo-template-name="@template.EmailTemplateId">@template.Name</td>
+                            <td>@template.Subject</td>
+                            <td>@(template.DocumentType is { } type ? type.ToString() : "— (genérico)")</td>
+                            <td data-dmo-template-version="@template.EmailTemplateId">@template.Version</td>
+                            <td>
+                                <button class="dmo-controlo__button" type="button"
+                                        data-dmo-template-delete="@template.EmailTemplateId"
+                                        data-dmo-template-delete-name="@template.Name"
+                                        data-dmo-template-delete-version="@template.Version">Eliminar</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <form class="dmo-controlo__settings-form" data-dmo-template-form="true">
+            <label class="dmo-controlo__label" for="dmo-controlo-template-name">Nome</label>
+            <input class="dmo-controlo__input" id="dmo-controlo-template-name" type="text" data-dmo-template-new-name="true" />
+            <label class="dmo-controlo__label" for="dmo-controlo-template-subject">Assunto</label>
+            <input class="dmo-controlo__input" id="dmo-controlo-template-subject" type="text" data-dmo-template-new-subject="true" />
+            <label class="dmo-controlo__label" for="dmo-controlo-template-body">Corpo (texto literal)</label>
+            <textarea class="dmo-controlo__input dmo-controlo__input--textarea"
+                      id="dmo-controlo-template-body"
+                      rows="4"
+                      data-dmo-template-new-body="true"></textarea>
+            <label class="dmo-controlo__label" for="dmo-controlo-template-type">Tipo de documento</label>
+            <select class="dmo-controlo__input dmo-controlo__input--select" id="dmo-controlo-template-type" data-dmo-template-new-type="true">
+                <option value="">— genérico —</option>
+                <option value="peso">Peso</option>
+                <option value="pegamentos">Pegamentos</option>
+                <option value="resumo">Resumo</option>
+            </select>
+            <button class="dmo-controlo__button" type="button" data-dmo-template-create="true">Criar template</button>
+            <div data-dmo-template-edit-region="true" hidden>
+                <input type="hidden" data-dmo-template-edit-id="true" />
+                <input type="hidden" data-dmo-template-edit-version="true" />
+                <button class="dmo-controlo__button" type="button" data-dmo-template-update="true">Guardar alterações</button>
+                <button class="dmo-controlo__button" type="button" data-dmo-template-edit-cancel="true">Cancelar edição</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="dmo-controlo__state" data-dmo-controlo-state="true" hidden></div>
+</section>

@@ -1,0 +1,291 @@
+@page "/controlo/create"
+@model DMO.Web.Pages.Controlo.CreateModel
+@using DMO.Web.Frontend.Shared.Contracts
+@{
+    ViewData["Title"] = "Novo controlo";
+    var isDraftMode = Model.Draft is not null;
+    var isProductionMode = Model.CmContext is not null && Model.Draft is null;
+}
+<partial name="~/Pages/Shared/Components/_SharedComponentAssets.cshtml" />
+<link rel="stylesheet" href="~/css/dmo-controlo.css" asp-append-version="true" />
+<script src="~/js/dmo-measurement-rows.js" defer></script>
+<script src="~/js/dmo-controlo.js" defer></script>
+
+@*
+    P2-T05 Novo controlo surface (contract §8.3 regions R1–R8, §8.4–§8.7).
+
+    Fixed desktop composition at the binding 1366 × 768 viewport (§24): R1–R8 keep their structural
+    order at every desktop width; smaller windows scroll; over-wide regions (R5 results) use local
+    keyboard-reachable overflow. No breakpoint variant, no card conversion, no required-column
+    hiding and no action relocation exists anywhere in this surface (LAY1/LAY3/AC-N1).
+
+    Every fact rendered is a REAL backend read: the strip (R1) and the CM context (R3) come from the
+    accepted Job On ficha composition, the draft (R4–R7) from the published Peso sheet; nothing is
+    reconstructed from form text. The mutating actions post to the accepted minimal-API routes
+    through the page-owned adapter (dmo-controlo.js); backend validation is authoritative and
+    entered values are retained on refusal (§8.5).
+*@
+<section class="dmo-controlo" data-dmo-controlo-surface="create" data-dmo-controlo-root="true">
+    @* ---- R1 — Production/Job On context strip (read-only header region) ------------------- *@
+    <div class="dmo-controlo__strip" data-dmo-controlo-strip="true" aria-label="Contexto da produção">
+        @if (Model.Strip is { } strip)
+        {
+            <dl class="dmo-controlo__strip-facts">
+                <div class="dmo-controlo__strip-fact"><dt>Referência</dt><dd data-dmo-strip-reference="true">@strip.Reference</dd></div>
+                <div class="dmo-controlo__strip-fact"><dt>Produção</dt><dd data-dmo-strip-production="true">@strip.ProductionNumber</dd></div>
+                <div class="dmo-controlo__strip-fact"><dt>Máquina</dt><dd data-dmo-strip-machine="true">@strip.Machine</dd></div>
+                <div class="dmo-controlo__strip-fact"><dt>Data</dt><dd data-dmo-strip-date="true">@(strip.ProductionDate?.ToString("yyyy-MM-dd") ?? "—")</dd></div>
+                <div class="dmo-controlo__strip-fact"><dt>Processo</dt><dd data-dmo-strip-processo="true">@(strip.Processo ?? "—")</dd></div>
+            </dl>
+        }
+        else
+        {
+            <p class="dmo-controlo__strip-empty" data-dmo-strip-empty="true">Selecione uma produção para iniciar o controlo.</p>
+        }
+    </div>
+
+    @* ---- R2 — Production selection (explicit human selection, never auto-selected) -------- *@
+    <div class="dmo-controlo__region" data-dmo-controlo-region="selection" aria-label="Seleção de produção">
+        <form class="dmo-controlo__lookup" method="get" action="/controlo/create" data-dmo-controlo-lookup="true">
+            <label class="dmo-controlo__label" for="dmo-controlo-reference">Referência</label>
+            <input class="dmo-controlo__input"
+                   id="dmo-controlo-reference"
+                   name="reference"
+                   type="text"
+                   value="@Model.Reference"
+                   data-dmo-controlo-reference="true" />
+            <button class="dmo-controlo__button" type="submit" data-dmo-controlo-lookup-submit="true">Pesquisar</button>
+        </form>
+
+        @if (Model.ValidationErrors.Count > 0)
+        {
+            <ul class="dmo-controlo__errors" role="alert" data-dmo-controlo-errors="true">
+                @foreach (var error in Model.ValidationErrors)
+                {
+                    <li data-dmo-controlo-error="@error">@error</li>
+                }
+            </ul>
+        }
+        else if (Model.LookupFailed)
+        {
+            <partial name="~/Pages/Shared/Components/_CommonStateRegion.cshtml"
+                     model="@CommonStateRegionPresentation.LookupFailed(
+                         "Não foi possível obter as produções desta referência.",
+                         "Seleção de produção")" />
+        }
+        else if (Model.Productions is not null)
+        {
+            <div class="dmo-controlo__route-map" data-dmo-productions-route-map="true" hidden>
+                @foreach (var route in Model.ProductionRoutes)
+                {
+                    <span data-dmo-production-route="@route.Key" data-dmo-production-href="@route.Href"></span>
+                }
+            </div>
+            <partial name="~/Pages/Shared/Components/_DenseDataTable.cshtml" model="Model.Productions" />
+        }
+    </div>
+
+    @* ---- R3 — CM context (determined / pending / missing-context recovery) ---------------- *@
+    @if (Model.CmContext is { } cm)
+    {
+        <div class="dmo-controlo__region" data-dmo-controlo-region="cm-context" aria-label="Contexto CM"
+             data-dmo-cm-tool="@cm.ToolId"
+             data-dmo-cm-id="@cm.CmContextId"
+             data-dmo-pending="@(cm.IsPending ? "true" : "false")">
+            @if (cm.IsPending)
+            {
+                @* The truthful pending condition: Job On por associar is a context condition, not
+                   an error and not a status; the Peso is fully usable in this state (AC-P2). *@
+                <div class="dmo-controlo__pending" data-dmo-pending-condition="true">
+                    <strong>Job On por associar</strong>
+                    <span>Este Peso está ancorado à ferramenta CM selecionada; a associação a uma produção é explícita e não bloqueia a medição.</span>
+                </div>
+                @if (cm.Tool is not null)
+                {
+                    <partial name="~/Pages/Shared/Components/_ToolSummaryRow.cshtml" model="cm.Tool" />
+                }
+                @if (Model.AssociationCandidates.Count > 0)
+                {
+                    <div class="dmo-controlo__associate" data-dmo-associate-region="true" aria-label="Associar a uma produção">
+                        <label class="dmo-controlo__label" for="dmo-controlo-candidate">Associar a</label>
+                        <select class="dmo-controlo__input dmo-controlo__input--select"
+                                id="dmo-controlo-candidate"
+                                data-dmo-associate-candidate="true">
+                            @foreach (var candidate in Model.AssociationCandidates)
+                            {
+                                <option value="@candidate.Key"
+                                        data-dmo-candidate-id="@candidate.CmContextId">@candidate.Reference — @candidate.ProductionNumber (@candidate.Machine)</option>
+                            }
+                        </select>
+                        <button class="dmo-controlo__button" type="button" data-dmo-associate="true">Associar</button>
+                    </div>
+                }
+            }
+            else if (cm.HasNoContext)
+            {
+                @* Missing-context recovery: actionable message; the shared Tool orchestration
+                   (ferramentas-gated) is the only Tool access path (AC-R6). *@
+                <div class="dmo-controlo__missing-context" data-dmo-missing-context="true">
+                    <strong>Esta produção não tem ferramenta CM associada.</strong>
+                    <span>Corrija as ferramentas no Job On (selecione/crie a ferramenta CM) e volte a abrir o controlo.</span>
+                </div>
+            }
+            else
+            {
+                @* The determined CM context: frozen triple + live Tool projection as SEPARATE
+                   facts (P2-T04 context semantics; the frozen triple is never refreshed). *@
+                <div class="dmo-controlo__cm-determined" data-dmo-cm-determined="true">
+                    <dl class="dmo-controlo__frozen-triple" data-dmo-frozen-triple="true">
+                        <div class="dmo-controlo__strip-fact"><dt>Ferramenta CM (fixada)</dt><dd>@cm.FrozenReference — lote @cm.FrozenLot</dd></div>
+                    </dl>
+                    @if (cm.Tool is not null)
+                    {
+                        <partial name="~/Pages/Shared/Components/_ToolSummaryRow.cshtml" model="cm.Tool" />
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    @* ---- R4 — Peso inputs (temperature, drawing inputs, SAP references, rows) ------------- *@
+    <div class="dmo-controlo__region" data-dmo-controlo-region="inputs"
+         data-dmo-inputs="true"
+         data-readonly="@(Model.IsSubmitted ? "true" : "false")">
+        <div class="dmo-controlo__facts">
+            <label class="dmo-controlo__label" for="dmo-controlo-temperature">Temperatura da água (°C)</label>
+            <input class="dmo-controlo__input dmo-controlo__input--compact"
+                   id="dmo-controlo-temperature"
+                   name="waterTemperature"
+                   type="number"
+                   step="0.1"
+                   min="5"
+                   max="35"
+                   value="@(Model.Draft?.WaterTemperature.ToString("0.0") ?? string.Empty)"
+                   data-dmo-field-temperature="true"
+                   readonly="@(Model.IsSubmitted ? "readonly" : null)"
+                   disabled="@(Model.IsSubmitted ? "disabled" : null)" />
+            <label class="dmo-controlo__label" for="dmo-controlo-marisa">Volume Marisa/BQ (cm³)</label>
+            <input class="dmo-controlo__input dmo-controlo__input--compact"
+                   id="dmo-controlo-marisa"
+                   name="volumeMarisaBq"
+                   type="number"
+                   step="0.0001"
+                   min="0"
+                   value="@(Model.Draft?.VolumeMarisaBq?.ToString("0.####") ?? string.Empty)"
+                   data-dmo-field-marisa="true"
+                   readonly="@(Model.IsSubmitted ? "readonly" : null)"
+                   disabled="@(Model.IsSubmitted ? "disabled" : null)" />
+            <label class="dmo-controlo__label" for="dmo-controlo-puncao">Volume Punção/PU (cm³)</label>
+            <input class="dmo-controlo__input dmo-controlo__input--compact"
+                   id="dmo-controlo-puncao"
+                   name="volumePuncaoPu"
+                   type="number"
+                   step="0.0001"
+                   min="0"
+                   value="@(Model.Draft?.VolumePuncaoPu?.ToString("0.####") ?? string.Empty)"
+                   data-dmo-field-puncao="true"
+                   readonly="@(Model.IsSubmitted ? "readonly" : null)"
+                   disabled="@(Model.IsSubmitted ? "disabled" : null)" />
+            <label class="dmo-controlo__label" for="dmo-controlo-sap-end">Fim da produção anterior (SAP)</label>
+            <input class="dmo-controlo__input"
+                   id="dmo-controlo-sap-end"
+                   name="previousProductionEndReference"
+                   type="text"
+                   value="@Model.Draft?.PreviousProductionEndReference"
+                   data-dmo-field-sap-end="true"
+                   readonly="@(Model.IsSubmitted ? "readonly" : null)"
+                   disabled="@(Model.IsSubmitted ? "disabled" : null)" />
+            <label class="dmo-controlo__label" for="dmo-controlo-sap-weight">Peso médio anterior (SAP)</label>
+            <input class="dmo-controlo__input"
+                   id="dmo-controlo-sap-weight"
+                   name="previousAverageWeightReference"
+                   type="text"
+                   value="@Model.Draft?.PreviousAverageWeightReference"
+                   data-dmo-field-sap-weight="true"
+                   readonly="@(Model.IsSubmitted ? "readonly" : null)"
+                   disabled="@(Model.IsSubmitted ? "disabled" : null)" />
+        </div>
+        @{
+            ViewData["MeasurementRowsRegionId"] = "dmo-controlo-rows";
+        }
+        <partial name="~/Pages/Shared/Components/_MeasurementRows.cshtml" model="Model.Rows" />
+    </div>
+
+    @* ---- R5 — Results (individual results first-class; derived averages present but never
+              hiding an individual result; CALCULATION_CONFIGURATION_MISSING state) --------- *@
+    <div class="dmo-controlo__region" data-dmo-controlo-region="results" aria-label="Resultados">
+        @if (Model.Results is { } results)
+        {
+            <div class="dmo-controlo__results-scroll" data-dmo-controlo-results-scroll="true" role="region" tabindex="0" aria-label="Resultados por leitura">
+                <table class="dmo-controlo__results-table" data-dmo-results-table="true">
+                    <thead>
+                        <tr>
+                            <th>Leitura</th>
+                            <th>Peso em água (g)</th>
+                            <th>Capacidade (cm³)</th>
+                            <th>Desvio cm³</th>
+                            <th>Desvio %</th>
+                            <th>Peso do vidro (g)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in results.Rows)
+                        {
+                            <tr data-dmo-result-row="@row.RowPosition">
+                                <td>@row.RowPosition</td>
+                                <td>@row.WaterWeightG.ToString("0.##")</td>
+                                <td data-dmo-result-capacity="@row.RowPosition">@row.CapacityCm3.ToString("0.##")</td>
+                                <td>@results.DeviationCm3(row).ToString("0.##")</td>
+                                <td>@(results.DeviationPercent(row)?.ToString("0.##") + "%")</td>
+                                <td data-dmo-result-glass="@row.RowPosition">@row.GlassWeightG.ToString("0.##")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <dl class="dmo-controlo__summary" data-dmo-results-summary="true">
+                <div><dt>Média em água</dt><dd data-dmo-summary-water>@(results.AverageWaterWeightG?.ToString("0.##") ?? "—")</dd></div>
+                <div><dt>Capacidade média</dt><dd data-dmo-summary-capacity>@(results.AverageCapacityCm3?.ToString("0.##") ?? "—")</dd></div>
+                <div><dt>Peso médio do vidro</dt><dd data-dmo-summary-glass>@(results.AverageGlassWeightG?.ToString("0.##") ?? "—")</dd></div>
+                <div><dt>Densidade usada</dt><dd data-dmo-summary-density>@(results.GlassDensityGCm3?.ToString("0.####") ?? "—")</dd></div>
+            </dl>
+        }
+        <p class="dmo-controlo__results-hint" data-dmo-results-hint="true" hidden>
+            Os resultados por leitura são apresentados após Calcular.
+        </p>
+        <div class="dmo-controlo__calculation-missing" data-dmo-calculation-missing="true" hidden role="alert">
+            A configuração de cálculo (divisor de temperatura ou densidade do vidro) não está disponível.
+            Nenhum valor é inventado; configure a cálcula e repita.
+        </div>
+    </div>
+
+    @* ---- R6 — Actions (DecisionBar; submitting distinct from saving; no approve semantics) -- *@
+    <div class="dmo-controlo__region" data-dmo-controlo-region="actions" aria-label="Ações">
+        @{
+            ViewData["DecisionBarRegionId"] = "dmo-controlo-actions";
+        }
+        <partial name="~/Pages/Shared/Components/_DecisionBar.cshtml" model="Model.Actions" />
+    </div>
+
+    @* ---- R7 — Status/state region (RecordStatus + pending condition + common states) ------ *@
+    <div class="dmo-controlo__region" data-dmo-controlo-region="status" aria-label="Estado">
+        <partial name="~/Pages/Shared/Components/_RecordStatus.cshtml" model="Model.Status" />
+        <div class="dmo-controlo__state" data-dmo-controlo-state="true" hidden></div>
+    </div>
+
+    @* ---- R8 — Document seam region (reserved; NO generation action and NO availability
+              lookup — P2-T08 owns generation/availability, Q-DOCREAD) ---------------------- *@
+    <div class="dmo-controlo__region" data-dmo-controlo-region="documents" aria-label="Documentos">
+        <p class="dmo-controlo__documents-seam" data-dmo-documents-seam="true">
+            A disponibilidade de documentos é apresentada após a aprovação.
+        </p>
+    </div>
+
+    @* Page-owned adapter state: the REAL observed version and anchors (backend facts only). *@
+    <div class="dmo-controlo__adapter-state" hidden
+         data-dmo-peso-id="@(Model.Draft?.PesoId)"
+         data-dmo-version="@Model.ObservedVersion"
+         data-dmo-anchor-cm="@(Model.Draft?.CmId ?? Model.CmContext?.CmContextId)"
+         data-dmo-anchor-tool="@(Model.Draft?.ToolId ?? Model.CmContext?.ToolId)"
+         data-dmo-submitted="@(Model.IsSubmitted ? "true" : "false")"></div>
+</section>

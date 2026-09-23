@@ -30,4 +30,15 @@ public interface IJobOnService
 
     /// <summary>Deletes the occurrence only when no registered dependency probe objects.</summary>
     Task<JobOnResult> DeleteAsync(DeleteJobOnCommand command, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Lists every real <c>cm_contexts</c> row resolving to the supplied canonical Tool (the
+    /// P2-T05 contract §20.4.2 additive read: one additive read-only member on the Job On
+    /// application contract, accepted under Q-CAND). It is the §8.3 reverse read exposed to the
+    /// consuming Controlo workflow for pending-association candidates; it modifies no other member
+    /// and no Job On route.
+    /// </summary>
+    Task<JobOnResult> ListPesoAssociationCandidatesAsync(
+        Guid toolId,
+        CancellationToken cancellationToken);
 }

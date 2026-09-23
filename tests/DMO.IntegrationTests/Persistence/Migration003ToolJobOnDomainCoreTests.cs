@@ -34,6 +34,12 @@ public sealed class Migration003ToolJobOnDomainCoreTests
     /// <summary>The EF migration class name of the P2-T04 migration (§16.1).</summary>
     private const string ToolJobOnMigrationName = "ToolJobOnDomainCore";
 
+    /// <summary>
+    /// The EF migration class name of the P2-T05 migration (P2-T05 contract §25.1) — disclosed
+    /// extension: the P2-T05 migration now applies on top of this one.
+    /// </summary>
+    private const string ControloCreateMigrationName = "ControloCreateDomain";
+
     /// <summary>The four foundation tables of migrations 001/002.</summary>
     private static readonly string[] FoundationTables =
         ["admin_accounts", "templates", "template_modules", "users"];
@@ -42,13 +48,26 @@ public sealed class Migration003ToolJobOnDomainCoreTests
     private static readonly string[] DomainCoreTables =
         ["bq_contexts", "cm_contexts", "job_ons", "mf_contexts", "tool_machines", "tools"];
 
+    /// <summary>
+    /// The eight contracted Controlo tables of migration 004 (disclosed P2-T05 extension, P2-T05
+    /// contract §16/§25).
+    /// </summary>
+    private static readonly string[] ControloTables =
+    [
+        "email_list_recipients", "email_lists", "email_templates",
+        "machine_repairer_assignments", "pdf_directory_settings", "peso_measurement_rows",
+        "pesos", "repairers",
+    ];
+
     /// <summary>EF's own migration bookkeeping table (never a product table).</summary>
     private const string MigrationHistoryTable = "__EFMigrationsHistory";
 
-    /// <summary>Tables that must never appear (contract §17, AC-99, AC-104).</summary>
+    /// <summary>Tables that must never appear (contract §17, AC-99, AC-104; P2-T05 removed
+    /// <c>repairers</c> from the forbidden list because the accepted P2-T05 contract creates the
+    /// canonical repairer register — disclosed extension).</summary>
     private static readonly string[] ForbiddenTables =
     [
-        "machines", "machine_registry", "repairers", "tool_references", "documents", "settings",
+        "machines", "machine_registry", "tool_references", "documents", "settings",
         "permissions", "capabilities", "roles", "admin_audit_events",
     ];
 
@@ -191,8 +210,10 @@ public sealed class Migration003ToolJobOnDomainCoreTests
             "SELECT table_name FROM information_schema.tables " +
             "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"));
 
+        // Disclosed P2-T05 extension: the shared schema now also holds the eight contracted
+        // Controlo tables (migration 004); the P2-T04 rows keep pinning the complete set.
         Assert.Equal(
-            Sorted([.. FoundationTables, .. DomainCoreTables, MigrationHistoryTable]),
+            Sorted([.. FoundationTables, .. DomainCoreTables, .. ControloTables, MigrationHistoryTable]),
             tables);
 
         foreach (var forbidden in ForbiddenTables)
@@ -526,8 +547,9 @@ public sealed class Migration003ToolJobOnDomainCoreTests
                 && !name.StartsWith("DmoDbContextModelSnapshot", StringComparison.Ordinal))
             .ToList();
 
-        // Exactly three migrations exist: 001, 002 and the single P2-T04 migration.
-        Assert.Equal(3, migrationFiles.Count);
+        // Exactly four migrations exist: 001, 002, the P2-T04 migration and the P2-T05 Controlo
+        // migration (disclosed extension).
+        Assert.Equal(4, migrationFiles.Count);
         var toolJobOnMigrations = migrationFiles
             .Where(name => name.EndsWith($"_{ToolJobOnMigrationName}.cs", StringComparison.Ordinal))
             .ToList();
@@ -542,14 +564,31 @@ public sealed class Migration003ToolJobOnDomainCoreTests
         var stamp = migrationFile[..migrationFile.IndexOf('_')];
         Assert.StartsWith(stamp, designerFile, StringComparison.Ordinal);
 
-        // The snapshot and the migration designer record exactly the ten product tables.
-        var expectedTables = Sorted([.. FoundationTables, .. DomainCoreTables]);
+        // The single P2-T05 migration pair exists on top of this one (P2-T05 contract §25.1).
+        var controloMigrations = migrationFiles
+            .Where(name => name.EndsWith($"_{ControloCreateMigrationName}.cs", StringComparison.Ordinal))
+            .ToList();
+        var controloMigrationFile = Assert.Single(controloMigrations);
+        var controloDesignerFile = Assert.Single(files, name =>
+            name.EndsWith($"_{ControloCreateMigrationName}.Designer.cs", StringComparison.Ordinal));
+        var controloStamp = controloMigrationFile[..controloMigrationFile.IndexOf('_')];
+        Assert.StartsWith(controloStamp, controloDesignerFile, StringComparison.Ordinal);
+
+        // The snapshot and the CONTROL migration designers record exactly the eighteen product tables
+        // (disclosed P2-T05 extension: ten prior + eight Controlo). The P2-T04 migration's OWN
+        // designer is a frozen historical artifact of its generation time and still records the
+        // ten tables it shipped with.
+        var expectedTables = Sorted([.. FoundationTables, .. DomainCoreTables, .. ControloTables]);
+        var expectedP2T04DesignerTables = Sorted([.. FoundationTables, .. DomainCoreTables]);
 
         var snapshot = await File.ReadAllTextAsync(Path.Combine(migrationsDirectory, "DmoDbContextModelSnapshot.cs"));
         Assert.Equal(expectedTables, Sorted(TablesOf(snapshot)));
 
         var designer = await File.ReadAllTextAsync(Path.Combine(migrationsDirectory, designerFile));
-        Assert.Equal(expectedTables, Sorted(TablesOf(designer)));
+        Assert.Equal(expectedP2T04DesignerTables, Sorted(TablesOf(designer)));
+
+        var controloDesigner = await File.ReadAllTextAsync(Path.Combine(migrationsDirectory, controloDesignerFile));
+        Assert.Equal(expectedTables, Sorted(TablesOf(controloDesigner)));
     }
 
     /// <summary>
@@ -565,7 +604,8 @@ public sealed class Migration003ToolJobOnDomainCoreTests
         await PersistenceTestDatabase.ApplyMigrationsAsync(context);
 
         var latest = context.Database.GetMigrations().Last();
-        Assert.EndsWith(ToolJobOnMigrationName, latest, StringComparison.Ordinal);
+        // Disclosed P2-T05 extension: the latest migration is now the Controlo domain migration.
+        Assert.EndsWith(ControloCreateMigrationName, latest, StringComparison.Ordinal);
 
         try
         {

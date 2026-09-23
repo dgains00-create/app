@@ -185,6 +185,21 @@ public enum JobOnRefusalReason
 }
 
 /// <summary>
+/// One pending-association candidate: a real <c>cm_contexts</c> row resolving to the anchor Tool.
+/// </summary>
+/// <remarks>
+/// Authority: P2-T05 contract §20.4.2 (the accepted Q-CAND additive read) and §4.3. Candidates are
+/// real context rows, never synthesized (PID9/AC-P6); association is always human-confirmed, never
+/// automatic and never inferred (CROSS_MODULE_FLOWS anti-inference rules).
+/// </remarks>
+public sealed record PesoAssociationCandidate(
+    Guid CmContextId,
+    Guid JobOnId,
+    string Reference,
+    string ProductionNumber,
+    string Machine);
+
+/// <summary>
 /// The closed Job On result set.
 /// </summary>
 /// <remarks>
@@ -218,6 +233,12 @@ public abstract record JobOnResult
 
     /// <summary>The occurrence was updated; the version incremented exactly once.</summary>
     public sealed record Updated(Guid JobOnId, int Version) : JobOnResult;
+
+    /// <summary>
+    /// The real pending-association candidates resolving to the supplied Tool (P2-T05 §20.4.2
+    /// additive read, Q-CAND).
+    /// </summary>
+    public sealed record AssociationCandidates(IReadOnlyList<PesoAssociationCandidate> Candidates) : JobOnResult;
 
     /// <summary>The duplicated occurrence and its explicit source.</summary>
     public sealed record Duplicated(Guid JobOnId, Guid SourceJobOnId, int Version) : JobOnResult;

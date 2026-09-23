@@ -207,14 +207,22 @@ public sealed class ToolRestrictionTests
                 .Where(name => name.Contains("tool", StringComparison.Ordinal))
                 .OrderBy(name => name, StringComparer.Ordinal));
 
-        // (d) No DbSet is declared over a Tool entity, and the declared DbSet set is the pre-P2-T04 one.
+        // (d) No DbSet is declared over a Tool entity, and the declared DbSet set is the pre-P2-T04
+        // one. Since P2-T05 (disclosed): the eight Controlo entities join the set — the P2-T05
+        // repositories obtain their sets through the same private `DbSet<TEntity> => _context.Set<T>()`
+        // convention, and the "no Tool entity is ever a DbSet" rule is unchanged.
         var dbSetArguments = MatchGroup(allSources, @"DbSet<\s*(\w+)\s*>")
             .Distinct(StringComparer.Ordinal)
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToList();
 
         Assert.Equal(
-            ["AdminAccountEntity", "JobOnEntity", "TemplateEntity", "TemplateModuleEntity", "UserEntity"],
+            [
+                "AdminAccountEntity", "EmailListEntity", "EmailListRecipientEntity",
+                "EmailTemplateEntity", "JobOnEntity", "MachineRepairerAssignmentEntity",
+                "PdfDirectorySettingsEntity", "PesoEntity", "PesoMeasurementRowEntity",
+                "RepairerEntity", "TemplateEntity", "TemplateModuleEntity", "UserEntity",
+            ],
             dbSetArguments);
         Assert.DoesNotContain(dbSetArguments, name => name.Contains("Tool", StringComparison.Ordinal));
 

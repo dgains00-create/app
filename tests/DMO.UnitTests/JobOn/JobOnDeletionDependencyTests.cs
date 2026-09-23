@@ -115,7 +115,10 @@ public sealed class JobOnDeletionDependencyTests
         Assert.Contains(rootConstructors, constructor => constructor.IsPrivate && constructor.GetParameters().Length == 0);
 
         var results = typeof(JobOnResult).GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic);
-        Assert.Equal(10, results.Length);
+        // 11 since P2-T05 (disclosed): the accepted Q-CAND additive read adds exactly one result
+        // case — JobOnResult.AssociationCandidates (P2-T05 contract §20.4.2); the closed-set
+        // discipline asserted below is unchanged.
+        Assert.Equal(11, results.Length);
         Assert.Contains(typeof(JobOnResult.Refused), results);
         Assert.All(
             results,

@@ -620,8 +620,12 @@ public sealed class JobOnContractTests
             Assert.False(source.HasDefaultValue);
         }
 
-        // Nothing else in the service contract could return "the" source occurrence.
-        Assert.Equal(7, typeof(IJobOnService).GetMethods().Length);
+        // Nothing else in the service contract could return "the" source occurrence. The count is
+        // 8 since P2-T05: the accepted Q-CAND additive member ListPesoAssociationCandidatesAsync
+        // (P2-T05 contract §20.4.2, Architect ACCEPT) is the single cross-stream additive read-only
+        // method on the Job On application contract; DUP13's closed-surface guarantee is unchanged
+        // for the duplication members themselves.
+        Assert.Equal(8, typeof(IJobOnService).GetMethods().Length);
     }
 
     /// <summary>

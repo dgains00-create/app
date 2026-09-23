@@ -1,5 +1,6 @@
 using DMO.Application.Accounts;
 using DMO.Application.Authentication;
+using DMO.Application.ControloCreate;
 using DMO.Application.JobOn;
 using DMO.Application.Repositories;
 using Microsoft.Extensions.DependencyInjection;
@@ -42,6 +43,20 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<IToolRepository, ToolRepository>();
         services.AddScoped<IJobOnRepository, JobOnRepository>();
         services.AddScoped<IJobOnDependencyProbe, JobOnLineageDependencyProbe>();
+
+        // ---- P2-T05 Controlo Create: Peso core + Definições settings -------------------------
+        // Additive registrations only (P2-T05 contract §20/§21.6): the P2-T05 repositories, the
+        // read-only cm-context traversal (DmoPesoContextRead), the server-host directory probe and
+        // the Peso delete-dependency probe (one additive line per contributing module, P2-T04
+        // §11.5 seam).
+        services.AddScoped<IPesoRepository, PesoRepository>();
+        services.AddScoped<IRepairerRepository, RepairerRepository>();
+        services.AddScoped<IMachineRepairerAssignmentRepository, MachineRepairerAssignmentRepository>();
+        services.AddScoped<IPdfDirectorySettingsRepository, PdfDirectorySettingsRepository>();
+        services.AddScoped<IEmailListRepository, EmailListRepository>();
+        services.AddScoped<IEmailTemplateRepository, EmailTemplateRepository>();
+        services.AddScoped<IPesoContextRead, DmoPesoContextRead>();
+        services.AddScoped<IJobOnDependencyProbe, PesoJobOnDependencyProbe>();
 
         return services;
     }

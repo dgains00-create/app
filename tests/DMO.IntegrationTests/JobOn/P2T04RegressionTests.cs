@@ -595,18 +595,64 @@ public sealed class P2T04RegressionTests
     /// Pegamentos, Folha, Resumo, Boquilhas, PDF, HISTÓRICO GLOBAL, secondary navigation, module
     /// availability registration or a destination-route/navigation reference (contract §17.4; AC-100).
     /// The legitimate <c>bq_contexts</c>/BQ vocabulary is deliberately not flagged.
+    /// <para>
+    /// <b>P2-T05 disclosed exclusion</b> (accepted Q-CAND, P2-T05 contract §20.4.2): the ONE
+    /// cross-stream additive read-only member on the Job On application contract
+    /// (<c>ListPesoAssociationCandidatesAsync</c>) necessarily lands in
+    /// <c>IJobOnService.cs</c>/<c>JobOnService.cs</c>/<c>JobOnModels.cs</c> (method, implementation,
+    /// candidate record + result case). Those three files are excluded from this row's vocabulary
+    /// scan — the exclusion is asserted to be exactly the three sanctioned files AND to carry the
+    /// additive vocabulary (never vacuous).
+    /// </para>
     /// </summary>
     [Fact]
     public void BND7_NoP2T05OrLaterVocabularyAppearsInAnyP2T04Source()
     {
+        var disclosedCrossStreamAdditivePaths = new[]
+        {
+            "src/DMO.Application/JobOn/IJobOnService.cs",
+            "src/DMO.Application/JobOn/JobOnService.cs",
+            "src/DMO.Application/JobOn/JobOnModels.cs",
+        };
+
         foreach (var token in P2T04ProductionScan.LaterWorkstreamTokens)
         {
-            var offenders = P2T04ProductionScan.ProductionSourcesMentioningInCode(token);
+            var offenders = P2T04ProductionScan
+                .ProductionSourcesMentioningInCode(token)
+                .Where(path => !disclosedCrossStreamAdditivePaths.Contains(path, StringComparer.Ordinal))
+                .ToList();
 
             Assert.True(
                 offenders.Count == 0,
                 $"The P2-T05+ token '{token}' appears in code/markup of: {string.Join(", ", offenders)}.");
         }
+
+        // The exclusion is real, not vacuous: every disclosed file exists and carries the
+        // sanctioned additive vocabulary (the Q-CAND candidate read), and it is exactly the three
+        // files — no other P2-T04 source carries the Peso vocabulary outside the scan.
+        foreach (var path in disclosedCrossStreamAdditivePaths)
+        {
+            Assert.True(P2T04ProductionScan.Exists(path), $"Disclosed additive path '{path}' is missing.");
+
+            var source = P2T04ProductionScan.Read(path);
+
+            Assert.True(
+                source.Contains(string.Concat("Peso", "Association", "Candidate"), StringComparison.Ordinal)
+                || source.Contains("ListPesoAssociation", StringComparison.Ordinal),
+                $"Disclosed additive path '{path}' does not carry the sanctioned additive member.");
+        }
+
+        var allPesoMentions = P2T04ProductionScan.ProductionSourcePaths
+            .Where(path => P2T04ProductionScan.CodeOccurrences(
+                P2T04ProductionScan.Read(path),
+                string.Concat("Pe", "so")).Count > 0)
+            .ToList();
+
+        Assert.All(
+            allPesoMentions,
+            path => Assert.True(
+                disclosedCrossStreamAdditivePaths.Contains(path, StringComparer.Ordinal),
+                $"P2-T04 source '{path}' carries Peso vocabulary outside the disclosed Q-CAND files."));
 
         // The legitimate BQ context vocabulary is present and must not be misread as a Boquilhas
         // aggregate: the P2-T04 sources do declare bq_contexts.
@@ -707,14 +753,19 @@ public sealed class P2T04RegressionTests
 
     /// <summary>
     /// BND9 — the changed-path allow-list holds: every file under <c>src</c> that mentions the P2-T04
-    /// domain vocabulary is inside the P2-T04 owned paths or is one of the four documented additive
-    /// files, and the protected <c>DmoDbContext.cs</c> carries no P2-T04 vocabulary at all (contract
-    /// §13.6, §17.2, Appendix B; AC-95).
+    /// domain vocabulary is inside the P2-T04 owned paths, is one of the four documented additive
+    /// files, or belongs to the P2-T05 owned surface (disclosed extension: the accepted P2-T05
+    /// implementation legitimately consumes the P2-T04 anchors — <c>tool_id</c>/<c>cm_id</c> — inside
+    /// its OWN paths; the P2-T05 allow-list itself is enforced by the P2-T05 BND9 row). The protected
+    /// <c>DmoDbContext.cs</c> carries no P2-T04 vocabulary at all (contract §13.6, §17.2,
+    /// Appendix B; AC-95).
     /// </summary>
     [Fact]
     public void BND9_TheChangedPathAllowListHoldsForEveryP2T04VocabularyMention()
     {
-        var offenders = P2T04ProductionScan.VocabularyMentionsOutsideOwnedPaths();
+        var offenders = P2T04ProductionScan.VocabularyMentionsOutsideOwnedPaths()
+            .Where(path => !IsPathInP2T05OwnedSurface(path))
+            .ToList();
 
         Assert.True(
             offenders.Count == 0,
@@ -741,6 +792,15 @@ public sealed class P2T04RegressionTests
         Assert.Empty(P2T04ProductionScan.CodeOccurrences(dbContext, string.Concat("job", "_on")));
         Assert.Empty(P2T04ProductionScan.CodeOccurrences(dbContext, string.Concat("job", "on")));
     }
+
+    /// <summary>
+    /// Whether a repository-relative path belongs to the P2-T05 owned surface (the disclosed
+    /// extension of the P2-T04 changed-path allow-list). The P2-T05 surfaces consume the accepted
+    /// P2-T04 anchors by contract, so their own paths are allowed to mention the P2-T04 vocabulary;
+    /// the P2-T05 paths are themselves pinned by the P2-T05 BND9 row.
+    /// </summary>
+    private static bool IsPathInP2T05OwnedSurface(string relativePath) =>
+        DMO.IntegrationTests.ControloCreate.P2T05ProductionScan.IsOwnedPath(relativePath);
 
     /// <summary>
     /// BND10 — the accepted <c>DMO.UnitTests</c> surface survives: every test method pinned by the
@@ -982,6 +1042,10 @@ public sealed class P2T04RegressionTests
                 toolRepository,
                 jobOnRepository,
                 dependencyProbe,
+                // Disclosed P2-T05 extension (P2-T05 contract §20.4.1/§20.4.2): the Peso
+                // dependency probe registers through the same one-additive-line seam, and the
+                // Job On region gains no other vocabulary-bearing line.
+                "services.AddScoped<IJobOnDependencyProbe, PesoJobOnDependencyProbe>();",
             }.OrderBy(line => line, StringComparer.Ordinal),
             persistenceLines
                 .Where(line => P2T04ProductionScan.TestVocabulary.Any(token =>

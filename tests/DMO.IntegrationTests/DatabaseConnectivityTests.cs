@@ -36,8 +36,11 @@ public sealed class DatabaseConnectivityTests
     /// <summary>
     /// P2-T04 (disclosed extension, contract §3/§16): the migration run applies EVERY pending
     /// migration — now 001, 002 and the P2-T04 domain-core migration — and the schema is exactly the
-    /// four foundation tables plus the six contracted domain-core tables, nothing more. The
-    /// idempotency evidence is unchanged.
+    /// four foundation tables plus the six contracted domain-core tables, nothing more. P2-T05
+    /// (disclosed extension, P2-T05 contract §25): the run applies ALL four migrations (001, 002,
+    /// ToolJobOnDomainCore, ControloCreateDomain) and the schema is exactly the 10 product tables
+    /// plus the eight contracted Controlo tables, nothing more. The idempotency evidence is
+    /// unchanged.
     /// </summary>
     [SkippableFact]
     public async Task MigrationRun_Applies001Then002_AndCreatesOnlyTheFoundationTables()
@@ -63,25 +66,30 @@ public sealed class DatabaseConnectivityTests
         // Action: run the migration mechanism from the fresh schema.
         var first = await runner.ApplyPendingAsync();
 
-        // Assertions: the three migrations, in generation order (001, 002, P2-T04 domain core).
-        Assert.Equal(3, first.AppliedCount);
+        // Assertions: the four migrations, in generation order (001, 002, P2-T04 domain core,
+        // P2-T05 Controlo domain).
+        Assert.Equal(4, first.AppliedCount);
         Assert.Equal(
             new[]
             {
                 "20260922001736_AccountAndTemplateFoundation",
                 "20260922001757_TemplateModuleComposition",
                 "20260922232349_ToolJobOnDomainCore",
+                "20260923045054_ControloCreateDomain",
             },
             first.AppliedMigrations);
 
-        // The schema is exactly the four foundation tables plus the six contracted domain-core
-        // tables — nothing more.
+        // The schema is exactly the ten product tables plus the eight contracted Controlo tables —
+        // nothing more.
         var tables = await ReadPublicTablesAsync(context);
         Assert.Equal(
             new[]
             {
-                "__EFMigrationsHistory", "admin_accounts", "bq_contexts", "cm_contexts", "job_ons",
-                "mf_contexts", "template_modules", "templates", "tool_machines", "tools", "users",
+                "__EFMigrationsHistory", "admin_accounts", "bq_contexts", "cm_contexts",
+                "email_list_recipients", "email_lists", "email_templates", "job_ons",
+                "machine_repairer_assignments", "mf_contexts", "pdf_directory_settings",
+                "peso_measurement_rows", "pesos", "repairers", "template_modules", "templates",
+                "tool_machines", "tools", "users",
             },
             tables);
 

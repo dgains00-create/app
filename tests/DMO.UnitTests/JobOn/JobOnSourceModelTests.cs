@@ -71,6 +71,28 @@ public sealed class JobOnSourceModelTests
             "ExecuteDeleteAsync", "FromSql",
         };
 
+        // Disclosed P2-T05 extension (accepted P2-T05 contract): the query-token scan below is scoped
+        // to the P2-T04 surface, so the P2-T05 persistence holders are excluded exactly as
+        // registered storage of their OWN tables plus the single sanctioned read-only traversal
+        // (DmoPesoContextRead, §26.3 "composed from cm_contexts"; reader-confirmed on 2026-09-23).
+        // The exclusion is asserted non-vacuous at the end of this test.
+        var p2t05PersistenceHolders = new[]
+        {
+            "src/DMO.Infrastructure/Persistence/PesoRepository.cs",
+            "src/DMO.Infrastructure/Persistence/RepairerRepository.cs",
+            "src/DMO.Infrastructure/Persistence/MachineRepairerAssignmentRepository.cs",
+            "src/DMO.Infrastructure/Persistence/PdfDirectorySettingsRepository.cs",
+            "src/DMO.Infrastructure/Persistence/EmailListRepository.cs",
+            "src/DMO.Infrastructure/Persistence/EmailTemplateRepository.cs",
+            "src/DMO.Infrastructure/Persistence/DmoPesoContextRead.cs",
+            "src/DMO.Infrastructure/Persistence/PesoJobOnDependencyProbe.cs",
+            "src/DMO.Infrastructure/Configuration/ConfigurationCalculationConfiguration.cs",
+        };
+
+        var p2t05ExcludedContents = p2t05PersistenceHolders
+            .Select(path => (Path: path, Source: Read(path)))
+            .ToArray();
+
         foreach (var path in AllP2T04SourcePaths())
         {
             var source = Read(path);
@@ -80,10 +102,32 @@ public sealed class JobOnSourceModelTests
                 continue;
             }
 
+            if (p2t05ExcludedContents.Any(entry => entry.Source == source))
+            {
+                continue;
+            }
+
             foreach (var token in queryTokens)
             {
                 Assert.DoesNotContain(token, source, StringComparison.Ordinal);
             }
+        }
+
+        // The exclusion is real, not vacuous: every disclosed holder exists, and every EF
+        // holder among them carries a query token.
+        foreach (var (path, source) in p2t05ExcludedContents)
+        {
+            Assert.True(source.Length > 0, $"Disclosed P2-T05 holder '{path}' is empty.");
+
+            if (path.EndsWith("DmoPesoContextRead.cs", StringComparison.Ordinal)
+                || path.EndsWith("ConfigurationCalculationConfiguration.cs", StringComparison.Ordinal))
+            {
+                continue; // the two non-EF holders are disclosed for completeness but query nothing
+            }
+
+            Assert.True(
+                queryTokens.Any(token => source.Contains(token, StringComparison.Ordinal)),
+                $"Disclosed P2-T05 holder '{path}' carries no query token.");
         }
     }
 

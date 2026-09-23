@@ -322,6 +322,45 @@ public sealed class JobOnService : IJobOnService
     }
 
     /// <inheritdoc />
+    public async Task<JobOnResult> ListPesoAssociationCandidatesAsync(
+        Guid toolId,
+        CancellationToken cancellationToken)
+    {
+        // The accepted Q-CAND additive read (P2-T05 contract §20.4.2): every REAL cm_contexts row
+        // resolving to the supplied canonical Tool. It is composed from the two existing P2-T04
+        // repository reads — the usage occurrences of the Tool and the occurrence ficha — so no
+        // repository contract and no protected file is modified. Candidates are never synthesized,
+        // never ranked and never auto-selected (PID9/AC-P6).
+        var usages = await _tools.ListUsageOccurrencesAsync(toolId, cancellationToken);
+
+        var candidates = new List<PesoAssociationCandidate>(usages.Count);
+
+        foreach (var usage in usages)
+        {
+            var occurrence = await _jobOns.GetByIdAsync(usage.JobOnId, cancellationToken);
+            if (occurrence is null)
+            {
+                continue;
+            }
+
+            var cm = occurrence.Contexts.FirstOrDefault(context => context.ContextType == ToolContextType.Cm);
+            if (cm is null)
+            {
+                continue;
+            }
+
+            candidates.Add(new PesoAssociationCandidate(
+                cm.ContextId,
+                occurrence.JobOnId.Value,
+                occurrence.Reference,
+                occurrence.ProductionNumber,
+                occurrence.Machine.Value));
+        }
+
+        return new JobOnResult.AssociationCandidates(candidates);
+    }
+
+    /// <inheritdoc />
     public async Task<JobOnResult> DeleteAsync(
         DeleteJobOnCommand command,
         CancellationToken cancellationToken)

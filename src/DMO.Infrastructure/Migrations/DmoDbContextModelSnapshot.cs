@@ -216,6 +216,149 @@ namespace DMO.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.EmailListEntity", b =>
+                {
+                    b.Property<Guid>("EmailListId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("email_list_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("version");
+
+                    b.HasKey("EmailListId");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("email_lists_name_key");
+
+                    b.ToTable("email_lists", null, t =>
+                        {
+                            t.HasCheckConstraint("email_lists_name_required_check", "btrim(name) <> ''");
+                        });
+                });
+
+            modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.EmailListRecipientEntity", b =>
+                {
+                    b.Property<Guid>("EmailListRecipientId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("email_list_recipient_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("address");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("EmailListId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("email_list_id");
+
+                    b.HasKey("EmailListRecipientId");
+
+                    b.HasIndex("EmailListId", "Address")
+                        .IsUnique()
+                        .HasDatabaseName("email_list_recipients_list_address_key");
+
+                    b.ToTable("email_list_recipients", null, t =>
+                        {
+                            t.HasCheckConstraint("email_list_recipients_address_required_check", "btrim(address) <> ''");
+                        });
+                });
+
+            modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.EmailTemplateEntity", b =>
+                {
+                    b.Property<Guid>("EmailTemplateId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("email_template_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("body");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("DocumentType")
+                        .HasColumnType("text")
+                        .HasColumnName("document_type");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("subject");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("version");
+
+                    b.HasKey("EmailTemplateId");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("email_templates_name_key");
+
+                    b.ToTable("email_templates", null, t =>
+                        {
+                            t.HasCheckConstraint("email_templates_body_required_check", "btrim(body) <> ''");
+
+                            t.HasCheckConstraint("email_templates_document_type_check", "document_type IS NULL OR document_type IN ('peso','pegamentos','resumo')");
+
+                            t.HasCheckConstraint("email_templates_name_required_check", "btrim(name) <> ''");
+
+                            t.HasCheckConstraint("email_templates_subject_required_check", "btrim(subject) <> ''");
+                        });
+                });
+
             modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.JobOnEntity", b =>
                 {
                     b.Property<Guid>("JobOnId")
@@ -285,6 +428,57 @@ namespace DMO.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.MachineRepairerAssignmentEntity", b =>
+                {
+                    b.Property<Guid>("MachineRepairerAssignmentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("machine_repairer_assignment_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Machine")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("machine");
+
+                    b.Property<Guid>("RepairerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("repairer_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("version");
+
+                    b.HasKey("MachineRepairerAssignmentId");
+
+                    b.HasIndex("Machine")
+                        .IsUnique()
+                        .HasDatabaseName("machine_repairer_assignments_machine_key");
+
+                    b.HasIndex("RepairerId")
+                        .HasDatabaseName("machine_repairer_assignments_repairer_idx");
+
+                    b.ToTable("machine_repairer_assignments", null, t =>
+                        {
+                            t.HasCheckConstraint("machine_repairer_assignments_machine_check", "machine IN ('B1','B2','B3','C1','C2','C3')");
+                        });
+                });
+
             modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.MfContextEntity", b =>
                 {
                     b.Property<Guid>("MfId")
@@ -344,6 +538,261 @@ namespace DMO.Infrastructure.Migrations
                             t.HasCheckConstraint("mf_contexts_tool_reference_required_check", "btrim(tool_reference) <> ''");
 
                             t.HasCheckConstraint("mf_contexts_tool_type_check", "tool_type = 'MF'");
+                        });
+                });
+
+            modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.PdfDirectorySettingsEntity", b =>
+                {
+                    b.Property<Guid>("PdfDirectorySettingId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("pdf_directory_setting_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("BaseDirectory")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("base_directory");
+
+                    b.Property<bool>("Singleton")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("singleton");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("version");
+
+                    b.HasKey("PdfDirectorySettingId");
+
+                    b.HasIndex("Singleton")
+                        .IsUnique()
+                        .HasDatabaseName("pdf_directory_settings_singleton_key");
+
+                    b.ToTable("pdf_directory_settings", null, t =>
+                        {
+                            t.HasCheckConstraint("pdf_directory_settings_directory_required_check", "btrim(base_directory) <> ''");
+
+                            t.HasCheckConstraint("pdf_directory_settings_singleton_check", "singleton");
+                        });
+                });
+
+            modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.PesoEntity", b =>
+                {
+                    b.Property<Guid>("PesoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("peso_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid?>("CmId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cm_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<decimal?>("GlassDensityGCm3")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("glass_density_g_cm3");
+
+                    b.Property<string>("PreviousAverageWeightReference")
+                        .HasColumnType("text")
+                        .HasColumnName("previous_average_weight_reference");
+
+                    b.Property<string>("PreviousProductionEndReference")
+                        .HasColumnType("text")
+                        .HasColumnName("previous_production_end_reference");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("pendente")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset?>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("submitted_at");
+
+                    b.Property<Guid?>("SubmittedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("submitted_by_user_id");
+
+                    b.Property<Guid?>("ToolId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tool_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("version");
+
+                    b.Property<decimal?>("VolumeMarisaBq")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("volume_marisa_bq");
+
+                    b.Property<decimal?>("VolumePuncaoPu")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("volume_puncao_pu");
+
+                    b.Property<decimal>("WaterTemperature")
+                        .HasPrecision(4, 1)
+                        .HasColumnType("numeric(4,1)")
+                        .HasColumnName("water_temperature");
+
+                    b.HasKey("PesoId");
+
+                    b.HasIndex("CmId")
+                        .HasDatabaseName("IX_pesos_cm_id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("SubmittedByUserId");
+
+                    b.HasIndex("ToolId")
+                        .HasDatabaseName("IX_pesos_tool_id");
+
+                    b.ToTable("pesos", null, t =>
+                        {
+                            t.HasCheckConstraint("pesos_anchor_check", "((cm_id IS NULL)::int + (tool_id IS NULL)::int) = 1");
+
+                            t.HasCheckConstraint("pesos_density_check", "glass_density_g_cm3 IS NULL OR glass_density_g_cm3 > 0");
+
+                            t.HasCheckConstraint("pesos_marisa_volume_check", "volume_marisa_bq IS NULL OR volume_marisa_bq >= 0");
+
+                            t.HasCheckConstraint("pesos_puncao_volume_check", "volume_puncao_pu IS NULL OR volume_puncao_pu >= 0");
+
+                            t.HasCheckConstraint("pesos_sap_reference_check", "previous_production_end_reference IS NULL OR btrim(previous_production_end_reference) <> ''");
+
+                            t.HasCheckConstraint("pesos_sap_weight_check", "previous_average_weight_reference IS NULL OR btrim(previous_average_weight_reference) <> ''");
+
+                            t.HasCheckConstraint("pesos_status_check", "status IN ('pendente','aprovado','nao_aprovado')");
+
+                            t.HasCheckConstraint("pesos_temperature_check", "water_temperature >= 5 AND water_temperature <= 35");
+                        });
+                });
+
+            modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.PesoMeasurementRowEntity", b =>
+                {
+                    b.Property<Guid>("PesoMeasurementRowId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("peso_measurement_row_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<decimal>("CapacityCm3")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("capacity_cm3");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<decimal>("GlassWeightG")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("glass_weight_g");
+
+                    b.Property<Guid>("PesoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("peso_id");
+
+                    b.Property<int>("RowPosition")
+                        .HasColumnType("integer")
+                        .HasColumnName("row_position");
+
+                    b.Property<decimal>("WaterWeightG")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("water_weight_g");
+
+                    b.HasKey("PesoMeasurementRowId");
+
+                    b.HasIndex("PesoId", "RowPosition")
+                        .IsUnique()
+                        .HasDatabaseName("peso_measurement_rows_peso_position_key");
+
+                    b.ToTable("peso_measurement_rows", null, t =>
+                        {
+                            t.HasCheckConstraint("peso_measurement_rows_capacity_check", "capacity_cm3 > 0");
+
+                            t.HasCheckConstraint("peso_measurement_rows_glass_check", "glass_weight_g > 0");
+
+                            t.HasCheckConstraint("peso_measurement_rows_position_check", "row_position >= 1");
+
+                            t.HasCheckConstraint("peso_measurement_rows_weight_check", "water_weight_g > 0");
+                        });
+                });
+
+            modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.RepairerEntity", b =>
+                {
+                    b.Property<Guid>("RepairerId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("repairer_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("version");
+
+                    b.HasKey("RepairerId");
+
+                    b.ToTable("repairers", null, t =>
+                        {
+                            t.HasCheckConstraint("repairers_name_required_check", "btrim(name) <> ''");
                         });
                 });
 
@@ -630,6 +1079,16 @@ namespace DMO.Infrastructure.Migrations
                         .HasConstraintName("FK_cm_contexts_tools_tool_id");
                 });
 
+            modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.EmailListRecipientEntity", b =>
+                {
+                    b.HasOne("DMO.Infrastructure.Persistence.Entities.EmailListEntity", null)
+                        .WithMany()
+                        .HasForeignKey("EmailListId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_email_list_recipients_email_lists_email_list_id");
+                });
+
             modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.JobOnEntity", b =>
                 {
                     b.HasOne("DMO.Infrastructure.Persistence.Entities.JobOnEntity", null)
@@ -637,6 +1096,16 @@ namespace DMO.Infrastructure.Migrations
                         .HasForeignKey("CopiedFromJobOnId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("FK_job_ons_job_ons_copied_from_jobon_id");
+                });
+
+            modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.MachineRepairerAssignmentEntity", b =>
+                {
+                    b.HasOne("DMO.Infrastructure.Persistence.Entities.RepairerEntity", null)
+                        .WithMany()
+                        .HasForeignKey("RepairerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_machine_repairer_assignments_repairers_repairer_id");
                 });
 
             modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.MfContextEntity", b =>
@@ -654,6 +1123,44 @@ namespace DMO.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("FK_mf_contexts_tools_tool_id");
+                });
+
+            modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.PesoEntity", b =>
+                {
+                    b.HasOne("DMO.Infrastructure.Persistence.Entities.CmContextEntity", null)
+                        .WithMany()
+                        .HasForeignKey("CmId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_pesos_cm_contexts_cm_id");
+
+                    b.HasOne("DMO.Infrastructure.Persistence.Entities.UserEntity", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_pesos_users_created_by_user_id");
+
+                    b.HasOne("DMO.Infrastructure.Persistence.Entities.UserEntity", null)
+                        .WithMany()
+                        .HasForeignKey("SubmittedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_pesos_users_submitted_by_user_id");
+
+                    b.HasOne("DMO.Infrastructure.Persistence.Entities.ToolEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ToolId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_pesos_tools_tool_id");
+                });
+
+            modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.PesoMeasurementRowEntity", b =>
+                {
+                    b.HasOne("DMO.Infrastructure.Persistence.Entities.PesoEntity", null)
+                        .WithMany()
+                        .HasForeignKey("PesoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_peso_measurement_rows_pesos_peso_id");
                 });
 
             modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.TemplateModuleEntity", b =>

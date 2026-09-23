@@ -1,5 +1,6 @@
 using DMO.Application.Accounts;
 using DMO.Application.Authentication;
+using DMO.Application.ControloCreate;
 using DMO.Application.JobOn;
 using DMO.Application.Migrations;
 using DMO.Application.Session;
@@ -134,6 +135,19 @@ try
     builder.Services.AddScoped<IToolService, ToolService>();
     builder.Services.AddScoped<IJobOnService, JobOnService>();
 
+    // ---- P2-T05 Controlo Create: Peso core + Controlo_Create → Definições ----------------
+    // The Peso create/measurement/submission service (composing the P2-T04 application
+    // contracts), the Definições settings service over the five configuration areas, the
+    // calculation configuration (Q-CALC: configuration-provided divisor/density mappings) and
+    // the server-host PDF-directory probe (Q-PDF). No policy, no availability entry, no
+    // destination route and no second registry is added here: every P2-T05 route is
+    // server-gated by the accepted `controlo-create` policy and stays denied to every caller
+    // until P2-T10 registers availability (contract §21.6).
+    builder.Services.AddScoped<IControloCreateService, ControloCreateService>();
+    builder.Services.AddScoped<IControloDefinicoesService, ControloDefinicoesService>();
+    builder.Services.AddSingleton<IControloCalculationConfiguration, ConfigurationCalculationConfiguration>();
+    builder.Services.AddSingleton<IPdfDirectoryProbe, ServerHostPdfDirectoryProbe>();
+
     // One ADMIN-only policy (dmo.administration) + scoped handler; deliberately outside the
     // Module policy namespace. Administration is ADMIN-account functionality, not a Module.
     builder.Services.AddAdministrationAuthorization();
@@ -184,5 +198,7 @@ app.MapUserAdministrationEndpoints();
 app.MapTemplateAdministrationEndpoints();
 app.MapJobOnEndpoints();
 app.MapFerramentasEndpoints();
+app.MapControloCreateEndpoints();
+app.MapControloDefinicoesEndpoints();
 
 return await StartupCommands.RunHostAsync(app);
