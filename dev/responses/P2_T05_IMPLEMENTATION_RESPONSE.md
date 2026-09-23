@@ -215,7 +215,7 @@ enum type, RLS policy or history statement (verified: no `InsertData`/`Sql(`/`Cr
 
 - Implementation commit: `092743a97da2fe6b90dac04d69a9a3986f0997d7` (implementation + tests +
   migration + governance status updates; 105 files, +21120/−43).
-- This response is the follow-up governance commit `__RESPONSE_SHA__` (see §1 table note: the
+- This response is the follow-up governance commit `f4e81da1f714cb473cce6f336169cf28dabd8e88` (see §1 table note: the
   P2-T04 discipline — the implementation response is recorded in its own governance commit
   after the implementation commit, so the response can carry the implementation SHA).
 - Remote `origin/main` after push: `092743a97da2fe6b90dac04d69a9a3986f0997d7` (both commits
