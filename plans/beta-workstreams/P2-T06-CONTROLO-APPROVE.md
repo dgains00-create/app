@@ -140,3 +140,26 @@ contract test proving it), not copied.
 ## 12. Downstream dependents
 
 P2-T08, P2-T10.
+
+## 13. Contract-authored record
+
+**Status: AUTHORED — AWAITING ARCHITECT PLAN REVIEW** (contract-authoring task, planning gate
+only; **no implementation**).
+
+The implementation contract is `plans/contracts/P2-T06_CONTROLO_APPROVE_CONTRACT.md` (authoring
+response `dev/responses/P2_T06_CONTRACT_AUTHORING_RESPONSE.md`). It fixes the decision core over
+the accepted, **CLOSED** P2-T05 state: the reviewable circuit (fixed predicate `submitted_at IS
+NOT NULL AND status = 'pendente'`), approve/reject/reopen on the **same `peso_id`** with backend
+attribution, the append-only decision trail (who/when/`pesos.version` per the Peso Identity
+Rule), the reopen mapping (`pendente` + cleared handoff; never `aprovado` without a new
+approval; "material edit" defined), read-only review composed from the **exact** shared
+`PesoSheetReadModel` (renderer-parity test; no fork), the local Histórico de Pesos, exactly ONE
+new table (`peso_review_decisions`) + the deferred `IX_pesos_reviewable` index in ONE new
+additive migration, exactly 9 routes all gated `dmo.module.controlo-approve`, and 10
+NON-BLOCKING authority questions with pinned defaults (Q-SEND, Q-REOPEN, Q-NOTE, Q-FOLHA,
+Q-PERCM, Q-COMP, Q-RENDER, Q-WARN, Q-PAGE, Q-DECISIONS) — 0 BLOCKING, 0 REQUIRES OWNER DECISION.
+
+The contract is **not** self-accepted: it awaits the Architect PLAN review per
+`dmo-beta-master/WORKFLOW.md` step 6. Implementation is **NOT STARTED — NOT AUTHORIZED**.
+`ModuleRegistrations.CurrentBuildAvailable` remains `[]`. **P2-T07 / P2-T08 / P2-T10 remain NOT
+AUTHORIZED.**
