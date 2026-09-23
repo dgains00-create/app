@@ -1,0 +1,99 @@
+@page "/jobon/{jobonId:guid}/duplicate"
+@model DMO.Web.Pages.JobOn.DuplicateModel
+@using DMO.Web.Frontend.Shared.Contracts
+@{
+    ViewData["Title"] = "Duplicar Job On";
+}
+<partial name="~/Pages/Shared/Components/_SharedComponentAssets.cshtml" />
+<link rel="stylesheet" href="~/css/dmo-jobon.css" asp-append-version="true" />
+<script src="~/js/dmo-jobon.js" defer></script>
+
+@*
+    P2-T04 Job On duplication surface (contract §13.2 route 9, §10.1, §10.2).
+
+    The preview is read-only: it shows the explicitly chosen source and its contexts (frozen triple and
+    live projection) and writes nothing. The source version observed here is the concurrency contract
+    of the duplication; the new occurrence receives a new jobon_id and new context identities, retains
+    the same canonical tool_ids and copies the SOURCE contexts' frozen triples verbatim.
+*@
+<section class="dmo-jobon" data-dmo-jobon-surface="duplicate">
+    <dl class="dmo-jobon__facts" data-dmo-jobon-source-facts="true">
+        <dt>Origem (Job On)</dt>
+        <dd data-dmo-jobon-source-id="@Model.Source!.JobOnId">@Model.Source.JobOnId</dd>
+        <dt>Referência</dt>
+        <dd data-dmo-jobon-source-reference="@Model.Source.Reference">@Model.Source.Reference</dd>
+        <dt>Número de produção de origem</dt>
+        <dd data-dmo-jobon-source-production-number="@Model.Source.ProductionNumber">@Model.Source.ProductionNumber</dd>
+        <dt>Máquina de origem</dt>
+        <dd data-dmo-jobon-source-machine="@Model.Source.Machine">@Model.Source.Machine</dd>
+        <dt>Versão de origem</dt>
+        <dd data-dmo-jobon-source-version="@Model.SourceVersion">@Model.SourceVersion</dd>
+    </dl>
+
+    @if (Model.Contexts.Count > 0)
+    {
+        <div class="dmo-jobon__contexts" data-dmo-jobon-source-contexts="true">
+            @foreach (var context in Model.Contexts)
+            {
+                <article class="dmo-jobon__context" data-dmo-jobon-context="@context.Token">
+                    <h2 class="dmo-jobon__context-title">Contexto @context.Token de origem</h2>
+                    <dl class="dmo-jobon__frozen" data-dmo-frozen-triple="true">
+                        <dt>Tipo (congelado)</dt>
+                        <dd data-dmo-frozen-type="@context.FrozenType">@context.FrozenType</dd>
+                        <dt>Referência (congelada)</dt>
+                        <dd data-dmo-frozen-reference="@context.FrozenReference">@context.FrozenReference</dd>
+                        <dt>Lote (congelado)</dt>
+                        <dd data-dmo-frozen-lot="@context.FrozenLot">@context.FrozenLot</dd>
+                    </dl>
+                </article>
+            }
+        </div>
+    }
+
+    <form class="dmo-jobon__form"
+          method="get"
+          action="/jobon/@Model.Source.JobOnId/duplicate"
+          data-dmo-jobon-origin-form="true"
+          data-dmo-jobon-duplicate-endpoint="/jobon/@Model.Source.JobOnId/duplicate"
+          data-dmo-jobon-expected-source-version="@Model.SourceVersion">
+
+        <input type="hidden" name="expectedSourceVersion" value="@Model.SourceVersion" data-dmo-jobon-field="expectedSourceVersion" />
+
+        <div class="dmo-jobon__grid">
+            <label class="dmo-jobon__label" for="dmo-jobon-duplicate-production-number">Número de produção</label>
+            <input class="dmo-jobon__input"
+                   id="dmo-jobon-duplicate-production-number"
+                   name="productionNumber"
+                   type="text"
+                   value=""
+                   data-dmo-jobon-field="productionNumber" />
+
+            <label class="dmo-jobon__label" for="dmo-jobon-duplicate-machine">Máquina</label>
+            <select class="dmo-jobon__input"
+                    id="dmo-jobon-duplicate-machine"
+                    name="machine"
+                    data-dmo-jobon-field="machine">
+                @foreach (var machine in DMO.Web.Pages.JobOn.DuplicateModel.Machines)
+                {
+                    <option value="@machine" selected="@(string.Equals(Model.Source.Machine, machine, StringComparison.Ordinal))">@machine</option>
+                }
+            </select>
+
+            <label class="dmo-jobon__label" for="dmo-jobon-duplicate-production-date">Data de produção</label>
+            <input class="dmo-jobon__input"
+                   id="dmo-jobon-duplicate-production-date"
+                   name="productionDate"
+                   type="date"
+                   value=""
+                   data-dmo-jobon-field="productionDate" />
+        </div>
+
+        <p class="dmo-jobon__hint" data-dmo-jobon-hint="true">
+            A nova produção mantém as ferramentas associadas e os valores congelados da origem.
+        </p>
+
+        <p class="dmo-jobon__error" data-dmo-jobon-submit-error="true" hidden></p>
+
+        <partial name="~/Pages/Shared/Components/_DecisionBar.cshtml" model="Model.Actions" />
+    </form>
+</section>

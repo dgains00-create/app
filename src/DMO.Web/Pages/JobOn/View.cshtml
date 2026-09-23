@@ -1,0 +1,68 @@
+@page "/jobon/{jobonId:guid}"
+@model DMO.Web.Pages.JobOn.ViewModel
+@using DMO.Web.Frontend.Shared.Contracts
+@{
+    ViewData["Title"] = "Job On";
+}
+<partial name="~/Pages/Shared/Components/_SharedComponentAssets.cshtml" />
+<link rel="stylesheet" href="~/css/dmo-jobon.css" asp-append-version="true" />
+
+@*
+    P2-T04 Job On sheet (contract §13.2 route 3, §8.4, §13.4).
+
+    Read only. The frozen triple of every context is presented as historical read-only data; the live
+    Tool facts of the referenced Tool are presented separately as a read-time projection that is never
+    persisted and never used to refresh the frozen triple.
+*@
+<section class="dmo-jobon" data-dmo-jobon-surface="sheet">
+    <dl class="dmo-jobon__facts" data-dmo-jobon-facts="true">
+        <dt>Referência</dt>
+        <dd data-dmo-jobon-reference="@Model.Ficha!.Reference">@Model.Ficha.Reference</dd>
+        <dt>Número de produção</dt>
+        <dd data-dmo-jobon-production-number="@Model.Ficha.ProductionNumber">@Model.Ficha.ProductionNumber</dd>
+        <dt>Máquina</dt>
+        <dd data-dmo-jobon-machine="@Model.Ficha.Machine">@Model.Ficha.Machine</dd>
+        <dt>Data de produção</dt>
+        <dd data-dmo-jobon-production-date="@(Model.Ficha.ProductionDate?.ToString("yyyy-MM-dd"))">
+            @(Model.Ficha.ProductionDate?.ToString("yyyy-MM-dd") ?? "sem data")
+        </dd>
+        <dt>Versão</dt>
+        <dd data-dmo-jobon-version="@Model.Ficha.Version">@Model.Ficha.Version</dd>
+        @if (Model.Ficha.CopiedFromJobOnId is { } source)
+        {
+            <dt>Duplicado de</dt>
+            <dd data-dmo-jobon-copied-from="@source">@source</dd>
+        }
+    </dl>
+
+    @if (Model.Contexts.Count == 0)
+    {
+        <partial name="~/Pages/Shared/Components/_CommonStateRegion.cshtml"
+                 model="@CommonStateRegionPresentation.Empty(
+                     "Este Job On ainda não tem contextos CM/MF/BQ associados.",
+                     "Contextos de produção")" />
+    }
+    else
+    {
+        <div class="dmo-jobon__contexts" data-dmo-jobon-contexts="true">
+            @foreach (var context in Model.Contexts)
+            {
+                <article class="dmo-jobon__context" data-dmo-jobon-context="@context.Token">
+                    <h2 class="dmo-jobon__context-title">Contexto @context.Token</h2>
+
+                    @* Frozen as used at that occurrence: read-only historical data, never refreshed. *@
+                    <dl class="dmo-jobon__frozen" data-dmo-frozen-triple="true">
+                        <dt>Tipo (congelado)</dt>
+                        <dd data-dmo-frozen-type="@context.FrozenType">@context.FrozenType</dd>
+                        <dt>Referência (congelada)</dt>
+                        <dd data-dmo-frozen-reference="@context.FrozenReference">@context.FrozenReference</dd>
+                        <dt>Lote (congelado)</dt>
+                        <dd data-dmo-frozen-lot="@context.FrozenLot">@context.FrozenLot</dd>
+                    </dl>
+
+                    <partial name="~/Pages/Shared/Components/_ToolSummaryRow.cshtml" model="context.Live" />
+                </article>
+            }
+        </div>
+    }
+</section>

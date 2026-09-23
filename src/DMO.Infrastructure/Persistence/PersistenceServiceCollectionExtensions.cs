@@ -1,5 +1,6 @@
 using DMO.Application.Accounts;
 using DMO.Application.Authentication;
+using DMO.Application.JobOn;
 using DMO.Application.Repositories;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -34,6 +35,13 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<IAdminAccountRepository, AdminAccountRepository>();
         services.AddScoped<ITemplateRepository, TemplateRepository>();
         services.AddScoped<ITemplateModuleRepository, TemplateModuleRepository>();
+
+        // ---- P2-T04 domain core: canonical Tool + Job On production occurrence ----------------
+        // Additive registrations only. The delete flow automatically includes every registered
+        // dependency probe without the Job On module knowing a later module's domain.
+        services.AddScoped<IToolRepository, ToolRepository>();
+        services.AddScoped<IJobOnRepository, JobOnRepository>();
+        services.AddScoped<IJobOnDependencyProbe, JobOnLineageDependencyProbe>();
 
         return services;
     }

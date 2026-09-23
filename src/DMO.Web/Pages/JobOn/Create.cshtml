@@ -1,0 +1,176 @@
+@page "/jobon/create"
+@model DMO.Web.Pages.JobOn.CreateModel
+@using DMO.Web.Frontend.Shared.Contracts
+@{
+    ViewData["Title"] = "Novo Job On";
+}
+<partial name="~/Pages/Shared/Components/_SharedComponentAssets.cshtml" />
+<link rel="stylesheet" href="~/css/dmo-jobon.css" asp-append-version="true" />
+<script src="~/js/dmo-jobon.js" defer></script>
+
+@*
+    P2-T04 Job On create surface (contract §13.2 route 4, §11.1, §18).
+
+    The origin state lives in this GET form: a Tool search is a round trip to the same route carrying
+    the form's own values, so nothing the operator entered is lost. The submit is intercepted by the
+    P2-T04 adapter script, which posts the create command to POST /jobon; the Tool create subflow posts
+    to POST /ferramentas/tools from this same page, so no navigation and no draft store is involved.
+
+    Every CM/MF/BQ region renders the accepted shared picker. A slot that was not searched renders the
+    picker with no candidates — an explicit "nothing searched yet" state, never a fabricated result and
+    never a pre-selection.
+*@
+<section class="dmo-jobon" data-dmo-jobon-surface="create">
+    <form class="dmo-jobon__form"
+          method="get"
+          action="/jobon/create"
+          data-dmo-jobon-origin-form="true"
+          data-dmo-jobon-create-endpoint="/jobon">
+
+        <div class="dmo-jobon__grid">
+            <label class="dmo-jobon__label" for="dmo-jobon-create-reference">Referência</label>
+            <input class="dmo-jobon__input"
+                   id="dmo-jobon-create-reference"
+                   name="reference"
+                   type="text"
+                   value="@Model.Reference"
+                   data-dmo-jobon-field="reference" />
+
+            <label class="dmo-jobon__label" for="dmo-jobon-create-production-number">Número de produção</label>
+            <input class="dmo-jobon__input"
+                   id="dmo-jobon-create-production-number"
+                   name="productionNumber"
+                   type="text"
+                   value="@Model.ProductionNumber"
+                   data-dmo-jobon-field="productionNumber" />
+
+            <label class="dmo-jobon__label" for="dmo-jobon-create-machine">Máquina</label>
+            <select class="dmo-jobon__input"
+                    id="dmo-jobon-create-machine"
+                    name="machine"
+                    data-dmo-jobon-field="machine">
+                <option value="">—</option>
+                @foreach (var machine in DMO.Web.Pages.JobOn.CreateModel.Machines)
+                {
+                    <option value="@machine" selected="@(string.Equals(Model.Machine, machine, StringComparison.Ordinal))">@machine</option>
+                }
+            </select>
+
+            <label class="dmo-jobon__label" for="dmo-jobon-create-production-date">Data de produção</label>
+            <input class="dmo-jobon__input"
+                   id="dmo-jobon-create-production-date"
+                   name="productionDate"
+                   type="date"
+                   value="@(Model.ProductionDate?.ToString("yyyy-MM-dd"))"
+                   data-dmo-jobon-field="productionDate" />
+        </div>
+
+        <div class="dmo-jobon__slots" data-dmo-jobon-slots="true">
+            @foreach (var slot in Model.Slots)
+            {
+                <fieldset class="dmo-jobon__slot" data-dmo-jobon-slot="@slot.Token">
+                    <legend class="dmo-jobon__legend">Contexto @slot.Token</legend>
+
+                    @* The canonical identity of the slot is this surface's own form state. *@
+                    <input type="hidden"
+                           name="@slot.HiddenFieldName"
+                           value="@slot.AssociatedToolId"
+                           data-dmo-jobon-associated-tool="@slot.Token" />
+
+                    @if (slot.AssociatedToolId is not null)
+                    {
+                        <p class="dmo-jobon__associated" data-dmo-jobon-associated-summary="@slot.Token">
+                            Ferramenta associada: @slot.AssociatedToolId
+                        </p>
+                    }
+
+                    @* The adapter's own opaque-key → canonical identity map for this interaction. *@
+                    <span class="dmo-jobon__candidate-map" data-dmo-jobon-candidate-map="@slot.Token" hidden>
+                        @foreach (var candidate in slot.CandidateMap)
+                        {
+                            <span data-dmo-jobon-candidate="@candidate.Key" data-dmo-jobon-candidate-tool="@candidate.ToolId"></span>
+                        }
+                    </span>
+
+                    @{ ViewData["ToolPickerRegionId"] = $"dmo-picker-{slot.Token}"; }
+                    <partial name="~/Pages/Shared/Components/_ToolPicker.cshtml" model="slot.Picker" view-data="ViewData" />
+                </fieldset>
+            }
+        </div>
+
+        @if (Model.CanCreateTool)
+        {
+            @* The inline Tool create subflow: it posts to the contextual Ferramentas endpoint without
+               leaving this page, so no origin value is ever at risk. *@
+            <fieldset class="dmo-jobon__tool-create"
+                      data-dmo-jobon-tool-create-panel="true"
+                      hidden>
+                <legend class="dmo-jobon__legend">Criar ferramenta</legend>
+                <label class="dmo-jobon__label" for="dmo-jobon-tool-type">Tipo</label>
+                <select class="dmo-jobon__input" id="dmo-jobon-tool-type" data-dmo-jobon-tool-field="type">
+                    @foreach (var token in new[] { "CM", "MF", "BQ" })
+                    {
+                        <option value="@token">@token</option>
+                    }
+                </select>
+                <label class="dmo-jobon__label" for="dmo-jobon-tool-reference">Referência</label>
+                <input class="dmo-jobon__input" id="dmo-jobon-tool-reference" type="text" data-dmo-jobon-tool-field="reference" value="@Model.Reference" />
+                <label class="dmo-jobon__label" for="dmo-jobon-tool-lot">Lote</label>
+                <input class="dmo-jobon__input" id="dmo-jobon-tool-lot" type="text" data-dmo-jobon-tool-field="lot" />
+                <label class="dmo-jobon__label" for="dmo-jobon-tool-processo">Processo</label>
+                <select class="dmo-jobon__input" id="dmo-jobon-tool-processo" data-dmo-jobon-tool-field="processo">
+                    <option value="">—</option>
+                    <option value="NNPB">NNPB</option>
+                    <option value="PS">PS</option>
+                </select>
+                <label class="dmo-jobon__label" for="dmo-jobon-tool-quantity">Quantidade</label>
+                <input class="dmo-jobon__input" id="dmo-jobon-tool-quantity" type="number" min="0" data-dmo-jobon-tool-field="quantity" />
+                <span class="dmo-jobon__label">Máquinas compatíveis</span>
+                <span class="dmo-jobon__machines" data-dmo-jobon-tool-machines="true">
+                    @foreach (var machine in DMO.Web.Pages.JobOn.CreateModel.Machines)
+                    {
+                        <label class="dmo-jobon__machine">
+                            <input type="checkbox" value="@machine" data-dmo-jobon-tool-machine="@machine" />
+                            @machine
+                        </label>
+                    }
+                </span>
+                <p class="dmo-jobon__error" data-dmo-jobon-tool-create-error="true" hidden></p>
+                <span class="dmo-jobon__tool-create-actions">
+                    <button type="button" class="dmo-jobon__button" data-dmo-jobon-tool-create-submit="true">Criar ferramenta</button>
+                    <button type="button" class="dmo-jobon__button" data-dmo-jobon-tool-create-cancel="true">Cancelar</button>
+                </span>
+            </fieldset>
+        }
+
+        <div class="dmo-jobon__existing">
+            <h2 class="dmo-jobon__context-title">Produções existentes desta referência</h2>
+            @if (Model.ProductionsLookupFailed)
+            {
+                <partial name="~/Pages/Shared/Components/_CommonStateRegion.cshtml"
+                         model="@CommonStateRegionPresentation.LookupFailed(
+                             "Não foi possível obter as produções desta referência.",
+                             "Produções existentes",
+                             SharedActionPresentation.CreateEnabled("retry", "Tentar novamente"))" />
+            }
+            else if (Model.ExistingProductions is not null)
+            {
+                <div class="dmo-jobon__route-map" data-dmo-jobon-route-map="true" hidden>
+                    @foreach (var route in Model.ProductionRoutes)
+                    {
+                        <span data-dmo-jobon-route="@route.Key" data-dmo-jobon-href="@route.Href"></span>
+                    }
+                </div>
+                <partial name="~/Pages/Shared/Components/_DenseDataTable.cshtml" model="Model.ExistingProductions" />
+            }
+            else
+            {
+                <p class="dmo-jobon__hint" data-dmo-jobon-hint="true">Indique a referência para detetar produções existentes.</p>
+            }
+        </div>
+
+        <p class="dmo-jobon__error" data-dmo-jobon-submit-error="true" hidden></p>
+
+        <partial name="~/Pages/Shared/Components/_DecisionBar.cshtml" model="Model.Actions" />
+    </form>
+</section>

@@ -1,0 +1,168 @@
+@page "/jobon/{jobonId:guid}/edit"
+@model DMO.Web.Pages.JobOn.EditModel
+@using DMO.Web.Frontend.Shared.Contracts
+@{
+    ViewData["Title"] = "Editar Job On";
+    var ficha = Model.Ficha!;
+}
+<partial name="~/Pages/Shared/Components/_SharedComponentAssets.cshtml" />
+<link rel="stylesheet" href="~/css/dmo-jobon.css" asp-append-version="true" />
+<script src="~/js/dmo-jobon.js" defer></script>
+
+@*
+    P2-T04 Job On edit surface (contract §13.2 route 7, §11.2, §18).
+
+    The frozen triple of every existing context is rendered read-only: it has no bound editable input,
+    and it is refreshed only by an explicit Tool re-selection for that slot. The association change
+    list (Keep/Set/Remove) is derived by the P2-T04 adapter from the difference between the original
+    canonical identity and the current one — never from a bare null.
+
+    A reached/passed production date renders the explicit warning; the acknowledgement is a request
+    fact of this submission, never a stored state.
+*@
+<section class="dmo-jobon" data-dmo-jobon-surface="edit">
+    <form class="dmo-jobon__form"
+          method="get"
+          action="/jobon/@ficha.JobOnId/edit"
+          data-dmo-jobon-origin-form="true"
+          data-dmo-jobon-update-endpoint="/jobon/@ficha.JobOnId"
+          data-dmo-jobon-delete-endpoint="/jobon/@ficha.JobOnId"
+          data-dmo-jobon-expected-version="@ficha.Version">
+
+        <input type="hidden" name="expectedVersion" value="@ficha.Version" data-dmo-jobon-field="expectedVersion" />
+
+        <div class="dmo-jobon__grid">
+            <label class="dmo-jobon__label" for="dmo-jobon-edit-reference">Referência</label>
+            <input class="dmo-jobon__input"
+                   id="dmo-jobon-edit-reference"
+                   name="reference"
+                   type="text"
+                   value="@ficha.Reference"
+                   data-dmo-jobon-field="reference" />
+
+            <label class="dmo-jobon__label" for="dmo-jobon-edit-production-number">Número de produção</label>
+            <input class="dmo-jobon__input"
+                   id="dmo-jobon-edit-production-number"
+                   name="productionNumber"
+                   type="text"
+                   value="@ficha.ProductionNumber"
+                   data-dmo-jobon-field="productionNumber" />
+
+            <label class="dmo-jobon__label" for="dmo-jobon-edit-machine">Máquina</label>
+            <select class="dmo-jobon__input"
+                    id="dmo-jobon-edit-machine"
+                    name="machine"
+                    data-dmo-jobon-field="machine">
+                @foreach (var machine in DMO.Web.Pages.JobOn.EditModel.Machines)
+                {
+                    <option value="@machine" selected="@(string.Equals(ficha.Machine, machine, StringComparison.Ordinal))">@machine</option>
+                }
+            </select>
+
+            <label class="dmo-jobon__label" for="dmo-jobon-edit-production-date">Data de produção</label>
+            <input class="dmo-jobon__input"
+                   id="dmo-jobon-edit-production-date"
+                   name="productionDate"
+                   type="date"
+                   value="@(ficha.ProductionDate?.ToString("yyyy-MM-dd"))"
+                   data-dmo-jobon-field="productionDate" />
+        </div>
+
+        @if (Model.DateThresholdReached)
+        {
+            @* A warning gate opened by an explicit human acknowledgement — never hard immutability. *@
+            <p class="dmo-jobon__warning" data-dmo-jobon-date-threshold-warning="true" role="alert">
+                Esta produção diz respeito a uma data de produção já alcançada ou ultrapassada.
+            </p>
+            <label class="dmo-jobon__checkbox">
+                <input type="checkbox" name="dateThresholdAcknowledged" value="true" data-dmo-jobon-acknowledge="true" />
+                Confirmo que pretendo alterar/eliminar esta produção.
+            </label>
+        }
+
+        <div class="dmo-jobon__slots" data-dmo-jobon-slots="true">
+            @foreach (var slot in Model.Slots)
+            {
+                <fieldset class="dmo-jobon__slot" data-dmo-jobon-slot="@slot.Token">
+                    <legend class="dmo-jobon__legend">Contexto @slot.Token</legend>
+
+                    @* Original canonical identity: the ONLY input of the Keep/Set/Remove derivation. *@
+                    <input type="hidden" value="@slot.OriginalToolId" data-dmo-jobon-original-tool="@slot.Token" />
+                    <input type="hidden"
+                           name="@slot.HiddenFieldName"
+                           value="@slot.AssociatedToolId"
+                           data-dmo-jobon-associated-tool="@slot.Token" />
+
+                    @if (slot.FrozenSummary is not null)
+                    {
+                        @* Read-only frozen history: no bound editable input exists for it. *@
+                        <p class="dmo-jobon__frozen-summary" data-dmo-frozen-triple="true">@slot.FrozenSummary</p>
+                    }
+
+                    @if (slot.AssociatedToolId is null)
+                    {
+                        <p class="dmo-jobon__associated" data-dmo-jobon-remove-marker="@slot.Token">
+                            Sem ferramenta associada — será removida a associação existente.
+                        </p>
+                    }
+
+                    @* The adapter's own opaque-key → canonical identity map for this interaction. *@
+                    <span class="dmo-jobon__candidate-map" data-dmo-jobon-candidate-map="@slot.Token" hidden>
+                        @foreach (var candidate in slot.CandidateMap)
+                        {
+                            <span data-dmo-jobon-candidate="@candidate.Key" data-dmo-jobon-candidate-tool="@candidate.ToolId"></span>
+                        }
+                    </span>
+
+                    @{ ViewData["ToolPickerRegionId"] = $"dmo-picker-{slot.Token}"; }
+                    <partial name="~/Pages/Shared/Components/_ToolPicker.cshtml" model="slot.Picker" view-data="ViewData" />
+                </fieldset>
+            }
+        </div>
+
+        @if (Model.CanCreateTool)
+        {
+            <fieldset class="dmo-jobon__tool-create" data-dmo-jobon-tool-create-panel="true" hidden>
+                <legend class="dmo-jobon__legend">Criar ferramenta</legend>
+                <label class="dmo-jobon__label" for="dmo-jobon-edit-tool-type">Tipo</label>
+                <select class="dmo-jobon__input" id="dmo-jobon-edit-tool-type" data-dmo-jobon-tool-field="type">
+                    @foreach (var token in new[] { "CM", "MF", "BQ" })
+                    {
+                        <option value="@token">@token</option>
+                    }
+                </select>
+                <label class="dmo-jobon__label" for="dmo-jobon-edit-tool-reference">Referência</label>
+                <input class="dmo-jobon__input" id="dmo-jobon-edit-tool-reference" type="text" data-dmo-jobon-tool-field="reference" value="@ficha.Reference" />
+                <label class="dmo-jobon__label" for="dmo-jobon-edit-tool-lot">Lote</label>
+                <input class="dmo-jobon__input" id="dmo-jobon-edit-tool-lot" type="text" data-dmo-jobon-tool-field="lot" />
+                <label class="dmo-jobon__label" for="dmo-jobon-edit-tool-processo">Processo</label>
+                <select class="dmo-jobon__input" id="dmo-jobon-edit-tool-processo" data-dmo-jobon-tool-field="processo">
+                    <option value="">—</option>
+                    <option value="NNPB">NNPB</option>
+                    <option value="PS">PS</option>
+                </select>
+                <label class="dmo-jobon__label" for="dmo-jobon-edit-tool-quantity">Quantidade</label>
+                <input class="dmo-jobon__input" id="dmo-jobon-edit-tool-quantity" type="number" min="0" data-dmo-jobon-tool-field="quantity" />
+                <span class="dmo-jobon__label">Máquinas compatíveis</span>
+                <span class="dmo-jobon__machines" data-dmo-jobon-tool-machines="true">
+                    @foreach (var machine in DMO.Web.Pages.JobOn.EditModel.Machines)
+                    {
+                        <label class="dmo-jobon__machine">
+                            <input type="checkbox" value="@machine" data-dmo-jobon-tool-machine="@machine" />
+                            @machine
+                        </label>
+                    }
+                </span>
+                <p class="dmo-jobon__error" data-dmo-jobon-tool-create-error="true" hidden></p>
+                <span class="dmo-jobon__tool-create-actions">
+                    <button type="button" class="dmo-jobon__button" data-dmo-jobon-tool-create-submit="true">Criar ferramenta</button>
+                    <button type="button" class="dmo-jobon__button" data-dmo-jobon-tool-create-cancel="true">Cancelar</button>
+                </span>
+            </fieldset>
+        }
+
+        <p class="dmo-jobon__error" data-dmo-jobon-submit-error="true" hidden></p>
+
+        <partial name="~/Pages/Shared/Components/_DecisionBar.cshtml" model="Model.Actions" />
+    </form>
+</section>

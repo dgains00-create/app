@@ -1,0 +1,163 @@
+/* P2-T04 Job On / contextual Ferramentas surfaces (contract §18.2.5).
+
+   A new P2-T04-owned stylesheet: nothing is appended to `dmo-components.css`, so the frozen P2-T02
+   and P2-T03 block scans are not perturbed and no accepted asset is touched.
+
+   Fixed desktop composition (master plan "DMO FIXED DESKTOP LAYOUT POLICY", contract Appendix C):
+   the design viewport is 1366 x 768, every structural region keeps its assigned place, and there is
+   NO breakpoint rule here — no @media, no @container, no @supports, no width-conditional variant, no
+   card conversion, no required-column hiding and no action relocation. A narrower window scrolls the
+   page; an over-wide region scrolls locally inside its own overflow container. */
+
+.dmo-page-frame .dmo-jobon {
+    display: flex;
+    flex-direction: column;
+    gap: var(--dmo-space-3);
+}
+
+.dmo-page-frame .dmo-jobon__lookup,
+.dmo-page-frame .dmo-jobon__grid {
+    display: grid;
+    grid-template-columns: 14rem minmax(16rem, 28rem);
+    gap: var(--dmo-space-2) var(--dmo-space-3);
+    align-items: center;
+}
+
+.dmo-page-frame .dmo-jobon__lookup {
+    grid-template-columns: 14rem minmax(16rem, 28rem) auto;
+}
+
+.dmo-page-frame .dmo-jobon__label {
+    color: var(--dmo-ink);
+    font-weight: 600;
+}
+
+.dmo-page-frame .dmo-jobon__input {
+    min-height: var(--dmo-control-height);
+    padding: 0 var(--dmo-space-2);
+    border: 1px solid var(--dmo-line-strong);
+    border-radius: var(--dmo-radius);
+    background: var(--dmo-surface);
+    color: var(--dmo-ink);
+    font-family: var(--dmo-font-sans);
+}
+
+.dmo-page-frame .dmo-jobon__button {
+    min-height: var(--dmo-control-height);
+    padding: 0 var(--dmo-space-3);
+    border: 1px solid var(--dmo-accent-dark);
+    border-radius: var(--dmo-radius);
+    background: var(--dmo-surface);
+    color: var(--dmo-accent-dark);
+    cursor: pointer;
+}
+
+.dmo-page-frame .dmo-jobon__facts,
+.dmo-page-frame .dmo-jobon__frozen {
+    display: grid;
+    grid-template-columns: 14rem minmax(12rem, auto);
+    gap: var(--dmo-space-1) var(--dmo-space-3);
+    margin: 0;
+}
+
+.dmo-page-frame .dmo-jobon__facts dt,
+.dmo-page-frame .dmo-jobon__frozen dt {
+    color: var(--dmo-muted);
+    font-weight: 600;
+}
+
+.dmo-page-frame .dmo-jobon__facts dd,
+.dmo-page-frame .dmo-jobon__frozen dd {
+    margin: 0;
+    font-family: var(--dmo-font-mono);
+}
+
+.dmo-page-frame .dmo-jobon__slots {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(20rem, 1fr));
+    gap: var(--dmo-space-3);
+    align-items: start;
+    overflow-x: auto;
+}
+
+.dmo-page-frame .dmo-jobon__slot,
+.dmo-page-frame .dmo-jobon__tool-create {
+    margin: 0;
+    padding: var(--dmo-space-3);
+    border: 1px solid var(--dmo-line);
+    border-radius: var(--dmo-radius);
+    background: var(--dmo-surface-muted);
+    min-width: 0;
+}
+
+.dmo-page-frame .dmo-jobon__legend,
+.dmo-page-frame .dmo-jobon__context-title {
+    color: var(--dmo-ink);
+    font-weight: 700;
+}
+
+.dmo-page-frame .dmo-jobon__contexts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(20rem, 1fr));
+    gap: var(--dmo-space-3);
+    align-items: start;
+    overflow-x: auto;
+}
+
+.dmo-page-frame .dmo-jobon__context {
+    padding: var(--dmo-space-3);
+    border: 1px solid var(--dmo-line);
+    border-radius: var(--dmo-radius);
+    background: var(--dmo-surface);
+    min-width: 0;
+}
+
+.dmo-page-frame .dmo-jobon__frozen-summary,
+.dmo-page-frame .dmo-jobon__associated,
+.dmo-page-frame .dmo-jobon__hint {
+    color: var(--dmo-muted);
+    margin: var(--dmo-space-2) 0;
+}
+
+.dmo-page-frame .dmo-jobon__warning {
+    margin: var(--dmo-space-2) 0;
+    padding: var(--dmo-space-2) var(--dmo-space-3);
+    border: 1px solid var(--dmo-warning);
+    border-radius: var(--dmo-radius);
+    color: var(--dmo-warning);
+    background: var(--dmo-surface-muted);
+}
+
+.dmo-page-frame .dmo-jobon__errors {
+    margin: 0;
+    padding-left: var(--dmo-space-5);
+    color: var(--dmo-danger);
+}
+
+.dmo-page-frame .dmo-jobon__error {
+    margin: var(--dmo-space-2) 0;
+    color: var(--dmo-danger);
+}
+
+.dmo-page-frame .dmo-jobon__machines {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--dmo-space-3);
+}
+
+.dmo-page-frame .dmo-jobon__machine {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--dmo-space-1);
+}
+
+.dmo-page-frame .dmo-jobon__tool-create-actions {
+    display: inline-flex;
+    gap: var(--dmo-space-2);
+    margin-top: var(--dmo-space-3);
+}
+
+.dmo-page-frame .dmo-jobon__existing {
+    border-top: 1px solid var(--dmo-line);
+    padding-top: var(--dmo-space-3);
+}

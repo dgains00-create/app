@@ -1,8 +1,10 @@
 using DMO.Application.Accounts;
 using DMO.Application.Authentication;
+using DMO.Application.JobOn;
 using DMO.Application.Migrations;
 using DMO.Application.Session;
 using DMO.Application.TemplateAdministration;
+using DMO.Application.Tools;
 using DMO.Application.UserAdministration;
 using DMO.Infrastructure;
 using DMO.Infrastructure.Configuration;
@@ -125,6 +127,13 @@ try
     // validation). Pages and endpoints share the same service and the same ADMIN gate.
     builder.Services.AddScoped<ITemplateAdministrationService, TemplateAdministrationService>();
 
+    // ---- P2-T04 domain core: canonical Tool identity + Job On production occurrence -------
+    // One shared Tool search/select/create orchestration and the Job On occurrence service,
+    // composed over the P2-T03 shared primitives. No policy, no availability entry, no
+    // destination route and no second registry is added here.
+    builder.Services.AddScoped<IToolService, ToolService>();
+    builder.Services.AddScoped<IJobOnService, JobOnService>();
+
     // One ADMIN-only policy (dmo.administration) + scoped handler; deliberately outside the
     // Module policy namespace. Administration is ADMIN-account functionality, not a Module.
     builder.Services.AddAdministrationAuthorization();
@@ -173,5 +182,7 @@ app.MapAuthEndpoints();
 app.MapDmoSharedFrontend();
 app.MapUserAdministrationEndpoints();
 app.MapTemplateAdministrationEndpoints();
+app.MapJobOnEndpoints();
+app.MapFerramentasEndpoints();
 
 return await StartupCommands.RunHostAsync(app);

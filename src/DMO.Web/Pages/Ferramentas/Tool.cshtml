@@ -1,0 +1,21 @@
+@page "/ferramentas/tools/{toolId:guid}"
+@model DMO.Web.Pages.Ferramentas.ToolModel
+@using DMO.Web.Frontend.Shared.Contracts
+@{
+    ViewData["Title"] = "Ferramenta";
+}
+<partial name="~/Pages/Shared/Components/_SharedComponentAssets.cshtml" />
+<link rel="stylesheet" href="~/css/dmo-jobon.css" asp-append-version="true" />
+
+@*
+    P2-T04 contextual Tool ficha (contract §13.2 route 14, §8.5, §17.3).
+
+    Contextual only: no top-level destination, no navigation entry and no mutation. The Tool's own
+    facts are rendered through the accepted shared summary row (an absent optional fact renders nothing
+    at all, never a dash or a zero), and the reverse relation is the contracted query result, never a
+    stored array on the Tool.
+*@
+<section class="dmo-jobon" data-dmo-jobon-surface="tool-ficha" data-dmo-tool-id="@Model.Ficha!.ToolId">
+    <partial name="~/Pages/Shared/Components/_ToolSummaryRow.cshtml" model="Model.Facts" />
+    <partial name="~/Pages/Shared/Components/_DenseDataTable.cshtml" model="Model.Usages" />
+</section>

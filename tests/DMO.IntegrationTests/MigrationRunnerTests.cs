@@ -29,13 +29,23 @@ public sealed class MigrationRunnerTests
 
         // P1-T03 assertion: the context models exactly the four persistence-foundation
         // tables (Migration 001 + 002). No other Phase 1 table is implied.
+        //
+        // P2-T04 (disclosed extension, contract §3 and §16.5): the accepted contract requires the
+        // six domain-core tables to be mapped by the SAME single DbContext, discovered through
+        // ApplyConfigurationsFromAssembly, so the exact modelled set necessarily grows by exactly
+        // those six tables. The assertion is not weakened — it still pins the complete modelled
+        // table set, and the forbidden-table non-effect below is unchanged.
         var modelled = context.Model.GetEntityTypes()
             .Select(e => e.GetTableName())
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToList();
 
         Assert.Equal(
-            new[] { "admin_accounts", "template_modules", "templates", "users" },
+            new[]
+            {
+                "admin_accounts", "bq_contexts", "cm_contexts", "job_ons", "mf_contexts",
+                "template_modules", "templates", "tool_machines", "tools", "users",
+            },
             modelled);
 
         // Required non-effect: none of the forbidden Phase 1 tables is modelled.
@@ -45,6 +55,15 @@ public sealed class MigrationRunnerTests
                  })
         {
             Assert.DoesNotContain(forbidden, modelled);
+        }
+
+        // P2-T04 non-effect: no seventh domain-core table and no machine registry exist.
+        foreach (var absent in new[]
+                 {
+                     "machines", "machine_registry", "repairers", "tool_references", "documents",
+                 })
+        {
+            Assert.DoesNotContain(absent, modelled);
         }
     }
 

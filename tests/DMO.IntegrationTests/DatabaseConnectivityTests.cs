@@ -33,6 +33,12 @@ public sealed class DatabaseConnectivityTests
     private static string? ConnectionString =>
         Environment.GetEnvironmentVariable(ConnectionEnvironmentVariable);
 
+    /// <summary>
+    /// P2-T04 (disclosed extension, contract §3/§16): the migration run applies EVERY pending
+    /// migration — now 001, 002 and the P2-T04 domain-core migration — and the schema is exactly the
+    /// four foundation tables plus the six contracted domain-core tables, nothing more. The
+    /// idempotency evidence is unchanged.
+    /// </summary>
     [SkippableFact]
     public async Task MigrationRun_Applies001Then002_AndCreatesOnlyTheFoundationTables()
     {
@@ -57,16 +63,26 @@ public sealed class DatabaseConnectivityTests
         // Action: run the migration mechanism from the fresh schema.
         var first = await runner.ApplyPendingAsync();
 
-        // Assertions: exactly the two P1-T03 migrations, in generation order (001 then 002).
-        Assert.Equal(2, first.AppliedCount);
+        // Assertions: the three migrations, in generation order (001, 002, P2-T04 domain core).
+        Assert.Equal(3, first.AppliedCount);
         Assert.Equal(
-            new[] { "20260922001736_AccountAndTemplateFoundation", "20260922001757_TemplateModuleComposition" },
+            new[]
+            {
+                "20260922001736_AccountAndTemplateFoundation",
+                "20260922001757_TemplateModuleComposition",
+                "20260922232349_ToolJobOnDomainCore",
+            },
             first.AppliedMigrations);
 
-        // The schema is exactly the four foundation tables — nothing more.
+        // The schema is exactly the four foundation tables plus the six contracted domain-core
+        // tables — nothing more.
         var tables = await ReadPublicTablesAsync(context);
         Assert.Equal(
-            new[] { "__EFMigrationsHistory", "admin_accounts", "template_modules", "templates", "users" },
+            new[]
+            {
+                "__EFMigrationsHistory", "admin_accounts", "bq_contexts", "cm_contexts", "job_ons",
+                "mf_contexts", "template_modules", "templates", "tool_machines", "tools", "users",
+            },
             tables);
 
         // Idempotency: a second run applies nothing and changes nothing.

@@ -1,0 +1,66 @@
+@page "/jobon"
+@model DMO.Web.Pages.JobOn.IndexModel
+@using DMO.Web.Frontend.Shared.Contracts
+@{
+    ViewData["Title"] = "Job On";
+}
+<partial name="~/Pages/Shared/Components/_SharedComponentAssets.cshtml" />
+<link rel="stylesheet" href="~/css/dmo-jobon.css" asp-append-version="true" />
+<script src="~/js/dmo-jobon.js" defer></script>
+
+@*
+    P2-T04 Job On consult surface (contract §13.2 route 1, §8.1, §13.4).
+
+    Read only: Job On View carries no create/edit/duplicate/delete capability, so this page renders no
+    mutating affordance at all. The reference lookup is an explicit submission; every matching
+    production — including historical ones — is listed and an occurrence is opened only through the
+    explicit selection control, never automatically. A denied caller never reaches this markup (the
+    module policy denies the route), so a denial can never look like an empty list.
+*@
+<section class="dmo-jobon" data-dmo-jobon-surface="consult">
+    <form class="dmo-jobon__lookup" method="get" action="/jobon" data-dmo-jobon-lookup="true">
+        <label class="dmo-jobon__label" for="dmo-jobon-reference">Referência</label>
+        <input class="dmo-jobon__input"
+               id="dmo-jobon-reference"
+               name="reference"
+               type="text"
+               value="@Model.Reference"
+               data-dmo-jobon-reference="true" />
+        <button class="dmo-jobon__button" type="submit" data-dmo-jobon-lookup-submit="true">Pesquisar</button>
+    </form>
+
+    @if (Model.ValidationErrors.Count > 0)
+    {
+        @* A validation failure is never rendered as an empty list. *@
+        <ul class="dmo-jobon__errors" data-dmo-jobon-errors="true" role="alert">
+            @foreach (var error in Model.ValidationErrors)
+            {
+                <li data-dmo-jobon-error="@error">@error</li>
+            }
+        </ul>
+    }
+    else if (Model.LookupFailed)
+    {
+        @* A failed lookup is structurally distinct from "no results". *@
+        <partial name="~/Pages/Shared/Components/_CommonStateRegion.cshtml"
+                 model="@CommonStateRegionPresentation.LookupFailed(
+                     "Não foi possível obter as produções desta referência.",
+                     "Produções da referência",
+                     SharedActionPresentation.CreateEnabled("retry", "Tentar novamente"))" />
+    }
+    else if (Model.Productions is not null)
+    {
+        <div class="dmo-jobon__route-map" data-dmo-jobon-route-map="true" hidden>
+            @foreach (var route in Model.ProductionRoutes)
+            {
+                <span data-dmo-jobon-route="@route.Key" data-dmo-jobon-href="@route.Href"></span>
+            }
+        </div>
+
+        <partial name="~/Pages/Shared/Components/_DenseDataTable.cshtml" model="Model.Productions" />
+    }
+    else
+    {
+        <p class="dmo-jobon__hint" data-dmo-jobon-hint="true">Indique a referência para consultar as produções.</p>
+    }
+</section>
