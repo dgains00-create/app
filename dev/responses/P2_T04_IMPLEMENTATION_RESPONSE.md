@@ -71,7 +71,7 @@ byte-equivalent before/after (MIG9); no `DROP`/`TRUNCATE`/seed statement exists 
 
 - 106 acceptance criteria / **155 unique test rows**: all 155 rows implemented and executed
   (row-ID cross-check: contract rows 155 == test rows 155, 0 missing, 0 extra).
-- Targeted P2-T04: **158 tests** (117 integration + 41 unit) — **0 failed, 0 skipped** when run with
+- Targeted P2-T04: **155 tests** (114 integration + 41 unit) — **0 failed, 0 skipped** when run with
   the disposable PostgreSQL connection string set.
 - DB-class rows ran for real against a disposable local PostgreSQL 16 container
   (`DMO_TEST_POSTGRES_CONNECTION`), category A of the accepted test posture; they are
@@ -86,7 +86,7 @@ byte-equivalent before/after (MIG9); no `DROP`/`TRUNCATE`/seed statement exists 
 | `dotnet build DMO.slnx -c Debug` | — | 0 errors | — | 1 pre-existing analyzer warning in accepted `P2T02RegressionTests.cs` (xUnit2029) — the file is protected and byte-identical; 0 warnings in all P2-T04 code |
 | Full unit suite | 509 | 0 | 0 | baseline was 468 (P2-T01–T03) |
 | Full integration suite (with disposable PostgreSQL) | 384 | 0 | 2 | the 2 skips are the pre-existing live-Supabase Auth tests (category B), unchanged from the baseline 71 → 2 when the DB is configured; without the DB env the DB-class rows are environment-gated skips (never passing) |
-| Targeted P2-T04 (unit + integration, DB attached) | 158 | 0 | 0 | 155 contract rows + 3 additive rows (JOB23/CTX10 source rows + one service-level extra) |
+| Targeted P2-T04 (unit + integration, DB attached) | 155 | 0 | 0 | 155 contract rows + 0 additive tests (JOB23/CTX10 are contract rows) |
 
 **Skipped-test classification (no unexpected skips):**
 - Category A DB-class rows: environment-gated skips ONLY when `DMO_TEST_POSTGRES_CONNECTION` is
