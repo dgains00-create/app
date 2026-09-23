@@ -93,6 +93,18 @@ internal static class P2T06ProductionScan
         .Where(path => path.EndsWith(".cs", StringComparison.Ordinal))
         .ToList();
 
+    /// <summary>
+    /// The single CP4 composition-seam file (contract §26.4 row CP4): the documented
+    /// application-level pin of the future Comparação carrier composition. This is the ONLY
+    /// P2-T06 production file allowed to carry the closed relation vocabulary (e.g.
+    /// <c>PreviousPesoId</c>) — it IS the contracted pin, not an invented carrier; BND6 proves
+    /// every other P2-T06 source stays free of the deferred-carrier tokens and proves the
+    /// seam's dormancy (pure composition: no persistence/route/query surface). AC-B6 (no
+    /// fabricated carrier table/column/route/type) is unchanged.
+    /// </summary>
+    public static string ComparisonCompositionSeamPath { get; } =
+        "src/DMO.Application/ControloApprove/ComparisonComposer.cs";
+
     // ================= boundary vocabularies ===============================================
 
     /// <summary>No P2-T08 execution tokens (BND-B2): PDF/file/email/document mechanics.</summary>

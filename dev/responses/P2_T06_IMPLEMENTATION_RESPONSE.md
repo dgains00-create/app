@@ -5,6 +5,9 @@ the exact shared Peso).
 **Task class:** implementation against the accepted contract. **No independent verification, no
 Architect implementation review, no availability registration** (per the approved STOP rules).
 **Status:** IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW.
+**Correction record:** independent verification returned **NOT VERIFIED** (report commit
+`8c49404`, `reports/P2_T06_CONTROLO_APPROVE_VERIFICATION.md`) with a single defect — matrix row
+CP4 absent; the focused correction of §14 implements exactly that seam and test.
 
 ---
 
@@ -256,3 +259,101 @@ P2-T07 / P2-T08 / P2-T10:        NOT AUTHORIZED (no work performed)
 | Supabase / live TEST | untouched (disposable PostgreSQL only) |
 | `ModuleRegistrations.CurrentBuildAvailable` | `[]` (unchanged) |
 | `DestinationRouteRegistrations` / route registry | unchanged (still empty) |
+
+---
+
+## 14. Focused correction — CP4 (independent verification defect)
+
+### 14.1 Verification record
+
+| Item | Value |
+|---|---|
+| Independent verification | `reports/P2_T06_CONTROLO_APPROVE_VERIFICATION.md` — verdict **NOT VERIFIED** |
+| Verification report commit | `8c49404a3ad51487a40a5c925b821f133e3e2972` (report only; no implementation changed) |
+| **Sole blocking defect** | contract §26.4 matrix row **CP4** absent: no unit test over the composition function with a supplied carrier, and no composition function exists in `src/DMO.Application/ControloApprove/**` |
+| Everything else | independently PASSed by the verifier (identity, persistence, approve, reject, reopen, shared Peso read model, historical freeze, routes/access, concurrency, Histórico, Q-SEND, deferred carriers, negative scope, availability) — **untouched by this correction** |
+
+### 14.2 The exact composition seam added
+
+`src/DMO.Application/ControloApprove/ComparisonComposer.cs` — the CP4 contract pin:
+
+- `ComparisonCarrier(Current, Previous)` — the **supplied** authoritative carrier shape: the
+  current side and the previous side of `current_peso_id → previous_peso_id`; the previous
+  side's `PesoId` IS the persisted `previous_peso_id` — no other id exists in the carrier, so
+  substitution is unrepresentable by construction.
+- `ComparisonComposition` — exposes `CurrentPesoId`/`PreviousPesoId` derived **only** from the
+  supplied sides, retaining the supplied current/previous context verbatim (same instances —
+  nothing copied, rebuilt, completed or inferred).
+- `ComparisonComposer.Compose(ComparisonCarrier?)` — pure, application-level, read-only,
+  non-persistent composition: supplied carrier → the exact composition; no carrier → `null`
+  (AC-CP4: no fabricated relation, no synthetic comparison state).
+
+The seam satisfies every correction boundary: it is **dormant** (no production call site —
+today no authoritative carrier exists; CP3 unchanged: the review sheet still carries no
+comparison region and fabricates none); **incapable** of inventing, searching for, choosing or
+persisting a previous Peso (single-branch passthrough of the supplied carrier; no query, no
+repository, no mutation, no latest/date/machine/reference fallback); and no decision route can
+write a pairing through it (AC-CP3 structural).
+
+### 14.3 The exact CP4 test added
+
+`tests/DMO.UnitTests/ControloApprove/ComparisonCompositionTests.cs` — row CP4 (class U;
+proves AC-CP1/AC-CP2/AC-CP4):
+
+1. the exact supplied `previous_peso_id` is retained (`PreviousPesoId` == the supplied previous
+   side's id);
+2. current context is retained exactly (same instance + record equality + every fact verbatim);
+3. previous context is retained exactly (same proof); NULL supplied facts stay NULL (nothing
+   invented);
+4. no substitution (a "tempting alternatives" carrier — recent submission/current reference —
+   is never used for the relation);
+5. no fallback (no carrier → nothing; a sparse carrier still exposes exactly the supplied id);
+6. the supplied carrier is not mutated (every supplied fact asserted unchanged after composing);
+7. the result derives only from the supplied data (deterministic; a different supplied carrier
+   yields a different composition);
+8. the no-carrier branch composes nothing — no synthetic comparison (AC-CP4).
+
+### 14.4 Negative-scan refinement (strictly required, single file)
+
+The BND6/CP2/D6 deferred-carrier scan over-approximates by forbidding the closed relation
+vocabulary in **all** P2-T06 sources; the CP4 seam is the ONE contracted file that must carry
+it (it IS the contract pin, not an invented carrier). Refined without weakening the proof:
+
+- `P2T06ProductionScan` names the single seam file
+  (`src/DMO.Application/ControloApprove/ComparisonComposer.cs`);
+- `BND6` scans **every other** P2-T06 production source for the deferred-carrier tokens
+  (unchanged: no invented carrier table/column/route/type anywhere);
+- `BND6` pins the carve-out (the seam exposes `PreviousPesoId` in code) and proves the seam's
+  dormancy (no `Repository`/`DbContext`/`DbSet`/route-map/`SaveAsync`/`Transaction`/query
+  surface in its code);
+- the migration assertions are unchanged (exactly one table: `peso_review_decisions`).
+
+### 14.5 What was NOT done (correction boundary honored)
+
+- **No Comparação persistence**: no `previous_peso_id` column, no comparison table, no
+  comparison repository, no comparison endpoint, no comparison mutation, no automatic candidate
+  lookup, no "latest Peso" logic (CP1/CP2/CP3/BND6/CP4 all still green).
+- **No migration, no schema change, no route change, no authorization change**, no
+  `Program.cs`/DI/Web/page/asset change; migrations 001–005 + `DmoDbContext.cs` stay
+  byte-identical (MG1).
+- No redesign of Comparação; no P2-T05 remainder implementation; P2-T07/T08/T10 NOT AUTHORIZED.
+
+### 14.6 Post-correction totals (this correction's own runs)
+
+```text
+P2-T06 matrix:         67 / 67 rows proven  (row CP4 now implemented and pinned)
+composition function:  src/DMO.Application/ControloApprove/ComparisonComposer.cs
+CP4 test:              tests/DMO.UnitTests/ControloApprove/ComparisonCompositionTests.cs (4 tests)
+unit:                  609 / 609 PASS  (was 605 / 605; +4 CP4 tests)
+integration:           568 PASS / 2 pre-existing live-Supabase SKIPS  (disposable PostgreSQL)
+build:                 PASS (dotnet build DMO.slnx)
+schema changed:        NO
+routes changed:        NO
+authorization changed: NO
+CurrentBuildAvailable: [] (unchanged; BND1)
+working tree:          clean after commit
+```
+
+**Governance after this correction:** P2-T06 remains **IMPLEMENTED — AWAITING INDEPENDENT
+RE-VERIFICATION (focused: CP4) / ARCHITECT IMPLEMENTATION REVIEW**. This correction performs no
+independent re-verification and no Architect review (per the STOP rules).

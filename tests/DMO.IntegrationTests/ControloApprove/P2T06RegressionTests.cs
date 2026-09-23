@@ -148,16 +148,26 @@ public sealed class P2T06RegressionTests
     // ------------------------------------------------------------------- BND6 (AC-B6) / deferred carriers (D6/CP2)
 
     /// <summary>
-    /// BND6/D6/CP2 â€” no deferred-carrier invention: no <c>previous_peso_id</c>, no per-CM
+    /// BND6/D6/CP2 — no deferred-carrier invention: no <c>previous_peso_id</c>, no per-CM
     /// decision table/route/type, no <c>controlo_sheet_id</c>/Folha table/column/route, no
-    /// send table â€” nothing is fabricated (contract Â§17.3/Â§18.3, BND-B6; Q-PERCM/Q-FOLHA/Q-COMP).
+    /// send table — nothing is fabricated (contract §17.3/§18.3, BND-B6; Q-PERCM/Q-FOLHA/Q-COMP).
+    /// The single CP4 composition seam (contract §26.4 row CP4, <c>ComparisonComposer.cs</c>) is
+    /// the one contracted file allowed to carry the closed relation vocabulary in code — it IS
+    /// the contract pin for the future carrier, not an invented carrier: every other P2-T06
+    /// source stays free of the tokens, and the seam's own dormancy (pure composition, no
+    /// persistence/route/query surface) is proven below.
     /// </summary>
     [Fact]
     public void BND6_NoComparisonFolhaPerCmOrSendCarrierIsInvented()
     {
+        var seamPath = P2T06ProductionScan.ComparisonCompositionSeamPath;
+        var otherSources = P2T06ProductionScan.ProductionSourcePaths
+            .Where(path => !string.Equals(path, seamPath, StringComparison.Ordinal))
+            .ToList();
+
         foreach (var token in P2T06ProductionScan.DeferredCarrierTokens)
         {
-            var offenders = P2T06ProductionScan.ProductionSourcePaths
+            var offenders = otherSources
                 .Where(path => P2T04ProductionScan.CodeOccurrences(
                     P2T04ProductionScan.Read(path),
                     token).Count > 0)
@@ -166,6 +176,28 @@ public sealed class P2T06RegressionTests
             Assert.True(
                 offenders.Count == 0,
                 $"The deferred-carrier token '{token}' appears in code/markup of: {string.Join(", ", offenders)}.");
+        }
+
+        // The seam really pins the contract: it exposes the closed relation vocabulary
+        // (PreviousPesoId) in CODE — the carve-out can never shelter an unrelated file.
+        Assert.True(P2T04ProductionScan.Exists(seamPath), $"The CP4 seam file is missing: {seamPath}");
+        var seamSource = P2T04ProductionScan.Read(seamPath);
+        Assert.True(
+            P2T04ProductionScan.CodeOccurrences(seamSource, "PreviousPesoId").Count > 0,
+            "The CP4 seam must expose the pinned previous_peso_id member in code.");
+
+        // The seam is dormant and pure (AC-CP4): no persistence, no route, no repository and no
+        // querying surface exists in its code.
+        foreach (var dormantToken in new[]
+                 {
+                     "Repository", "DbContext", "DbSet", "MapGet", "MapPost", "MapGroup",
+                     "RequireAuthorization", "SaveAsync", "Transaction", "SqlQuery",
+                     "ExecuteUpdate",
+                 })
+        {
+            Assert.True(
+                P2T04ProductionScan.CodeOccurrences(seamSource, dormantToken).Count == 0,
+                $"The CP4 seam must stay dormant: the token '{dormantToken}' must not appear in {seamPath}.");
         }
 
         // The migration creates EXACTLY the one contracted table (and no comparison/Folha/send table).
