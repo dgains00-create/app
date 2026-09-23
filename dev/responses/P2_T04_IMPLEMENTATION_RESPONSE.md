@@ -1,6 +1,6 @@
 # P2-T04 — Domain Core: Canonical Tool Identity + Job On Light + Ferramentas Light — IMPLEMENTATION RESPONSE
 
-**Implementation status:** `IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW`.
+**Implementation status:** `IMPLEMENTED — AWAITING RE-VERIFICATION / ARCHITECT RE-REVIEW`.
 **B1 status:** `RESOLVED — PLAN ACCEPT 7d7a7c564027945a5c9a73cb798e9c226ee7f013`.
 **P2-T04 is NOT CLOSED. P2-T05 and later remain NOT AUTHORIZED.**
 
@@ -71,8 +71,9 @@ byte-equivalent before/after (MIG9); no `DROP`/`TRUNCATE`/seed statement exists 
 
 - 106 acceptance criteria / **155 unique test rows**: all 155 rows implemented and executed
   (row-ID cross-check: contract rows 155 == test rows 155, 0 missing, 0 extra).
-- Targeted P2-T04: **155 tests** (114 integration + 41 unit) — **0 failed, 0 skipped** when run with
-  the disposable PostgreSQL connection string set.
+- Targeted P2-T04: **156 tests** (115 integration + 41 unit) — **0 failed, 0 skipped** when run with
+  the disposable PostgreSQL connection string set: the 155 contracted rows plus the single
+  Architect-mandated save-time concurrency-race regression test (§13).
 - DB-class rows ran for real against a disposable local PostgreSQL 16 container
   (`DMO_TEST_POSTGRES_CONNECTION`), category A of the accepted test posture; they are
   `[SkippableFact]` + `PersistenceTestDatabase.SkipIfNotConfigured()` and are reported as
@@ -86,7 +87,7 @@ byte-equivalent before/after (MIG9); no `DROP`/`TRUNCATE`/seed statement exists 
 | `dotnet build DMO.slnx -c Debug` | — | 0 errors | — | 1 pre-existing analyzer warning in accepted `P2T02RegressionTests.cs` (xUnit2029) — the file is protected and byte-identical; 0 warnings in all P2-T04 code |
 | Full unit suite | 509 | 0 | 0 | baseline was 468 (P2-T01–T03) |
 | Full integration suite (with disposable PostgreSQL) | 384 | 0 | 2 | the 2 skips are the pre-existing live-Supabase Auth tests (category B), unchanged from the baseline 71 → 2 when the DB is configured; without the DB env the DB-class rows are environment-gated skips (never passing) |
-| Targeted P2-T04 (unit + integration, DB attached) | 155 | 0 | 0 | 155 contract rows + 0 additive tests (JOB23/CTX10 are contract rows) |
+| Targeted P2-T04 (unit + integration, DB attached) | 156 | 0 | 0 | 155 contract rows + 0 additive contract tests + 1 Architect-mandated save-time-race regression test (§13) |
 
 **Skipped-test classification (no unexpected skips):**
 - Category A DB-class rows: environment-gated skips ONLY when `DMO_TEST_POSTGRES_CONNECTION` is
@@ -184,3 +185,57 @@ each reading keeps the documented vocabulary and is asserted by tests:
   P2-T04 → `IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW`.
 - `plans/beta-workstreams/P2-T04-DOMAIN-CORE-TOOL-JOBON.md` §5.1: same record.
 - P2-T04 is NOT closed; P2-T05 remains NOT AUTHORIZED.
+
+## 13. Correction — save-time concurrency conflict mapping (Architect implementation review `5d490113b8dd1d80759742cc86a99e8f0294b44c`)
+
+**Defect (the single REJECT basis):** contract §15.1 requires the active EF concurrency token to
+surface a race between the explicit in-transaction version compare and `SaveChangesAsync` as a
+typed conflict through `ConcurrencyConflictExceptionMapping.ToDomainConflict(...)`. The write paths
+of `src/DMO.Infrastructure/Persistence/JobOnRepository.cs` (`UpdatedAsync`, `DuplicatedAsync`,
+`DeletedAsync`) called `SaveChangesAsync` directly and caught only `DbUpdateException` cases backed
+by a PostgreSQL SQLSTATE, so a save-time race (another transaction committing a version bump between
+the compare and the save) made the guarded write match zero rows with no server error — EF raised
+`DbUpdateConcurrencyException`, which escaped as HTTP 500 instead of the contracted 409
+`stale-version`. The explicit compare and the token were both already correct; only the mapping was
+missing.
+
+**Correction (smallest, per the accepted foundation pattern `TemplateRepository.SaveAsync` /
+`UserRepository`):** `JobOnRepository` now saves through one private `SaveAsync` helper that wraps
+`SaveChangesAsync` and catches `DbUpdateConcurrencyException`, rethrowing
+`ConcurrencyConflictExceptionMapping.ToDomainConflict(exception)` in every version-token write path
+(`CreatedAsync`, `UpdatedAsync`, `DuplicatedAsync`, `DeletedAsync`). The application layer already
+translates `ConcurrencyConflictException` into `Refused(StaleVersion)` → HTTP 409 `stale-version`.
+Both protections remain: (1) the explicit stale-version comparison and (2) the EF concurrency-token
+race guard. No second conflict type was invented, nothing is swallowed, and no generic 500 remains
+on this path. No schema, migration, contract or other repository code was changed; `ToolRepository`
+needs no identical mapping because `tools` has no concurrency token.
+
+**Regression test (real PostgreSQL race, not a pre-stale version):**
+`tests/DMO.IntegrationTests/Persistence/JobOnSaveTimeConcurrencyTests.cs` — `S15_SaveTimeConcurrencyRaceIsMappedToAStaleVersionRefusal`
+reproduces the exact race on the disposable database: the occurrence is seeded at version 1; the
+repository loads it, the explicit compare passes; a `SaveTimeRaceInterceptor` opened inside the
+repository's `SaveChangesAsync` commits `version = 2` through a second, real database connection
+before the guarded `UPDATE ... WHERE version = 1` executes; EF raises `DbUpdateConcurrencyException`
+for real (zero rows matched); the result is the typed `Refused(StaleVersion)` with transport token
+`stale-version` (the endpoint's 409 mapping); and the persisted row still carries the seeded facts
+(B1) with version 2 — nothing of the losing write was saved. The test is registered in
+`P2T04ProductionScan.NewP2T04PersistenceTestFiles` so the BND11/BND12 allow-lists remain exact: the
+155-row contract matrix is unchanged (0 additive contract tests); this single post-review regression
+test is disclosed here and in the scan.
+
+**Build / test results (exact, final runs):**
+
+| Suite | Passed | Failed | Skipped | Notes |
+|---|---|---|---|---|
+| `dotnet build DMO.slnx -c Debug -t:Rebuild` | — | 0 errors | — | 1 pre-existing analyzer warning in accepted `P2T02RegressionTests.cs` (xUnit2029, protected file, byte-identical); 0 warnings in all P2-T04 code incl. the correction |
+| Full unit suite | 509 | 0 | 0 | unchanged baseline (468 P2-T01–T03 + 41 P2-T04) |
+| Full integration suite (with disposable PostgreSQL 16) | 385 | 0 | 2 | 384 pre-correction + 1 new race regression; the 2 skips are the pre-existing live-Supabase Auth category-B tests |
+| Targeted P2-T04 (unit + integration, DB attached) | 156 | 0 | 0 | 155 contracted rows + 1 Architect-mandated regression test |
+| New save-time-race regression | 1 | 0 | 0 | `S15_...` against real PostgreSQL 16 (container `postgres:16`) |
+
+**Correction SHA:** `d6a81b5fbcfc5351c38e2a2b8c6650758abb9bce` — "fix: map P2-T04 save-time
+concurrency conflicts to stale-version (contract 15.1)" (correction + regression test + scan
+registration; this response follow-up is the second, governance-only commit).
+
+**Status:** P2-T04 remains `IMPLEMENTED — AWAITING RE-VERIFICATION / ARCHITECT RE-REVIEW`; NOT
+CLOSED; P2-T05 NOT AUTHORIZED.
