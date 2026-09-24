@@ -236,8 +236,7 @@ working tree (after commit)   : CLEAN
 
 ```text
 ARCHITECT PLAN REVIEW REQUIRED BEFORE P2-T07 IMPLEMENTATION
-P2-T07 contract SHA = <recorded by the follow-up governance commit>
-(pushed to DMO-MODULAR/main)
+P2-T07 contract SHA = dcca794685c03969d97295887e57e0f60e0bd7d8 (pushed to DMO-MODULAR/main)
 ```
 
 The Architect must review the committed contract

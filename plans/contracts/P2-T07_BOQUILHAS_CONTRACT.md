@@ -2547,8 +2547,8 @@ build/tests                         : not modified (authoring only; no build cla
 | Item | Value |
 |---|---|
 | Contract file | `plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md` (this file) |
-| Authoring commit | recorded by the follow-up governance commit (this contract's SHA recording, P2-T06 `d458d0d` precedent) |
-| Authoring response | `dev/responses/P2_T07_CONTRACT_AUTHORING_RESPONSE.md` (same authoring commit) |
+| Authoring commit | `dcca794685c03969d97295887e57e0f60e0bd7d8` (DMO-MODULAR remote `main`) |
+| Authoring response | `dev/responses/P2_T07_CONTRACT_AUTHORING_RESPONSE.md` (same commit) |
 | DMO-MODULAR remote `main` before this task | `8f9e4f85af774453d6b99f66fc3dbaa7d5196a11` |
 | Implementation performed | **NONE** (docs-only planning commit: contract + response + master-plan/workstream status records) |
 | Status | **AUTHORED — AWAITING ARCHITECT PLAN REVIEW** (PLAN ACCEPT / corrections / reject) |
