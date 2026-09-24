@@ -35,19 +35,22 @@ public sealed class Migration004ControloCreateDomainTests
         "pdf_directory_settings", "peso_measurement_rows", "pesos", "repairers",
     ];
 
-    /// <summary>The complete public product-table register after all SIX migrations (order-insensitive;
+    /// <summary>The complete public product-table register after all SEVEN migrations (order-insensitive;
     /// the post-closure correction adds exactly the one approved table; P2-T06 adds exactly the one
-    /// review-decision table).</summary>
+    /// review-decision table; P2-T07 adds exactly the six Boquilhas tables — disclosed extension,
+    /// P2-T07 contract §28).</summary>
     private static readonly string[] PublicProductTables =
     [
-        "admin_accounts", "bq_contexts", "cm_contexts", "email_list_recipients", "email_lists",
+        "admin_accounts", "boquilha_close_snapshots", "boquilha_machines",
+        "boquilha_movement_audit", "boquilha_movements", "boquilha_reopenings", "boquilhas",
+        "bq_contexts", "cm_contexts", "email_list_recipients", "email_lists",
         "email_templates", "glass_density_settings", "job_ons", "machine_repairer_assignments",
         "mf_contexts", "pdf_directory_settings", "peso_measurement_rows", "pesos", "repairers",
         "template_modules", "templates", "tool_machines", "tools", "users", "peso_review_decisions",
     ];
 
-    /// <summary>The six migrations, in generation order (Â§25.1; the correction migration 005 is
-    /// the FIFTH overall â€” Architect review observation N-1).</summary>
+    /// <summary>The seven migrations, in generation order (§25.1; the correction migration 005 is
+    /// the FIFTH overall — Architect review observation N-1; P2-T07 migration 007 is the SEVENTH).</summary>
     private static readonly string[] AllMigrationIds =
     [
         "20260922001736_AccountAndTemplateFoundation",
@@ -56,6 +59,7 @@ public sealed class Migration004ControloCreateDomainTests
         "20260923045054_ControloCreateDomain",
         "20260923122429_GlassDensitySettings",
         "20260923171223_ControloApproveDomain",
+        "20260924031924_BoquilhasDomain",
     ];
 
     /// <summary>The 22 contracted CHECK constraints of the eight tables (Â§17.1).</summary>
@@ -127,13 +131,15 @@ public sealed class Migration004ControloCreateDomainTests
     ];
 
     /// <summary>
-    /// MIG-X1: applying all migrations to a reset schema leaves exactly the six contracted
-    /// migrations in <c>__EFMigrationsHistory</c> and exactly the 21 public product tables (the
+    /// MIG-X1: applying all migrations to a reset schema leaves exactly the seven contracted
+    /// migrations in <c>__EFMigrationsHistory</c> and exactly the 27 raw public tables (the
     /// post-closure correction adds exactly the one approved table to the closed 19-table state;
-    /// P2-T06 adds exactly the one review-decision table to the closed 20-table state).
+    /// P2-T06 adds exactly the one review-decision table; P2-T07 adds exactly the six Boquilhas
+    /// tables — the raw count 27 includes <c>__EFMigrationsHistory</c>, see the P2-T07
+    /// implementation response).
     /// </summary>
     [SkippableFact]
-    public async Task MIG_X1_ApplyingAllMigrationsLeavesSixMigrationsAndTheTwentyOnePublicTables()
+    public async Task MIG_X1_ApplyingAllMigrationsLeavesSevenMigrationsAndTheTwentySevenRawTables()
     {
         PersistenceTestDatabase.SkipIfNotConfigured();
 
@@ -151,7 +157,7 @@ public sealed class Migration004ControloCreateDomainTests
             "SELECT table_name FROM information_schema.tables " +
             "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"));
 
-        Assert.Equal(21, tables.Count);
+        Assert.Equal(27, tables.Count);
         Assert.Equal(Sorted([.. PublicProductTables, MigrationHistoryTable]), tables);
     }
 
@@ -381,13 +387,14 @@ public sealed class Migration004ControloCreateDomainTests
         await using var context = PersistenceTestDatabase.CreateContext();
         await PersistenceTestDatabase.ApplyMigrationsAsync(context);
 
-        Assert.Equal(6, (await context.Database.GetAppliedMigrationsAsync()).Count());
+        // P2-T07 (disclosed extension): SEVEN migrations are applied with the database up to date.
+        Assert.Equal(7, (await context.Database.GetAppliedMigrationsAsync()).Count());
 
         // The second application is a complete no-op: it must not throw and leaves nothing pending.
         await PersistenceTestDatabase.ApplyMigrationsAsync(context);
 
         Assert.Empty(await context.Database.GetPendingMigrationsAsync());
-        Assert.Equal(6, (await context.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(7, (await context.Database.GetAppliedMigrationsAsync()).Count());
     }
 
     private static IReadOnlyList<string> Sorted(IReadOnlyList<string> values) =>

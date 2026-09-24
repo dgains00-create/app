@@ -335,6 +335,22 @@ internal static class P2T05ProductionScan
         "src/DMO.Web/Endpoints/ControloApproveEndpoints.cs",
         "src/DMO.Web/wwwroot/css/dmo-controlo-approve.css",
         "src/DMO.Web/wwwroot/js/dmo-controlo-approve.js",
+        // ---- P2-T07 (disclosed extension, P2-T07 contract Appendix B): the Boquilhas surface
+        // consumes the P2-T05 repairer register and machine assignments by contract (read-only),
+        // so its OWN paths are an accepted extension of the P2-T05 owned surface (the P2-T07 paths
+        // are themselves pinned by the P2-T07 boundary rows).
+        "src/DMO.Domain/Boquilhas/",
+        "src/DMO.Application/Boquilhas/",
+        "src/DMO.Application/Repositories/IBoquilhas",
+        "src/DMO.Application/Persistence/BoquilhasPersistenceException.cs",
+        "src/DMO.Infrastructure/Persistence/Boquilhas",
+        "src/DMO.Infrastructure/Persistence/Entities/Boquilha",
+        "src/DMO.Infrastructure/Persistence/EntityConfigurations/Boquilha",
+        "src/DMO.Infrastructure/Migrations/20260924031924_BoquilhasDomain",
+        "src/DMO.Web/Pages/Boquilhas/",
+        "src/DMO.Web/Endpoints/BoquilhasEndpoints.cs",
+        "src/DMO.Web/wwwroot/css/dmo-boquilhas.css",
+        "src/DMO.Web/wwwroot/js/dmo-boquilhas.js",
     ];
 
     /// <summary>

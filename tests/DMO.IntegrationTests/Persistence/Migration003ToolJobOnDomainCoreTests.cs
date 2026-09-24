@@ -68,6 +68,15 @@ public sealed class Migration003ToolJobOnDomainCoreTests
     /// <summary>The single P2-T06 table of migration 006 (disclosed extension, P2-T06 contract §25).</summary>
     private const string PesoReviewDecisionsTable = "peso_review_decisions";
 
+    /// <summary>
+    /// The six Boquilhas tables of migration 007 (disclosed extension, P2-T07 contract §28).
+    /// </summary>
+    private static readonly string[] BoquilhasTables =
+    [
+        "boquilha_close_snapshots", "boquilha_machines", "boquilha_movement_audit",
+        "boquilha_movements", "boquilha_reopenings", "boquilhas",
+    ];
+
     /// <summary>EF's own migration bookkeeping table (never a product table).</summary>
     private const string MigrationHistoryTable = "__EFMigrationsHistory";
 
@@ -222,10 +231,11 @@ public sealed class Migration003ToolJobOnDomainCoreTests
         // Disclosed P2-T05 extension: the shared schema now also holds the eight contracted
         // Controlo tables (migration 004); the post-closure glass-density correction adds
         // exactly the one approved settings table (migration 005); the P2-T06 Controlo Approve
-        // migration 006 adds exactly the one review-decision table. The P2-T04 rows keep
+        // migration 006 adds exactly the one review-decision table; the P2-T07 Boquilhas
+        // migration 007 adds exactly the six Boquilhas tables. The P2-T04 rows keep
         // pinning the complete set.
         Assert.Equal(
-            Sorted([.. FoundationTables, .. DomainCoreTables, .. ControloTables, GlassDensitySettingsTable, PesoReviewDecisionsTable, MigrationHistoryTable]),
+            Sorted([.. FoundationTables, .. DomainCoreTables, .. ControloTables, GlassDensitySettingsTable, PesoReviewDecisionsTable, .. BoquilhasTables, MigrationHistoryTable]),
             tables);
 
         foreach (var forbidden in ForbiddenTables)
@@ -559,10 +569,12 @@ public sealed class Migration003ToolJobOnDomainCoreTests
                 && !name.StartsWith("DmoDbContextModelSnapshot", StringComparison.Ordinal))
             .ToList();
 
-        // Exactly five migrations exist: 001, 002, the P2-T04 migration, the P2-T05 Controlo
-        // migration (disclosed extension) and the glass-density correction migration 005
-        // (post-closure correction; Architect review observation N-1).
-        Assert.Equal(6, migrationFiles.Count);
+        // Exactly SEVEN migrations exist: 001, 002, the P2-T04 migration, the P2-T05 Controlo
+        // migration (disclosed extension), the glass-density correction migration 005
+        // (post-closure correction; Architect review observation N-1), the P2-T06 approve
+        // migration 006 and the P2-T07 Boquilhas migration 007 (disclosed extension,
+        // P2-T07 contract §28).
+        Assert.Equal(7, migrationFiles.Count);
         var toolJobOnMigrations = migrationFiles
             .Where(name => name.EndsWith($"_{ToolJobOnMigrationName}.cs", StringComparison.Ordinal))
             .ToList();
@@ -589,11 +601,12 @@ public sealed class Migration003ToolJobOnDomainCoreTests
 
         // The snapshot and the CONTROL migration designers record exactly the eighteen product tables
         // (disclosed P2-T05 extension: ten prior + eight Controlo); the snapshot ALSO records the
-        // one correction table (nineteen product tables after migration 005). The P2-T04
-        // migration's OWN designer is a frozen historical artifact of its generation time and
-        // still records the ten tables it shipped with.
+        // one correction table (nineteen product tables after migration 005) and the one review
+        // decision table (P2-T06) and the SIX Boquilhas tables (P2-T07). The P2-T04 migration's
+        // OWN designer is a frozen historical artifact of its generation time and still records
+        // the ten tables it shipped with.
         var expectedTables = Sorted([.. FoundationTables, .. DomainCoreTables, .. ControloTables]);
-        var expectedSnapshotTables = Sorted([.. FoundationTables, .. DomainCoreTables, .. ControloTables, GlassDensitySettingsTable, PesoReviewDecisionsTable]);
+        var expectedSnapshotTables = Sorted([.. FoundationTables, .. DomainCoreTables, .. ControloTables, GlassDensitySettingsTable, PesoReviewDecisionsTable, .. BoquilhasTables]);
         var expectedP2T04DesignerTables = Sorted([.. FoundationTables, .. DomainCoreTables]);
 
         var snapshot = await File.ReadAllTextAsync(Path.Combine(migrationsDirectory, "DmoDbContextModelSnapshot.cs"));
@@ -622,14 +635,16 @@ public sealed class Migration003ToolJobOnDomainCoreTests
         // Disclosed P2-T05 extension: the latest migration is now the Controlo domain migration;
         // the post-closure correction adds the glass-density migration 005 on top (Architect
         // review observation N-1: the correction migration is the FIFTH overall); P2-T06 adds
-        // the Controlo Approve migration 006 on top (disclosed extension).
+        // the Controlo Approve migration 006 on top (disclosed extension); P2-T07 adds the
+        // Boquilhas migration 007 on top (disclosed extension, P2-T07 contract §28).
         var latestIsControlo = latest.EndsWith(ControloCreateMigrationName, StringComparison.Ordinal);
         var latestIsCorrection = latest.EndsWith(CorrectionMigrationName, StringComparison.Ordinal);
         var latestIsP2T06 = latest.EndsWith("ControloApproveDomain", StringComparison.Ordinal);
+        var latestIsP2T07 = latest.EndsWith("BoquilhasDomain", StringComparison.Ordinal);
         Assert.True(
-            latestIsControlo || latestIsCorrection || latestIsP2T06,
-            $"The latest migration must be the Controlo domain, the glass-density correction or the " +
-            $"P2-T06 Controlo Approve domain, was {latest}.");
+            latestIsControlo || latestIsCorrection || latestIsP2T06 || latestIsP2T07,
+            $"The latest migration must be the Controlo domain, the glass-density correction, " +
+            $"the P2-T06 Controlo Approve domain or the P2-T07 Boquilhas domain, was {latest}.");
 
         try
         {

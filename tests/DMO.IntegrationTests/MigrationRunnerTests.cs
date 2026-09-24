@@ -37,8 +37,12 @@ public sealed class MigrationRunnerTests
         // Controlo contract requires the eight Controlo tables to be mapped by the same single
         // DbContext, so the exact modelled set grows by exactly those eight tables. Post-closure
         // glass-density correction (contract Â§5.1): the one approved settings table is mapped by
-        // the same single DbContext, growing the modelled set by exactly one table. The assertion
-        // is not weakened â€” it still pins the complete modelled table set, and the forbidden-table
+        // the same single DbContext, growing the modelled set by exactly one table. P2-T06
+        // (disclosed extension, P2-T06 contract Â§25): the one decision table is mapped by the same
+        // single DbContext, growing the modelled set by exactly one table. P2-T07 (disclosed
+        // extension, P2-T07 contract Â§28): the SIX Boquilhas tables are mapped by the same single
+        // DbContext, growing the modelled set by exactly those six tables. The assertion is not
+        // weakened â€” it still pins the complete modelled table set, and the forbidden-table
         // non-effect below is unchanged.
         var modelled = context.Model.GetEntityTypes()
             .Select(e => e.GetTableName())
@@ -48,7 +52,9 @@ public sealed class MigrationRunnerTests
         Assert.Equal(
             new[]
             {
-                "admin_accounts", "bq_contexts", "cm_contexts", "email_list_recipients", "email_lists",
+                "admin_accounts", "boquilha_close_snapshots", "boquilha_machines",
+                "boquilha_movement_audit", "boquilha_movements", "boquilha_reopenings", "boquilhas",
+                "bq_contexts", "cm_contexts", "email_list_recipients", "email_lists",
                 "email_templates", "glass_density_settings", "job_ons", "machine_repairer_assignments",
                 "mf_contexts", "pdf_directory_settings", "peso_measurement_rows", "peso_review_decisions", "pesos", "repairers",
                 "template_modules", "templates", "tool_machines", "tools", "users",

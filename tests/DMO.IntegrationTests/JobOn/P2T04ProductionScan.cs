@@ -521,6 +521,9 @@ internal static class P2T04ProductionScan
         // ---- P2-T06 (disclosed): the new Controlo Approve test surface --------------------
         "tests/DMO.UnitTests/ControloApprove/",
         "tests/DMO.IntegrationTests/ControloApprove/",
+        // ---- P2-T07 (disclosed): the new Boquilhas test surface ---------------------------
+        "tests/DMO.UnitTests/Boquilhas/",
+        "tests/DMO.IntegrationTests/Boquilhas/",
     ];
 
     /// <summary>
@@ -573,6 +576,9 @@ internal static class P2T04ProductionScan
         // ---- P2-T06 (disclosed): the new env-gated Controlo Approve persistence tests ---------
         "Migration006ControloApproveDomainTests.cs",
         "PesoReviewRepositoryIntegrationTests.cs",
+        // ---- P2-T07 (disclosed): the new env-gated Boquilhas persistence tests --------------
+        "Migration007BoquilhasDomainTests.cs",
+        "BoquilhasRepositoryIntegrationTests.cs",
     ];
 
     /// <summary>Returns whether a repository-relative test path belongs to the new P2-T04 surface.</summary>

@@ -1,0 +1,163 @@
+@page "/boquilhas/novo"
+@model DMO.Web.Pages.Boquilhas.NovoModel
+@using DMO.Web.Frontend.Shared.Contracts
+@{
+    ViewData["Title"] = "Boquilhas — Novo";
+}
+<partial name="~/Pages/Shared/Components/_SharedComponentAssets.cshtml" />
+<link rel="stylesheet" href="~/css/dmo-boquilhas.css" asp-append-version="true" />
+<script src="~/js/dmo-boquilhas.js" defer></script>
+
+@*
+    P2-T07 Novo surface (contract §25.2 regions N1–N4, §16, §22).
+
+    Fixed desktop composition at the binding 1366 × 768 viewport: N1–N4 keep their structural order
+    at every desktop width; smaller windows scroll. No breakpoint variant, no card conversion, no
+    required-field hiding and no action relocation exists anywhere in this surface (AC-L1/L2).
+
+    Both flows are first-class: production-linked (boquilhas_id → bq_id → jobon_id + tool_id, a REAL
+    bq_contexts row created ONLY through IJobOnService) and standalone (boquilhas_id → tool_id, a
+    REAL canonical BQ Tool — no fake Job On, no fake bq_id; AC-I2/I3). The shared Tool orchestration
+    is consumed unchanged: candidates are BQ Tools only, a single candidate is NEVER auto-selected,
+    ambiguity stays explicit, and the contextual "Criar ferramenta" subflow posts the P2-T04
+    ferramentas route and returns to THIS origin state with the entered opening facts preserved
+    (AC-T1/T2/T3/T4). The Início quantity IS the opening quantity of the aggregate (Q-INICIO); the
+    opening date defaults to today; % utilização is manual only.
+*@
+<section class="dmo-boquilhas" data-dmo-boquilhas-surface="novo" data-dmo-boquilhas-root="true">
+
+    @* ---- N1 — Flow choice (both first-class; no forced Job On) ------------------------------ *@
+    <div class="dmo-boquilhas__region" data-dmo-boquilhas-region="flow" aria-label="Tipo de abertura">
+        <fieldset class="dmo-boquilhas__flow" data-dmo-flow-choice="true">
+            <legend class="dmo-boquilhas__legend">Tipo de abertura</legend>
+            <label class="dmo-boquilhas__flow-option">
+                <input type="radio" name="flow" value="linked" checked data-dmo-flow="linked" />
+                Ligado a produção
+            </label>
+            <label class="dmo-boquilhas__flow-option">
+                <input type="radio" name="flow" value="standalone" data-dmo-flow="standalone" />
+                Independente
+            </label>
+        </fieldset>
+    </div>
+
+    @* ---- N2 — Production context (linked only): reference search → productions → Job On read -- *@
+    <div class="dmo-boquilhas__region" data-dmo-boquilhas-region="production" aria-label="Contexto de produção">
+        <div class="dmo-boquilhas__search" data-dmo-production-search="true">
+            <label class="dmo-boquilhas__label" for="dmo-boquilhas-reference-search">Referência</label>
+            <input class="dmo-boquilhas__input" id="dmo-boquilhas-reference-search" type="text"
+                   value="@Model.JobOnId?.ToString() ?? string.Empty" data-dmo-production-reference="true" />
+            <button type="button" class="dmo-boquilhas__button" data-dmo-production-search-submit="true">Pesquisar produções</button>
+        </div>
+
+        <div class="dmo-boquilhas__productions" data-dmo-productions="true" hidden>
+            <p class="dmo-boquilhas__empty" data-dmo-productions-empty="true" hidden>Sem produções para esta referência.</p>
+        </div>
+
+        <div class="dmo-boquilhas__jobon" data-dmo-jobon-facts="true" hidden>
+            <p class="dmo-boquilhas__jobon-present" data-dmo-bq-present="true" hidden>
+                Contexto BQ presente — produção ligada.
+            </p>
+            <p class="dmo-boquilhas__jobon-missing" data-dmo-bq-missing="true" hidden>
+                Contexto BQ em falta para esta produção.
+            </p>
+            <button type="button"
+                    class="dmo-boquilhas__button"
+                    data-dmo-associate-bq="true"
+                    disabled
+                    hidden>Associar BQ</button>
+        </div>
+    </div>
+
+    @* ---- N3 — BQ Tool via the SHARED picker (explicit selection or contextual create) ------- *@
+    <div class="dmo-boquilhas__region" data-dmo-boquilhas-region="tool" aria-label="Ferramenta BQ">
+        @if (Model.ToolPicker is { } picker)
+        {
+            ViewData["ToolPickerRegionId"] = "dmo-boquilhas-picker";
+            <partial name="~/Pages/Shared/Components/_ToolPicker.cshtml" model="picker" view-data="ViewData" />
+        }
+
+        @* The adapter's own opaque-key → canonical tool_id map for this interaction. *@
+        <span class="dmo-boquilhas__candidate-map" data-dmo-boquilhas-candidate-map="true" hidden></span>
+
+        @* The contextual Tool create subflow (posts POST /ferramentas/tools; returns to THIS origin) *@
+        <fieldset class="dmo-boquilhas__tool-create"
+                  data-dmo-boquilhas-tool-create-panel="true"
+                  hidden>
+            <legend class="dmo-boquilhas__legend">Criar ferramenta BQ</legend>
+            <label class="dmo-boquilhas__label" for="dmo-boquilhas-tool-reference">Referência</label>
+            <input class="dmo-boquilhas__input" id="dmo-boquilhas-tool-reference" type="text" data-dmo-boquilhas-tool-field="reference" />
+            <label class="dmo-boquilhas__label" for="dmo-boquilhas-tool-lot">Lote</label>
+            <input class="dmo-boquilhas__input" id="dmo-boquilhas-tool-lot" type="text" data-dmo-boquilhas-tool-field="lot" />
+            <label class="dmo-boquilhas__label" for="dmo-boquilhas-tool-processo">Processo</label>
+            <select class="dmo-boquilhas__input" id="dmo-boquilhas-tool-processo" data-dmo-boquilhas-tool-field="processo">
+                <option value="">—</option>
+                <option value="NNPB">NNPB</option>
+                <option value="PS">PS</option>
+            </select>
+            <label class="dmo-boquilhas__label" for="dmo-boquilhas-tool-quantity">Quantidade</label>
+            <input class="dmo-boquilhas__input" id="dmo-boquilhas-tool-quantity" type="number" min="0" data-dmo-boquilhas-tool-field="quantity" />
+            <span class="dmo-boquilhas__label">Máquinas compatíveis</span>
+            <span class="dmo-boquilhas__machines" data-dmo-boquilhas-tool-machines="true">
+                @foreach (var machine in NovoModel.Machines)
+                {
+                    <label class="dmo-boquilhas__machine">
+                        <input type="checkbox" value="@machine.Value" data-dmo-boquilhas-tool-machine="@machine.Value" />
+                        @machine.Value
+                    </label>
+                }
+            </span>
+            <p class="dmo-boquilhas__error" data-dmo-boquilhas-tool-create-error="true" hidden></p>
+            <span class="dmo-boquilhas__tool-create-actions">
+                <button type="button" class="dmo-boquilhas__button" data-dmo-boquilhas-tool-create-submit="true">Criar ferramenta</button>
+                <button type="button" class="dmo-boquilhas__button" data-dmo-boquilhas-tool-create-cancel="true">Cancelar</button>
+            </span>
+        </fieldset>
+    </div>
+
+    @* ---- N4 — Opening facts (machines ≥ 1, Início quantity, opening date, manual %, observations) *@
+    <div class="dmo-boquilhas__region" data-dmo-boquilhas-region="opening" aria-label="Dados de abertura">
+        <fieldset class="dmo-boquilhas__opening" data-dmo-opening-facts="true">
+            <legend class="dmo-boquilhas__legend">Dados de abertura</legend>
+
+            <span class="dmo-boquilhas__label">Máquinas/Aberturas (pelo menos uma)</span>
+            <span class="dmo-boquilhas__machines" data-dmo-opening-machines="true">
+                @foreach (var machine in NovoModel.Machines)
+                {
+                    <label class="dmo-boquilhas__machine">
+                        <input type="checkbox" value="@machine.Value" data-dmo-opening-machine="@machine.Value" />
+                        @machine.Value
+                    </label>
+                }
+            </span>
+
+            <label class="dmo-boquilhas__label" for="dmo-boquilhas-opening-quantity">Quantidade inicial (Início)</label>
+            <input class="dmo-boquilhas__input" id="dmo-boquilhas-opening-quantity" type="number" min="1" value="1"
+                   data-dmo-opening-field="initialQuantity" />
+
+            <label class="dmo-boquilhas__label" for="dmo-boquilhas-opening-date">Data de abertura</label>
+            <input class="dmo-boquilhas__input" id="dmo-boquilhas-opening-date" type="date"
+                   value="@DateTime.Today.ToString("yyyy-MM-dd")" data-dmo-opening-field="openingDate" />
+
+            <label class="dmo-boquilhas__label" for="dmo-boquilhas-opening-utilisation">% utilização (manual)</label>
+            <input class="dmo-boquilhas__input" id="dmo-boquilhas-opening-utilisation" type="number" min="0" max="100" step="0.01"
+                   data-dmo-opening-field="utilisation" />
+
+            <label class="dmo-boquilhas__label" for="dmo-boquilhas-opening-observations">Observações</label>
+            <input class="dmo-boquilhas__input" id="dmo-boquilhas-opening-observations" type="text"
+                   data-dmo-opening-field="observations" />
+
+            <span class="dmo-boquilhas__actions">
+                <button type="button" class="dmo-boquilhas__button" data-dmo-create-submit="true">Criar registo</button>
+            </span>
+        </fieldset>
+
+        @* Page-owned adapter state: the selected canonical tool_id (never built from display text) *@
+        <input type="hidden" data-dmo-selected-tool="true" />
+        <input type="hidden" data-dmo-selected-bq="true" />
+        <input type="hidden" data-dmo-selected-jobon="true" data-dmo-selected-jobon-version="0" />
+
+        @* Page-owned failure surface (conflict = message + explicit reload recovery, D2) *@
+        <div class="dmo-boquilhas__state" data-dmo-boquilhas-state="true" hidden></div>
+    </div>
+</section>

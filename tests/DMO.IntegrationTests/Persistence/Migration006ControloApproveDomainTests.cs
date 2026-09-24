@@ -32,7 +32,8 @@ public sealed class Migration006ControloApproveDomainTests
     /// <summary>The exact single new table of the slice.</summary>
     private const string DecisionTable = "peso_review_decisions";
 
-    /// <summary>The six migrations, in generation order (this slice owns the SIXTH).</summary>
+    /// <summary>The seven migrations, in generation order (this slice owns the SIXTH; P2-T07 adds
+    /// the SEVENTH — disclosed extension, P2-T07 contract §28).</summary>
     private static readonly string[] AllMigrationIds =
     [
         "20260922001736_AccountAndTemplateFoundation",
@@ -41,22 +42,25 @@ public sealed class Migration006ControloApproveDomainTests
         "20260923045054_ControloCreateDomain",
         "20260923122429_GlassDensitySettings",
         "20260923171223_ControloApproveDomain",
+        "20260924031924_BoquilhasDomain",
     ];
 
-    /// <summary>The complete public product-table register after all six migrations (the closed
-    /// 20-table state + EXACTLY the one decision table).</summary>
+    /// <summary>The complete public product-table register after all seven migrations (the closed
+    /// 20-table state + EXACTLY the one decision table + the six Boquilhas tables).</summary>
     private static readonly string[] PublicProductTables =
     [
-        "admin_accounts", "bq_contexts", "cm_contexts", "email_list_recipients", "email_lists",
+        "admin_accounts", "boquilha_close_snapshots", "boquilha_machines",
+        "boquilha_movement_audit", "boquilha_movements", "boquilha_reopenings", "boquilhas",
+        "bq_contexts", "cm_contexts", "email_list_recipients", "email_lists",
         "email_templates", "glass_density_settings", "job_ons", "machine_repairer_assignments",
         "mf_contexts", "pdf_directory_settings", "peso_measurement_rows", "peso_review_decisions",
         "pesos", "repairers", "template_modules", "templates", "tool_machines", "tools", "users",
     ];
 
     /// <summary>
-    /// MG1 — applying all six migrations to a reset schema leaves exactly the six contracted
-    /// migrations in <c>__EFMigrationsHistory</c> and exactly the 21 public product tables; the
-    /// slice adds exactly ONE table to the closed 20-table state.
+    /// MG1 — applying all seven migrations to a reset schema leaves exactly the seven contracted
+    /// migrations in <c>__EFMigrationsHistory</c> and exactly the 27 raw public tables; the
+    /// slice adds exactly ONE table to the closed 20-table state and P2-T07 adds exactly SIX.
     /// </summary>
     [SkippableFact]
     public async Task MG1_ExactlyOneNewTableAndTheSixthMigrationAreApplied()
@@ -77,7 +81,7 @@ public sealed class Migration006ControloApproveDomainTests
             "SELECT table_name FROM information_schema.tables " +
             "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"));
 
-        Assert.Equal(21, tables.Count); // 20 closed tables + exactly one decision table
+        Assert.Equal(27, tables.Count); // 26 product tables + history
         Assert.Equal(Sorted([.. PublicProductTables, MigrationHistoryTable]), tables);
     }
 

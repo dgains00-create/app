@@ -1,5 +1,6 @@
 using DMO.Application.Accounts;
 using DMO.Application.Authentication;
+using DMO.Application.Boquilhas;
 using DMO.Application.ControloCreate;
 using DMO.Application.JobOn;
 using DMO.Application.Repositories;
@@ -64,6 +65,15 @@ public static class PersistenceServiceCollectionExtensions
         // history queries + the atomic decision write). The application service is registered in
         // DMO.Web/Program.cs with the shared read composition.
         services.AddScoped<IPesoReviewRepository, PesoReviewRepository>();
+
+        // ---- P2-T07 Boquilhas: the aggregate + movement ledger + lifecycle ----------------------
+        // Additive registrations only (P2-T07 contract §8.1/§27): the Boquilhas repository, the
+        // narrow read-only bq-context traversal seam and the Boquilhas delete-dependency probe
+        // (one additive line per contributing module, P2-T04 §11.5 seam). The application service
+        // is registered in DMO.Web/Program.cs.
+        services.AddScoped<IBoquilhasRepository, BoquilhasRepository>();
+        services.AddScoped<IBoquilhasContextRead, DmoBoquilhasContextRead>();
+        services.AddScoped<IJobOnDependencyProbe, BoquilhasDependencyProbe>();
 
         return services;
     }

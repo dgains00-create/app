@@ -756,15 +756,19 @@ public sealed class P2T04RegressionTests
     /// domain vocabulary is inside the P2-T04 owned paths, is one of the four documented additive
     /// files, or belongs to the P2-T05 owned surface (disclosed extension: the accepted P2-T05
     /// implementation legitimately consumes the P2-T04 anchors — <c>tool_id</c>/<c>cm_id</c> — inside
-    /// its OWN paths; the P2-T05 allow-list itself is enforced by the P2-T05 BND9 row). The protected
-    /// <c>DmoDbContext.cs</c> carries no P2-T04 vocabulary at all (contract §13.6, §17.2,
-    /// Appendix B; AC-95).
+    /// its OWN paths; the P2-T05 allow-list itself is enforced by the P2-T05 BND9 row) or to the
+    /// P2-T07 owned surface (disclosed extension, P2-T07 response: the Boquilhas surfaces consume
+    /// the closed P2-T04 Tool/Job On/context facts by contract — the accepted read-only
+    /// entity-set composition of review observation N1; the P2-T07 allow-list itself is enforced
+    /// by the P2-T07 boundary rows). The protected <c>DmoDbContext.cs</c> carries no P2-T04
+    /// vocabulary at all (contract §13.6, §17.2, Appendix B; AC-95).
     /// </summary>
     [Fact]
     public void BND9_TheChangedPathAllowListHoldsForEveryP2T04VocabularyMention()
     {
         var offenders = P2T04ProductionScan.VocabularyMentionsOutsideOwnedPaths()
             .Where(path => !IsPathInP2T05OwnedSurface(path))
+            .Where(path => !IsPathInP2T07OwnedSurface(path))
             .ToList();
 
         Assert.True(
@@ -801,6 +805,16 @@ public sealed class P2T04RegressionTests
     /// </summary>
     private static bool IsPathInP2T05OwnedSurface(string relativePath) =>
         DMO.IntegrationTests.ControloCreate.P2T05ProductionScan.IsOwnedPath(relativePath);
+
+    /// <summary>
+    /// Whether a repository-relative path belongs to the P2-T07 owned surface (the disclosed
+    /// extension of the P2-T04 changed-path allow-list). The Boquilhas surfaces consume the closed
+    /// P2-T04 Tool/Job On/context facts by contract (the accepted read-only entity-set composition
+    /// of review observation N1), so their own paths are allowed to mention the P2-T04 vocabulary;
+    /// the P2-T07 paths are themselves pinned by the P2-T07 boundary rows.
+    /// </summary>
+    private static bool IsPathInP2T07OwnedSurface(string relativePath) =>
+        DMO.IntegrationTests.Boquilhas.P2T07ProductionScan.IsOwnedPath(relativePath);
 
     /// <summary>
     /// BND10 — the accepted <c>DMO.UnitTests</c> surface survives: every test method pinned by the
@@ -1046,6 +1060,9 @@ public sealed class P2T04RegressionTests
                 // dependency probe registers through the same one-additive-line seam, and the
                 // Job On region gains no other vocabulary-bearing line.
                 "services.AddScoped<IJobOnDependencyProbe, PesoJobOnDependencyProbe>();",
+                // Disclosed P2-T07 extension (P2-T07 contract §27/App. A): the Boquilhas
+                // dependency probe registers through the same one-additive-line seam.
+                "services.AddScoped<IJobOnDependencyProbe, BoquilhasDependencyProbe>();",
             }.OrderBy(line => line, StringComparer.Ordinal),
             persistenceLines
                 .Where(line => P2T04ProductionScan.TestVocabulary.Any(token =>

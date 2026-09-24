@@ -41,8 +41,11 @@ public sealed class DatabaseConnectivityTests
     /// ToolJobOnDomainCore, ControloCreateDomain) and the schema is exactly the 10 product tables
     /// plus the eight contracted Controlo tables. Post-closure glass-density correction
     /// (contract Â§5.6, Architect observation N-1): the run applies ALL FIVE migrations and the
-    /// schema is exactly those 19 tables plus the one approved correction table. The idempotency
-    /// evidence is unchanged.
+    /// schema is exactly those 19 tables plus the one approved correction table. P2-T06 (disclosed
+    /// extension, P2-T06 contract Â§25): the run applies ALL SIX migrations and the schema grows by
+    /// exactly the one decision table. P2-T07 (disclosed extension, P2-T07 contract Â§28): the run
+    /// applies ALL SEVEN migrations and the schema grows by exactly the six Boquilhas tables. The
+    /// idempotency evidence is unchanged.
     /// </summary>
     [SkippableFact]
     public async Task MigrationRun_Applies001Then002_AndCreatesOnlyTheFoundationTables()
@@ -68,9 +71,10 @@ public sealed class DatabaseConnectivityTests
         // Action: run the migration mechanism from the fresh schema.
         var first = await runner.ApplyPendingAsync();
 
-        // Assertions: the five migrations, in generation order (001, 002, P2-T04 domain core,
-        // P2-T05 Controlo domain, glass-density correction).
-        Assert.Equal(6, first.AppliedCount);
+        // Assertions: the seven migrations, in generation order (001, 002, P2-T04 domain core,
+        // P2-T05 Controlo domain, glass-density correction, P2-T06 approve domain, P2-T07
+        // Boquilhas domain).
+        Assert.Equal(7, first.AppliedCount);
         Assert.Equal(
             new[]
             {
@@ -80,16 +84,20 @@ public sealed class DatabaseConnectivityTests
                 "20260923045054_ControloCreateDomain",
                 "20260923122429_GlassDensitySettings",
                 "20260923171223_ControloApproveDomain",
+                "20260924031924_BoquilhasDomain",
             },
             first.AppliedMigrations);
 
-        // The schema is exactly the nineteen product tables plus the one approved correction
-        // table â€” nothing more.
+        // The schema is exactly the twenty-six product tables + __EFMigrationsHistory â€” nothing
+        // more (the raw count is 27; the contract's "21 current" narrative counts product tables
+        // only, see the P2-T07 implementation response).
         var tables = await ReadPublicTablesAsync(context);
         Assert.Equal(
             new[]
             {
-                "__EFMigrationsHistory", "admin_accounts", "bq_contexts", "cm_contexts",
+                "__EFMigrationsHistory", "admin_accounts", "boquilha_close_snapshots",
+                "boquilha_machines", "boquilha_movement_audit", "boquilha_movements",
+                "boquilha_reopenings", "boquilhas", "bq_contexts", "cm_contexts",
                 "email_list_recipients", "email_lists", "email_templates", "glass_density_settings",
                 "job_ons", "machine_repairer_assignments", "mf_contexts", "pdf_directory_settings",
                 "peso_measurement_rows", "peso_review_decisions", "pesos", "repairers",

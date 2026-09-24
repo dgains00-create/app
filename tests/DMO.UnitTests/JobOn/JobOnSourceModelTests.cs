@@ -89,7 +89,21 @@ public sealed class JobOnSourceModelTests
             "src/DMO.Infrastructure/Configuration/ConfigurationCalculationConfiguration.cs",
         };
 
+        // Disclosed P2-T07 extension (accepted P2-T07 contract): the Boquilhas persistence
+        // holders are excluded exactly as registered storage of their OWN six tables plus the
+        // read-only entity-set traversal of the accepted N1 reading (the History/ficha filters
+        // and facts compose bq_contexts/tools/job_ons — the P2-T06 PesoReviewRepository
+        // precedent, review ACCEPT 4d88dbe; review observation N1 resolved in the P2-T07
+        // implementation response). The exclusion is asserted non-vacuous at the end of this test.
+        var p2t07PersistenceHolders = new[]
+        {
+            "src/DMO.Infrastructure/Persistence/BoquilhasRepository.cs",
+            "src/DMO.Infrastructure/Persistence/BoquilhasDependencyProbe.cs",
+            "src/DMO.Infrastructure/Persistence/DmoBoquilhasContextRead.cs",
+        };
+
         var p2t05ExcludedContents = p2t05PersistenceHolders
+            .Concat(p2t07PersistenceHolders)
             .Select(path => (Path: path, Source: Read(path)))
             .ToArray();
 
@@ -114,10 +128,10 @@ public sealed class JobOnSourceModelTests
         }
 
         // The exclusion is real, not vacuous: every disclosed holder exists, and every EF
-        // holder among them carries a query token.
+        // holder among them (of either workstream's extension) carries a query token.
         foreach (var (path, source) in p2t05ExcludedContents)
         {
-            Assert.True(source.Length > 0, $"Disclosed P2-T05 holder '{path}' is empty.");
+            Assert.True(source.Length > 0, $"Disclosed holder '{path}' is empty.");
 
             if (path.EndsWith("DmoPesoContextRead.cs", StringComparison.Ordinal)
                 || path.EndsWith("ConfigurationCalculationConfiguration.cs", StringComparison.Ordinal))
@@ -127,7 +141,7 @@ public sealed class JobOnSourceModelTests
 
             Assert.True(
                 queryTokens.Any(token => source.Contains(token, StringComparison.Ordinal)),
-                $"Disclosed P2-T05 holder '{path}' carries no query token.");
+                $"Disclosed holder '{path}' carries no query token.");
         }
     }
 

@@ -1,0 +1,239 @@
+/* P2-T07 Boquilhas page-owned styles (Registo + Novo + Histórico).
+ *
+ * Authority: P2-T07 contract §25/App. C — DMO FIXED DESKTOP LAYOUT POLICY.
+ * Canonical validation viewport: 1366 × 768. Region-stable composition (R1–R6, N1–N4, H1–H3):
+ * NO @media / @container / @supports structural rule, NO width listener, NO table→card
+ * conversion, NO required-column hiding and NO action relocation exist in this file — the
+ * layout, scrolling and the shared primitives (DenseDataTable, DecisionBar, AuditTrail,
+ * ToolPicker, RecordStatus) come from the shared A1/A2 contract styles; this file only composes
+ * the page-owned regions on top of the shared design tokens of dmo-tokens.css. No token is
+ * re-declared and no colour-literal system is introduced: every value below comes from the
+ * shared tokens.
+ */
+.dmo-boquilhas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dmo-space-5);
+  min-width: 0;
+}
+
+.dmo-boquilhas__region {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dmo-space-3);
+  min-width: 0;
+}
+
+.dmo-boquilhas__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--dmo-space-3);
+}
+
+.dmo-boquilhas__label {
+  font-size: var(--dmo-font-size-sm, 0.8125rem);
+  color: var(--dmo-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--dmo-space-1);
+}
+
+.dmo-boquilhas__input {
+  font: inherit;
+  padding: .3rem .5rem;
+  border: 1px solid var(--dmo-line-strong);
+  border-radius: var(--dmo-radius);
+  background: var(--dmo-surface);
+  color: var(--dmo-ink);
+  min-width: 9rem;
+  min-height: var(--dmo-control-height);
+}
+
+.dmo-boquilhas__button {
+  font: inherit;
+  padding: .3rem .75rem;
+  border: 1px solid var(--dmo-line-strong);
+  border-radius: var(--dmo-radius);
+  background: var(--dmo-surface);
+  color: var(--dmo-ink);
+  min-height: var(--dmo-control-height);
+  cursor: pointer;
+}
+
+.dmo-boquilhas__button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.dmo-boquilhas__errors {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--dmo-danger);
+}
+
+.dmo-boquilhas__empty {
+  color: var(--dmo-muted);
+}
+
+.dmo-boquilhas__route-map {
+  display: none;
+}
+
+/* R2/H3 — the opened aggregate register ------------------------------------------------ */
+.dmo-boquilhas__ficha-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--dmo-space-3);
+  flex-wrap: wrap;
+}
+
+.dmo-boquilhas__title {
+  margin: 0;
+  font-size: .95rem;
+  color: var(--dmo-ink);
+}
+
+.dmo-boquilhas__anchor,
+.dmo-boquilhas__facts,
+.dmo-boquilhas__balance,
+.dmo-boquilhas__panel-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dmo-space-3) var(--dmo-space-5);
+  margin: 0;
+}
+
+.dmo-boquilhas__fact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dmo-space-1);
+}
+
+.dmo-boquilhas__fact dt {
+  font-size: .72rem;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: var(--dmo-muted);
+}
+
+.dmo-boquilhas__fact dd {
+  margin: 0;
+}
+
+.dmo-boquilhas__negative {
+  color: var(--dmo-danger);
+}
+
+/* R6 — production-line contextual panel (read-only REAL context; never a simulated sidebar) */
+.dmo-boquilhas__panel {
+  border: 1px solid var(--dmo-line);
+  border-radius: var(--dmo-radius);
+  padding: var(--dmo-space-3) var(--dmo-space-4);
+  background: var(--dmo-surface-muted);
+}
+
+.dmo-boquilhas__panel-standalone {
+  margin: 0;
+  color: var(--dmo-muted);
+}
+
+/* Movement ledger (selection/open arbitration is the shared DenseDataTable rule; the ledger
+   table itself is a page-owned dense table with the same interaction surface) */
+.dmo-boquilhas__ledger-scroll {
+  overflow: auto;
+  max-height: 24rem;
+}
+
+.dmo-boquilhas__ledger {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: .8rem;
+}
+
+.dmo-boquilhas__ledger th,
+.dmo-boquilhas__ledger td {
+  border-bottom: 1px solid var(--dmo-line);
+  padding: .3rem .5rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.dmo-boquilhas__ledger th {
+  color: var(--dmo-muted);
+  font-weight: 600;
+}
+
+.dmo-boquilhas__ledger tbody tr:focus-visible {
+  outline: 3px solid var(--dmo-focus);
+  outline-offset: -3px;
+}
+
+/* R3/N4 — entry / opening-facts forms -------------------------------------------------- */
+.dmo-boquilhas__entry,
+.dmo-boquilhas__opening,
+.dmo-boquilhas__flow,
+.dmo-boquilhas__tool-create {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dmo-space-3);
+  border: 1px solid var(--dmo-line);
+  border-radius: var(--dmo-radius);
+  padding: var(--dmo-space-3) var(--dmo-space-4);
+}
+
+.dmo-boquilhas__legend {
+  font-weight: 600;
+  color: var(--dmo-ink);
+}
+
+.dmo-boquilhas__entry[disabled] {
+  opacity: .7;
+}
+
+.dmo-boquilhas__flow-option {
+  display: flex;
+  align-items: center;
+  gap: var(--dmo-space-2);
+}
+
+.dmo-boquilhas__machines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dmo-space-3);
+}
+
+.dmo-boquilhas__machine {
+  display: flex;
+  align-items: center;
+  gap: var(--dmo-space-1);
+}
+
+.dmo-boquilhas__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--dmo-space-3);
+  flex-wrap: wrap;
+}
+
+.dmo-boquilhas__reason {
+  display: flex;
+  align-items: center;
+  gap: var(--dmo-space-3);
+  flex-wrap: wrap;
+}
+
+/* R5 — movement edit/detail trail ----------------------------------------------------- */
+.dmo-boquilhas__trail {
+  border: 1px solid var(--dmo-line);
+  border-radius: var(--dmo-radius);
+  padding: var(--dmo-space-3) var(--dmo-space-4);
+}
+
+/* Adapter-hidden states (never display:block) ----------------------------------------- */
+.dmo-boquilhas__adapter-state,
+.dmo-boquilhas__candidate-map,
+.dmo-boquilhas__resolutions {
+  display: none;
+}

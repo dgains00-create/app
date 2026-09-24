@@ -1,5 +1,6 @@
 using DMO.Application.Accounts;
 using DMO.Application.Authentication;
+using DMO.Application.Boquilhas;
 using DMO.Application.ControloApprove;
 using DMO.Application.ControloCreate;
 using DMO.Application.JobOn;
@@ -157,6 +158,15 @@ try
     // registers availability (contract §13.3).
     builder.Services.AddScoped<IControloApproveService, ControloApproveService>();
 
+    // ---- P2-T07 Boquilhas: Registo + Novo + Histórico ------------------------------------------
+    // The aggregate/movement service composing the closed P2-T04/P2-T05 application contracts
+    // (Tool/Job On/repairer/assignments) and the Boquilhas repository. No policy, no availability
+    // entry, no destination route and no second registry is added here: every P2-T07 route is
+    // server-gated by the accepted `boquilhas` policy and stays denied to every caller until
+    // P2-T10 registers availability (contract §13.3). The repository and the one additive
+    // dependency-probe line are registered in AddPersistenceFoundation (§27).
+    builder.Services.AddScoped<IBoquilhasService, BoquilhasService>();
+
     // One ADMIN-only policy (dmo.administration) + scoped handler; deliberately outside the
     // Module policy namespace. Administration is ADMIN-account functionality, not a Module.
     builder.Services.AddAdministrationAuthorization();
@@ -210,5 +220,6 @@ app.MapFerramentasEndpoints();
 app.MapControloCreateEndpoints();
 app.MapControloDefinicoesEndpoints();
 app.MapControloApproveEndpoints();
+app.MapBoquilhasEndpoints();
 
 return await StartupCommands.RunHostAsync(app);

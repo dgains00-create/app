@@ -215,6 +215,9 @@ public sealed class ToolRestrictionTests
         // joins the set with the same convention. Since P2-T06 (disclosed): exactly ONE review
         // entity joins the set (<c>PesoReviewDecisionEntity</c>); the review repository's composed
         // list reads use the <c>IQueryable</c> accessor convention (no new Tool/CM/JobOn surface).
+        // P2-T07 (disclosed in the implementation response) declares NO DbSet member anywhere: the
+        // Boquilhas repository uses the same <c>IQueryable</c> accessor convention for reads and
+        // <c>_context.Set&lt;TEntity&gt;()</c> inline for its writes, so this inventory is unchanged.
         var dbSetArguments = MatchGroup(allSources, @"DbSet<\s*(\w+)\s*>")
             .Distinct(StringComparer.Ordinal)
             .OrderBy(name => name, StringComparer.Ordinal)
