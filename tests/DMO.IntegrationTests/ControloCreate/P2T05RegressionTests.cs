@@ -565,12 +565,18 @@ public sealed class P2T05RegressionTests
         }
 
         // No table→card conversion marker and no hiding of required columns in the markup: the
-        // tables are present with their full heading sets in the page sources.
+        // tables are present with their full heading sets in the page sources (the §34.3 delta
+        // moved the repairers/assignments tables to Boquilhas > Definições).
         var createMarkup = P2T04ProductionScan.Read("src/DMO.Web/Pages/Controlo/Create.cshtml");
         var definicoesMarkup = P2T04ProductionScan.Read("src/DMO.Web/Pages/Controlo/Definicoes.cshtml");
 
         Assert.Contains("data-dmo-results-table", createMarkup, StringComparison.Ordinal);
         Assert.Contains("dmo-controlo__settings-table", definicoesMarkup, StringComparison.Ordinal);
-        Assert.Contains("data-dmo-assignments-table", definicoesMarkup, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-dmo-assignments-table", definicoesMarkup, StringComparison.Ordinal);
+
+        // The moved family is really rendered by the Boquilhas surface.
+        var boquilhasMarkup = P2T04ProductionScan.Read("src/DMO.Web/Pages/Boquilhas/Definicoes.cshtml");
+        Assert.Contains("data-dmo-assignments-table", boquilhasMarkup, StringComparison.Ordinal);
+        Assert.Contains("data-dmo-repairers-table", boquilhasMarkup, StringComparison.Ordinal);
     }
 }

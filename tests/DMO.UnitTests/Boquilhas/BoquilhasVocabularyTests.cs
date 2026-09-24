@@ -62,14 +62,37 @@ public sealed class BoquilhasVocabularyTests
     public void TheRegister_IsAnIdentityCarrier_NotALifecycle()
     {
         // The register exposes the derived outstanding and the ledger; it carries no status.
-        var register = new BoquilhaRegister(
+        // Production-linked: the REAL bq_id anchor (one register per BQ context).
+        var productionLinked = new BoquilhaRegister(
             BoquilhasId.From(Guid.NewGuid()),
             BqId: Guid.NewGuid(),
+            ToolId: null,
+            Version: 1,
             CreatedByUserId: Guid.NewGuid(),
             CreatedAt: DateTimeOffset.UtcNow,
             Movements: []);
 
-        Assert.Equal(0, register.Outstanding);
-        Assert.Empty(register.Movements);
+        Assert.Equal(0, productionLinked.Outstanding);
+        Assert.Empty(productionLinked.Movements);
+        Assert.False(productionLinked.IsPending);
+    }
+
+    /// <summary>§34 — the TRANSITIONAL pré-JobOn anchor is exactly that: pending, versioned, and
+    /// never a permanent standalone (BqId null, ToolId set; IsPending true).</summary>
+    [Fact]
+    public void ThePendingRegister_IsTheTransitionalPreJobOnAnchor()
+    {
+        var pending = new BoquilhaRegister(
+            BoquilhasId.From(Guid.NewGuid()),
+            BqId: null,
+            ToolId: Guid.NewGuid(),
+            Version: 1,
+            CreatedByUserId: Guid.NewGuid(),
+            CreatedAt: DateTimeOffset.UtcNow,
+            Movements: []);
+
+        Assert.True(pending.IsPending);
+        Assert.Null(pending.BqId);
+        Assert.NotNull(pending.ToolId);
     }
 }

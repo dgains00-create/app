@@ -4,7 +4,7 @@ using DMO.Domain.Boquilhas;
 namespace DMO.Application.Repositories;
 
 /// <summary>
-/// The single Boquilhas repository contract (the OWNER CLARIFICATION register model).
+/// The single Boquilhas repository contract (the OWNER CLARIFICATION register model, §34).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -25,9 +25,11 @@ namespace DMO.Application.Repositories;
 /// <para>
 /// The register and its ledger are a historical fact set: appends carry no version guard (the
 /// derived outstanding is a sum, races cannot corrupt it); edits use the per-movement
-/// optimistic-concurrency token. The History/ficha traversal follows the accepted read-only
-/// entity-set composition pattern over <c>bq_contexts</c>/<c>tools</c>/<c>job_ons</c>.
-/// </para>
+/// optimistic-concurrency token. The ONLY register-row update is the §34 association write
+/// (<see cref="AssociatedAsync"/> — version-guarded; sets the REAL <c>bq_id</c>, clears the
+/// provisional <c>tool_id</c> anchor, version + 1). The History/ficha traversal follows the
+/// accepted read-only entity-set composition pattern over <c>bq_contexts</c>/<c>tools</c>/
+/// <c>job_ons</c>.</para>
 /// </remarks>
 public interface IBoquilhasRepository
 {
@@ -59,7 +61,9 @@ public interface IBoquilhasRepository
         Guid movementId,
         CancellationToken cancellationToken);
 
-    /// <summary>Create the register IDENTITY (one row, no quantity event), transactionally.</summary>
+    /// <summary>Create the register IDENTITY (one row, no quantity event), transactionally.
+    /// EXACTLY one anchor: the REAL <c>bq_contexts</c> row XOR the provisional canonical BQ
+    /// <c>tool_id</c> (§34.1).</summary>
     Task<BoquilhaRegister> CreatedAsync(BoqCreateUnit unit, CancellationToken cancellationToken);
 
     /// <summary>Append: ONE transaction — the single movement row (three closed types).</summary>
@@ -67,4 +71,37 @@ public interface IBoquilhasRepository
 
     /// <summary>Edit: ONE transaction — guarded UPDATE of the same row + the audit row.</summary>
     Task<BoqEditResult> EditMovementAsync(BoqEditUnit unit, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The §34 association write: ONE transaction — version-guarded UPDATE of the SAME register
+    /// row (sets the REAL <c>bq_id</c>, clears the provisional <c>tool_id</c> anchor, version + 1).
+    /// The candidate <c>bq_id</c> must resolve to a REAL <c>bq_contexts</c> row. A register that is
+    /// already production-linked is refused (<c>AlreadyAssociated</c>); the <c>bq_id</c> unique key
+    /// maps to <c>RegisterExists</c>; a version race maps to <see cref="ConcurrencyConflictException"/>.
+    /// </summary>
+    Task<BoquilhaRegister> AssociatedAsync(
+        Guid boquilhasId,
+        Guid bqId,
+        int expectedVersion,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The §34.1 rule-2 candidate read (register side): ONE context-specific statement keyed by the
+    /// register's own provisional <c>tool_id</c> — every REAL <c>bq_contexts</c> row whose
+    /// <c>tool_id</c> equals it, with the REAL Job On production facts. No global scan, no
+    /// load-then-filter.
+    /// </summary>
+    Task<IReadOnlyList<BqAssociationCandidate>> ListBqAssociationCandidatesAsync(
+        Guid toolId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The §34.1 rule-2 read (Job-On-incoming direction): the pending (pré-JobOn) registers whose
+    /// provisional <c>tool_id</c> equals the supplied canonical UUID, with the canonical Tool's
+    /// current reference/lot and the derived movement facts (light packet — history only when
+    /// opened). No global scan.
+    /// </summary>
+    Task<IReadOnlyList<PendingRegisterCandidate>> ListPendingRegistersAsync(
+        Guid toolId,
+        CancellationToken cancellationToken);
 }

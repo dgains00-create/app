@@ -339,7 +339,11 @@ internal static class P2T05ProductionScan
         // surface consumes the P2-T05 repairer register and machine assignments by contract
         // (read-only), so its OWN paths are an accepted extension of the P2-T05 owned surface (the
         // P2-T07 paths are themselves pinned by the P2-T07 boundary rows; the migration 007 pair
-        // was corrected pre-closure to the final register schema).
+        // was corrected pre-closure to the final register schema). §34 (disclosed extension of the
+        // same OWNER clarification, P2-T05 §31.3): the repairer FAMILY surface moved to
+        // Boquilhas > Definições (same physical tables; ownership/service/UI only), so the
+        // Boquilhas Definições endpoint file and the delta migration 008 (whose Designer mirrors
+        // the full model, incl. the P2-T05 tables) are accepted extensions too.
         "src/DMO.Domain/Boquilhas/",
         "src/DMO.Application/Boquilhas/",
         "src/DMO.Application/Repositories/IBoquilhas",
@@ -348,8 +352,10 @@ internal static class P2T05ProductionScan
         "src/DMO.Infrastructure/Persistence/Entities/Boquilha",
         "src/DMO.Infrastructure/Persistence/EntityConfigurations/Boquilha",
         "src/DMO.Infrastructure/Migrations/20260924051151_BoquilhasDomain",
+        "src/DMO.Infrastructure/Migrations/20260924130151_BoquilhasPreJobonAssociation",
         "src/DMO.Web/Pages/Boquilhas/",
         "src/DMO.Web/Endpoints/BoquilhasEndpoints.cs",
+        "src/DMO.Web/Endpoints/BoquilhasDefinicoesEndpoints.cs",
         "src/DMO.Web/wwwroot/css/dmo-boquilhas.css",
         "src/DMO.Web/wwwroot/js/dmo-boquilhas.js",
     ];

@@ -44,7 +44,7 @@ public sealed class DatabaseConnectivityTests
     /// schema is exactly those 19 tables plus the one approved correction table. P2-T06 (disclosed
     /// extension, P2-T06 contract Â§25): the run applies ALL SIX migrations and the schema grows by
     /// exactly the one decision table. P2-T07 (disclosed extension, P2-T07 OWNER CLARIFICATION): the run
-    /// applies ALL SEVEN migrations and the schema grows by exactly the THREE Boquilhas register
+    /// applies migrations 001-007 and the schema grows by exactly the THREE Boquilhas register
     /// tables (the unreviewed 007 lifecycle tables are gone). The
     /// idempotency evidence is unchanged.
     /// </summary>
@@ -72,10 +72,10 @@ public sealed class DatabaseConnectivityTests
         // Action: run the migration mechanism from the fresh schema.
         var first = await runner.ApplyPendingAsync();
 
-        // Assertions: the seven migrations, in generation order (001, 002, P2-T04 domain core,
+        // Assertions: the eight migrations, in generation order (001, 002, P2-T04 domain core,
         // P2-T05 Controlo domain, glass-density correction, P2-T06 approve domain, P2-T07
-        // Boquilhas domain).
-        Assert.Equal(7, first.AppliedCount);
+        // Boquilhas domain, the §34 OWNER-clarification delta migration 008).
+        Assert.Equal(8, first.AppliedCount);
         Assert.Equal(
             new[]
             {
@@ -86,6 +86,7 @@ public sealed class DatabaseConnectivityTests
                 "20260923122429_GlassDensitySettings",
                 "20260923171223_ControloApproveDomain",
                 "20260924051151_BoquilhasDomain",
+                "20260924130151_BoquilhasPreJobonAssociation",
             },
             first.AppliedMigrations);
 

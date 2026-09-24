@@ -2,7 +2,7 @@ namespace DMO.Application.Persistence;
 
 /// <summary>
 /// Typed Boquilhas persistence failure of the <c>IBoquilhasRepository</c> writes (the OWNER
-/// CLARIFICATION register model).
+/// CLARIFICATION register model, §34).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -16,15 +16,16 @@ namespace DMO.Application.Persistence;
 /// <item>SQLSTATE <c>23514 check_violation</c> on a P2-T07 CHECK → the <b>same validator token</b>
 /// the validator raises first (carried by <see cref="ConstraintViolation"/>);</item>
 /// <item>SQLSTATE <c>23503 foreign_key_violation</c> on the anchor/reference FKs → the typed
-/// anchor tokens (<see cref="BqContextNotFound"/>/<see cref="RepairerNotFound"/>).</item>
+/// anchor tokens (<see cref="BqContextNotFound"/>/<see cref="ToolNotFound"/>/<see cref="RepairerNotFound"/>).</item>
 /// </list>
 /// <para>
 /// <b>Superseded (Owner clarification):</b> <c>ActiveAggregateExists</c> (with its scoped 23505
 /// mapping on the removed ACTIVE partial unique indexes) and the lifecycle/balance refusal reasons
 /// (AlreadyClosed/NotClosed/NotLastClosed/AggregateClosed/OnlyOneInicio/SaidaExceedsAvailable/
 /// IrreparavelExceedsInRepair) are REMOVED. General optimistic-concurrency conflicts (the
-/// per-movement edit token) use <see cref="ConcurrencyConflictException"/> (409
-/// <c>stale-version</c>).</para>
+/// per-movement edit token and the §34 association token) use
+/// <see cref="ConcurrencyConflictException"/> (409 <c>stale-version</c>); a pending register that
+/// already became production-linked is refused through <see cref="AlreadyAssociated"/>.</para>
 /// </remarks>
 public sealed class BoquilhasPersistenceException : Exception
 {
@@ -65,6 +66,18 @@ public enum BoquilhasPersistenceFailureReason
 
     /// <summary>The supplied <c>bq_id</c> is not a real <c>bq_contexts</c> row (or it vanished).</summary>
     BqContextNotFound,
+
+    /// <summary>
+    /// The supplied provisional <c>tool_id</c> is not a real canonical <c>tools</c> row (RESTRICT
+    /// FK backstop of the pending anchor).
+    /// </summary>
+    ToolNotFound,
+
+    /// <summary>
+    /// The register is already production-linked; the §34 association is offered only while the
+    /// register is pending (defensive in-transaction re-assertion of the service pre-check).
+    /// </summary>
+    AlreadyAssociated,
 
     /// <summary>The supplied <c>repairer_id</c> is not a real register row (RESTRICT FK backstop).</summary>
     RepairerNotFound,

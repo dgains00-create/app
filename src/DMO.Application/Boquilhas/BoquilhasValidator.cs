@@ -12,9 +12,12 @@ namespace DMO.Application.Boquilhas;
 /// tokens; <c>REPAIRER_REQUIRED</c>/<c>REPAIRER_NOT_FOUND</c>/<c>BQ_CONTEXT_NOT_FOUND</c> keep the
 /// P2-T07/consumed-token shapes. <b>Superseded (Owner clarification):</b> the lifecycle tokens
 /// (UTILISATION_INVALID, REOPEN_REASON_REQUIRED, INITIAL_QUANTITY_REQUIRED, MACHINES_REQUIRED,
-/// MACHINE_NOT_IN_AGGREGATE, ANCHOR_REQUIRED/ANCHOR_CONFLICT, TOOL_NOT_FOUND/TOOL_TYPE_MISMATCH)
-/// are removed — the register has no opening facts, no standalone anchor and no quantity opening.
-/// These are validation <b>inputs</b>, not domain states, and no code outside this set is produced.</remarks>
+/// MACHINE_NOT_IN_AGGREGATE) and the balance-relative input tokens are removed — the register has
+/// no opening facts, no balance machinery and no quantity opening. The §34 delta re-introduces the
+/// anchor tokens for the TRANSITIONAL pré-JobOn registration: <c>ANCHOR_CONFLICT</c> (exactly one
+/// anchor is required — the REAL <c>bq_id</c> XOR the provisional <c>tool_id</c>) and the canonical
+/// Tool tokens (<c>TOOL_NOT_FOUND</c>/<c>TOOL_TYPE_MISMATCH</c>) for the pending anchor. These are
+/// validation <b>inputs</b>, not domain states, and no code outside this set is produced.</remarks>
 public static class BoquilhasValidationErrors
 {
     /// <summary>An append/edit quantity is not positive (whole-unit BQ count).</summary>
@@ -38,6 +41,18 @@ public static class BoquilhasValidationErrors
     /// <summary>The supplied <c>bq_id</c> is not a real <c>bq_contexts</c> row.</summary>
     public const string BqContextNotFound = "BQ_CONTEXT_NOT_FOUND";
 
+    /// <summary>
+    /// The creation command did not carry EXACTLY ONE anchor — <c>bq_id</c> and
+    /// <c>pending_tool_id</c> are mutually exclusive and one of them is required (§34.1 rule 1).
+    /// </summary>
+    public const string AnchorConflict = "ANCHOR_CONFLICT";
+
+    /// <summary>The supplied <c>pending_tool_id</c> is not a real canonical <c>tools</c> row.</summary>
+    public const string ToolNotFound = "TOOL_NOT_FOUND";
+
+    /// <summary>The supplied <c>pending_tool_id</c> is a real Tool but not of the BQ family.</summary>
+    public const string ToolTypeMismatch = "TOOL_TYPE_MISMATCH";
+
     /// <summary>A supplied business date is not well-formed.</summary>
     public const string BusinessDateInvalid = "BUSINESS_DATE_INVALID";
 
@@ -56,8 +71,9 @@ public static class BoquilhasValidationErrors
 /// codes.
 /// </summary>
 /// <remarks>
-/// The validator owns no database access: contextual existence resolution (BQ context, repairer)
-/// happens in the service pre-checks and again authoritatively inside the write transactions.
+/// The validator owns no database access: contextual existence resolution (BQ context, Tool,
+/// repairer) happens in the service pre-checks and again authoritatively inside the write
+/// transactions.
 /// <b>Superseded (Owner clarification):</b> the balance-relative rules (Saída ≤ Disponível,
 /// Irreparável ≤ Em reparação) and the machine-set membership rule are removed — the register
 /// records historical movement facts, and the outstanding value is derived, never validated.
@@ -70,14 +86,56 @@ public static class BoquilhasValidator
     /// <summary>The contracted list/history page-size upper bound.</summary>
     public const int MaxPageSize = 100;
 
-    /// <summary>Validates the register-creation command (route 4).</summary>
+    /// <summary>Validates the register-creation command (route 4): exactly ONE anchor.</summary>
     public static IReadOnlyList<string> Validate(CreateBoquilhaRegisterCommand command)
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        return command.BqId == Guid.Empty
-            ? [BoquilhasValidationErrors.BqContextNotFound]
-            : [];
+        var errors = new List<string>();
+
+        // The anchor XOR rule (provisional pré-JobOn tool_id vs the REAL bq_id): both or neither
+        // is a shape conflict — the register maps to exactly one authority.
+        if ((command.BqId is null) == (command.PendingToolId is null))
+        {
+            errors.Add(BoquilhasValidationErrors.AnchorConflict);
+        }
+
+        if (command.BqId == Guid.Empty)
+        {
+            errors.Add(BoquilhasValidationErrors.BqContextNotFound);
+        }
+
+        if (command.PendingToolId == Guid.Empty)
+        {
+            errors.Add(BoquilhasValidationErrors.ToolNotFound);
+        }
+
+        return errors;
+    }
+
+    /// <summary>Validates the pré-JobOn association command shape (§34.1 rule 2).</summary>
+    public static IReadOnlyList<string> Validate(AssociateBoquilhasCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        var errors = new List<string>();
+
+        if (command.BoquilhasId == Guid.Empty)
+        {
+            errors.Add(BoquilhasValidationErrors.FilterInvalid);
+        }
+
+        if (command.BqId == Guid.Empty)
+        {
+            errors.Add(BoquilhasValidationErrors.BqContextNotFound);
+        }
+
+        if (command.ExpectedVersion < 1)
+        {
+            errors.Add(BoquilhasValidationErrors.FilterInvalid);
+        }
+
+        return errors;
     }
 
     /// <summary>Validates a movement append command (route 5).</summary>

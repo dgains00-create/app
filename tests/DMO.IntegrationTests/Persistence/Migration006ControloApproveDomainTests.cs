@@ -43,6 +43,7 @@ public sealed class Migration006ControloApproveDomainTests
         "20260923122429_GlassDensitySettings",
         "20260923171223_ControloApproveDomain",
         "20260924051151_BoquilhasDomain",
+        "20260924130151_BoquilhasPreJobonAssociation",
     ];
 
     /// <summary>The complete public product-table register after all seven migrations (the closed

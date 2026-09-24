@@ -142,20 +142,9 @@ public sealed class ControloCreateAccessTests
             Assert.Equal(HttpStatusCode.Forbidden, calculate.StatusCode);
         }
 
-        using (var repairers = await P2T05TestHost.GetAsync(
-                   client, $"{DefinicoesPage}/repairers"))
-        {
-            Assert.Equal(HttpStatusCode.Forbidden, repairers.StatusCode);
-        }
-
-        using (var assignment = await P2T05TestHost.SendJsonAsync(
-                   client,
-                   HttpMethod.Put,
-                   $"{DefinicoesPage}/machine-assignments/B1",
-                   P2T05TestHost.Json(new { repairerId = (Guid?)null, expectedVersion = (int?)null })))
-        {
-            Assert.Equal(HttpStatusCode.Forbidden, assignment.StatusCode);
-        }
+        // The repairer surface MOVED to Boquilhas (Owner clarification P2-T07 §34.3): the
+        // Controlo repairer/assignment routes no longer exist under Controlo at all — the
+        // moved gate is proven by the Boquilhas access rows.
 
         // ADMIN gained nothing operational and wrote nothing.
         Assert.Equal(0, composition.PesoCount);
@@ -263,18 +252,6 @@ public sealed class ControloCreateAccessTests
                 P2T05TestHost.Json(new { cmId = Guid.NewGuid(), expectedVersion = 1 })),
             new(HttpMethod.Post, $"{CreatePage}/jobons/{id}/cm-association",
                 P2T05TestHost.Json(new { toolId, expectedJobOnVersion = 1 })),
-
-            // Definições route 13 — repairers.
-            new(HttpMethod.Get, $"{DefinicoesPage}/repairers", null),
-            new(HttpMethod.Post, $"{DefinicoesPage}/repairers",
-                P2T05TestHost.Json(new { name = "José" })),
-            new(HttpMethod.Put, $"{DefinicoesPage}/repairers/{id}",
-                P2T05TestHost.Json(new { expectedVersion = 1, name = "José" })),
-
-            // Definições route 14 — machine assignments.
-            new(HttpMethod.Get, $"{DefinicoesPage}/machine-assignments", null),
-            new(HttpMethod.Put, $"{DefinicoesPage}/machine-assignments/B1",
-                P2T05TestHost.Json(new { repairerId = (Guid?)null, expectedVersion = (int?)null })),
 
             // Definições route 15 — PDF directory.
             new(HttpMethod.Get, $"{DefinicoesPage}/pdf-directory", null),

@@ -1,0 +1,115 @@
+@page "/boquilhas/definicoes"
+@model DMO.Web.Pages.Boquilhas.DefinicoesModel
+@using DMO.Web.Frontend.Shared.Contracts
+@{
+    ViewData["Title"] = "Boquilhas — Definições";
+}
+<partial name="~/Pages/Shared/Components/_SharedComponentAssets.cshtml" />
+<link rel="stylesheet" href="~/css/dmo-boquilhas.css" asp-append-version="true" />
+<script src="~/js/dmo-boquilhas.js" defer></script>
+
+@*
+    Boquilhas > Definições (Owner clarification P2-T07 §34.3 / P2-T05 §31.3): the repairer family
+    — the repairer register and the independent line/machine → repairer assignments — owned by
+    Boquilhas (NOT Controlo, NOT Admin). The physical tables stay where they are: this surface is
+    ownership/service/UI only, no schema migration.
+
+    Shape rules of the closed model, unchanged as shape: name is the only required repairer data
+    (no delete/deactivation path), ONE independent assignment per machine (B1 B2 B3 C1 C2 C3 —
+    altering one machine never touches another), no grouping, current-state only; changing the
+    default repairer of a line NEVER rewrites past movements (the movement keeps the repairer used
+    at the time).
+
+    The page is server-gated `boquilhas`; the page-owned adapter (dmo-boquilhas.js) executes the
+    `/boquilhas/definicoes` routes; backend validation is authoritative and a stale version enters
+    the accepted conflict presentation with the explicit reload recovery (D2). The PDF/email/
+    document settings are NOT here — they remain under Controlo_Create → Definições.
+*@
+<section class="dmo-boquilhas" data-dmo-boquilhas-surface="definicoes" data-dmo-boquilhas-root="true">
+
+    @if (Model.LookupFailed)
+    {
+        <partial name="~/Pages/Shared/Components/_CommonStateRegion.cshtml"
+                 model="@CommonStateRegionPresentation.LookupFailed(
+                     "Não foi possível obter as definições de Boquilhas.",
+                     "Definições")" />
+    }
+
+    @* ---- Section 1 — Reparadores (register: name only; add / rename; NO delete) ------------ *@
+    <div class="dmo-boquilhas__region" data-dmo-boquilhas-region="repairers" aria-label="Reparadores">
+        <h2 class="dmo-boquilhas__title">Reparadores</h2>
+        <div class="dmo-boquilhas__settings-scroll" role="region" tabindex="0" aria-label="Lista de reparadores">
+            <table class="dmo-boquilhas__settings-table" data-dmo-repairers-table="true">
+                <thead>
+                    <tr><th>Nome</th><th>Versão</th><th>Renomear</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var repairer in Model.Repairers)
+                    {
+                        <tr data-dmo-repairer-row="@repairer.RepairerId">
+                            <td data-dmo-repairer-name="@repairer.RepairerId">@repairer.Name</td>
+                            <td>@repairer.Version</td>
+                            <td>
+                                <input class="dmo-boquilhas__input dmo-boquilhas__input--compact"
+                                       type="text"
+                                       value="@repairer.Name"
+                                       data-dmo-repairer-rename="@repairer.RepairerId"
+                                       data-dmo-repairer-version="@repairer.Version"
+                                       aria-label="Novo nome do reparador" />
+                                <button class="dmo-boquilhas__button" type="button" data-dmo-repairer-rename-save="@repairer.RepairerId">Renomear</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="dmo-boquilhas__settings-form" data-dmo-repairer-add-region="true">
+            <label class="dmo-boquilhas__label" for="dmo-boquilhas-repairer-name">Novo reparador</label>
+            <input class="dmo-boquilhas__input" id="dmo-boquilhas-repairer-name" type="text" data-dmo-repairer-new-name="true" />
+            <button class="dmo-boquilhas__button" type="button" data-dmo-repairer-add="true">Adicionar</button>
+        </div>
+    </div>
+
+    @* ---- Section 2 — Reparador por máquina (B1 B2 B3 C1 C2 C3, independent; no grouping) --- *@
+    <div class="dmo-boquilhas__region" data-dmo-boquilhas-region="machine-assignments" aria-label="Reparador por máquina">
+        <h2 class="dmo-boquilhas__title">Reparador por máquina</h2>
+        <div class="dmo-boquilhas__settings-scroll" role="region" tabindex="0" aria-label="Atribuições por máquina">
+            <table class="dmo-boquilhas__settings-table" data-dmo-assignments-table="true">
+                <thead>
+                    <tr><th>Máquina</th><th>Reparador</th><th>Guardar</th><th>Limpar</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var machine in Model.MachineAssignments)
+                    {
+                        <tr data-dmo-assignment-row="@machine.Machine">
+                            <td>@machine.Machine</td>
+                            <td>
+                                <select class="dmo-boquilhas__input dmo-boquilhas__input--select"
+                                        data-dmo-assignment-repairer="@machine.Machine"
+                                        data-dmo-assignment-version="@machine.Version"
+                                        aria-label="Reparador da máquina @machine.Machine">
+                                    <option value="" selected="@(machine.RepairerId is null)">— sem reparador —</option>
+                                    @foreach (var repairer in Model.Repairers)
+                                    {
+                                        <option value="@repairer.RepairerId"
+                                                selected="@(machine.RepairerId == repairer.RepairerId)">@repairer.Name</option>
+                                    }
+                                </select>
+                            </td>
+                            <td><button class="dmo-boquilhas__button" type="button" data-dmo-assignment-set="@machine.Machine">Guardar</button></td>
+                            <td><button class="dmo-boquilhas__button" type="button" data-dmo-assignment-clear="@machine.Machine">Limpar</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p class="dmo-boquilhas__hint">
+            Cada máquina tem a sua própria atribuição independente; não existe agrupamento por linha
+            e alterar uma máquina não altera as outras. Mudar o reparador default de uma linha não
+            reescreve movimentos históricos — cada movimento mantém o reparador usado na altura.
+        </p>
+    </div>
+
+    @* Page-owned failure surface (conflict = message + explicit reload recovery, D2) *@
+    <div class="dmo-boquilhas__state" data-dmo-boquilhas-state="true" hidden></div>
+</section>

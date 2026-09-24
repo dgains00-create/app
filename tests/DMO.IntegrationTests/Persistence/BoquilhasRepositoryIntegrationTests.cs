@@ -175,7 +175,7 @@ public sealed class BoquilhasRepositoryIntegrationTests
 
             var repository = new BoquilhasRepository(context);
             var created = await repository.CreatedAsync(
-                new BoqCreateUnit(bqId, userId),
+                new BoqCreateUnit(bqId, PendingToolId: null, userId),
                 CancellationToken.None);
 
             Assert.NotNull(created);
@@ -228,16 +228,16 @@ public sealed class BoquilhasRepositoryIntegrationTests
 
             var fake = await Assert.ThrowsAsync<BoquilhasPersistenceException>(() =>
                 repository.CreatedAsync(
-                    new BoqCreateUnit(Guid.NewGuid(), userId),
+                    new BoqCreateUnit(Guid.NewGuid(), PendingToolId: null, userId),
                     CancellationToken.None));
             Assert.Equal(BoquilhasPersistenceFailureReason.BqContextNotFound, fake.Reason);
             Assert.Equal(0, await QueryIntAsync(context, "SELECT count(*) FROM boquilhas"));
 
-            await repository.CreatedAsync(new BoqCreateUnit(bqId, userId), CancellationToken.None);
+            await repository.CreatedAsync(new BoqCreateUnit(bqId, PendingToolId: null, userId), CancellationToken.None);
 
             var duplicate = await Assert.ThrowsAsync<BoquilhasPersistenceException>(() =>
                 repository.CreatedAsync(
-                    new BoqCreateUnit(bqId, userId),
+                    new BoqCreateUnit(bqId, PendingToolId: null, userId),
                     CancellationToken.None));
             Assert.Equal(BoquilhasPersistenceFailureReason.RegisterExists, duplicate.Reason);
             Assert.Equal(1, await QueryIntAsync(context, "SELECT count(*) FROM boquilhas"));

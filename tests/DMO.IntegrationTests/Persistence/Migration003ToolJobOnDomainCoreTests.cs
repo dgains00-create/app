@@ -572,12 +572,14 @@ public sealed class Migration003ToolJobOnDomainCoreTests
                 && !name.StartsWith("DmoDbContextModelSnapshot", StringComparison.Ordinal))
             .ToList();
 
-        // Exactly SEVEN migrations exist: 001, 002, the P2-T04 migration, the P2-T05 Controlo
+        // Exactly EIGHT migrations exist: 001, 002, the P2-T04 migration, the P2-T05 Controlo
         // migration (disclosed extension), the glass-density correction migration 005
         // (post-closure correction; Architect review observation N-1), the P2-T06 approve
-        // migration 006 and the P2-T07 Boquilhas migration 007 (disclosed extension,
-        // P2-T07 contract §28).
-        Assert.Equal(7, migrationFiles.Count);
+        // migration 006, the P2-T07 Boquilhas migration 007 (disclosed extension,
+        // P2-T07 contract §28) and the §34 OWNER-clarification delta migration 008
+        // (BoquilhasPreJobonAssociation — disclosed extension of the same disclosed workstream:
+        // the transitional pré-JobOn anchor).
+        Assert.Equal(8, migrationFiles.Count);
         var toolJobOnMigrations = migrationFiles
             .Where(name => name.EndsWith($"_{ToolJobOnMigrationName}.cs", StringComparison.Ordinal))
             .ToList();
@@ -641,15 +643,18 @@ public sealed class Migration003ToolJobOnDomainCoreTests
         // the post-closure correction adds the glass-density migration 005 on top (Architect
         // review observation N-1: the correction migration is the FIFTH overall); P2-T06 adds
         // the Controlo Approve migration 006 on top (disclosed extension); P2-T07 adds the
-        // Boquilhas migration 007 on top (disclosed extension, P2-T07 contract §28).
+        // Boquilhas migration 007 on top (disclosed extension, P2-T07 contract §28); the §34
+        // OWNER-clarification delta adds migration 008 (BoquilhasPreJobonAssociation) on top.
         var latestIsControlo = latest.EndsWith(ControloCreateMigrationName, StringComparison.Ordinal);
         var latestIsCorrection = latest.EndsWith(CorrectionMigrationName, StringComparison.Ordinal);
         var latestIsP2T06 = latest.EndsWith("ControloApproveDomain", StringComparison.Ordinal);
         var latestIsP2T07 = latest.EndsWith("BoquilhasDomain", StringComparison.Ordinal);
+        var latestIsPreJobon = latest.EndsWith("BoquilhasPreJobonAssociation", StringComparison.Ordinal);
         Assert.True(
-            latestIsControlo || latestIsCorrection || latestIsP2T06 || latestIsP2T07,
+            latestIsControlo || latestIsCorrection || latestIsP2T06 || latestIsP2T07 || latestIsPreJobon,
             $"The latest migration must be the Controlo domain, the glass-density correction, " +
-            $"the P2-T06 Controlo Approve domain or the P2-T07 Boquilhas domain, was {latest}.");
+            $"the P2-T06 Controlo Approve domain, the P2-T07 Boquilhas domain or the §34 delta " +
+            $"(BoquilhasPreJobonAssociation), was {latest}.");
 
         try
         {

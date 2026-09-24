@@ -274,3 +274,83 @@
 .dmo-boquilhas__resolutions {
   display: none;
 }
+
+/* §34 pré-JobOn association: the candidates/pending rows and the human-confirmed buttons */
+.dmo-boquilhas__link {
+  font: inherit;
+  color: var(--dmo-ink);
+  border: 1px solid var(--dmo-line-strong);
+  border-radius: var(--dmo-radius);
+  padding: .3rem .75rem;
+  text-decoration: none;
+  min-height: var(--dmo-control-height);
+}
+
+.dmo-boquilhas__pending,
+.dmo-boquilhas__candidates {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dmo-space-2);
+  border: 1px solid var(--dmo-line);
+  border-radius: var(--dmo-radius);
+  padding: var(--dmo-space-3) var(--dmo-space-4);
+  background: var(--dmo-surface-muted);
+}
+
+.dmo-boquilhas__candidates {
+  background: var(--dmo-surface);
+}
+
+.dmo-boquilhas__candidate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--dmo-space-3);
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--dmo-line);
+  padding: var(--dmo-space-2) 0;
+}
+
+.dmo-boquilhas__candidate:last-child {
+  border-bottom: none;
+}
+
+/* Boquilhas > Definições (repairer register + machine assignments; §34.3) */
+.dmo-boquilhas__settings-scroll {
+  overflow: auto;
+  max-height: 20rem;
+}
+
+.dmo-boquilhas__settings-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: .8rem;
+}
+
+.dmo-boquilhas__settings-table th,
+.dmo-boquilhas__settings-table td {
+  border-bottom: 1px solid var(--dmo-line);
+  padding: .3rem .5rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.dmo-boquilhas__settings-table th {
+  color: var(--dmo-muted);
+  font-weight: 600;
+}
+
+.dmo-boquilhas__settings-form {
+  display: flex;
+  align-items: center;
+  gap: var(--dmo-space-3);
+  flex-wrap: wrap;
+}
+
+.dmo-boquilhas__input--compact {
+  min-width: 10rem;
+}
+
+.dmo-boquilhas__input--select {
+  min-width: 12rem;
+}

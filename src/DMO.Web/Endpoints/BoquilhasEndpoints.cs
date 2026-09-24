@@ -9,8 +9,9 @@ namespace DMO.Web.Endpoints;
 
 /// <summary>
 /// Minimal API surface of Boquilhas — the production movement register (P2-T07 OWNER
-/// CLARIFICATION routes 1–12; the three pages are <c>Pages/Boquilhas/Index</c> + <c>Novo</c> +
-/// <c>Historico</c>).
+/// CLARIFICATION routes 1–12 + the §34 pré-JobOn association routes; the four pages are
+/// <c>Pages/Boquilhas/Index</c> + <c>Novo</c> + <c>Historico</c> + <c>Definicoes</c>, whose
+/// endpoints live in <c>BoquilhasDefinicoesEndpoints</c>).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -20,9 +21,12 @@ namespace DMO.Web.Endpoints;
 /// direct-route denial is server-side; ADMIN gains no operational access.</para>
 /// <para>
 /// <b>Superseded (Owner clarification):</b> the close/reopen routes, the opening-facts route and
-/// the standalone-anchored create branch are REMOVED — there is no lifecycle state machine and no
-/// standalone flow; the register creation carries no quantity; the final route matrix is
-/// recalculated (12 endpoints + 3 pages = 15), NOT preserved at the old count.</para>
+/// the PERMANENT standalone-anchored create branch are REMOVED — there is no lifecycle state
+/// machine and no permanent standalone flow; the register creation carries no quantity. The §34
+/// delta adds the TRANSITIONAL pré-JobOn branch (the create carrier <c>pending_tool_id</c>), the
+/// human-confirmed association surface (candidates read + associate write) and the
+/// Job-On-incoming pending-registers light packet. The final route matrix is recalculated
+/// (15 endpoints + 4 pages = 19 in this file's surface family), NOT preserved at the old count.</para>
 /// </remarks>
 public static class BoquilhasEndpoints
 {
@@ -66,6 +70,8 @@ public static class BoquilhasEndpoints
                     rows.Select(row => new RegisterItemResponse(
                         row.BoquilhasId,
                         row.BqId,
+                        row.ToolId,
+                        row.IsPending,
                         row.Reference,
                         row.Lot,
                         row.ProductionNumber,
@@ -108,7 +114,9 @@ public static class BoquilhasEndpoints
                 : MapResult(result);
         });
 
-        // Route 4 — create the register IDENTITY of a REAL production BQ context (NO quantity event).
+        // Route 4 — create the register IDENTITY (NO quantity event): EXACTLY ONE anchor — the
+        // REAL production BQ context (bqId) XOR the transitional pré-JobOn canonical BQ Tool
+        // (pendingToolId, §34.1 rule 1).
         group.MapPost("/registers", async (
             CreateRegisterRequest? body,
             IBoquilhasService service,
@@ -118,7 +126,7 @@ public static class BoquilhasEndpoints
         {
             if (body is null)
             {
-                return ValidationFailed(BoquilhasValidationErrors.BqContextNotFound);
+                return ValidationFailed(BoquilhasValidationErrors.AnchorConflict);
             }
 
             var account = await currentAccount.GetCurrentAsync(cancellationToken);
@@ -130,7 +138,7 @@ public static class BoquilhasEndpoints
             }
 
             var result = await service.CreateAsync(
-                new CreateBoquilhaRegisterCommand(body.BqId, user.AccountId),
+                new CreateBoquilhaRegisterCommand(body.BqId, body.PendingToolId, user.AccountId),
                 cancellationToken);
 
             return await ExecuteAsync(
@@ -141,6 +149,86 @@ public static class BoquilhasEndpoints
                         $"{BoquilhasBasePath}/registers/{id}",
                         new RegisterCreatedResponse(id))
                     : null);
+        });
+
+        // §34.1 rule 2 — the association candidates of a PENDING register: every REAL
+        // bq_contexts row whose tool_id equals the register's provisional anchor, with the REAL
+        // Job On production facts (register-side context; never auto-selected).
+        group.MapGet("/registers/{boquilhasId:guid}/association-candidates", async (
+            Guid boquilhasId,
+            IBoquilhasService service,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await service.GetAssociationCandidatesAsync(boquilhasId, cancellationToken);
+
+            return result is BoquilhasResult.AssociationCandidatesFound(var candidates)
+                ? Results.Ok(new AssociationCandidatesResponse(
+                    candidates.Select(candidate => new AssociationCandidateResponse(
+                        candidate.BqId,
+                        candidate.JobOnId,
+                        candidate.Reference,
+                        candidate.ProductionNumber,
+                        candidate.Machine,
+                        candidate.ProductionDate))
+                        .ToArray()))
+                : MapResult(result);
+        });
+
+        // §34.1 rules 2–3 — the HUMAN-CONFIRMED association: the same boquilhas_id binds to the
+        // explicit candidate bq_id (whose bq_contexts.tool_id must equal the pending anchor — the
+        // same-UUID proof). Typed refusals: already-associated / association-mismatch /
+        // stale-version; history untouched.
+        group.MapPost("/registers/{boquilhasId:guid}/associate", async (
+            Guid boquilhasId,
+            AssociateRegisterRequest? body,
+            IBoquilhasService service,
+            ILogger<LoggerCategory> logger,
+            CancellationToken cancellationToken) =>
+        {
+            if (body is null)
+            {
+                return ValidationFailed(BoquilhasValidationErrors.BqContextNotFound);
+            }
+
+            var result = await service.AssociateAsync(
+                new AssociateBoquilhasCommand(boquilhasId, body.BqId, body.ExpectedVersion),
+                cancellationToken);
+
+            return await ExecuteAsync(
+                result,
+                logger,
+                success: r => r is BoquilhasResult.Associated(var associatedId, var version, var bqId)
+                    ? Results.Ok(new AssociatedResponse(associatedId, version, bqId))
+                    : null);
+        });
+
+        // §34.1 rule 2 — the Job-On-incoming direction: the pending registers of the production's
+        // canonical Tool (bq_id → tool_id; ONE context-specific query, never a global scan).
+        group.MapGet("/pending-registers", async (
+            Guid? bqId,
+            IBoquilhasService service,
+            CancellationToken cancellationToken) =>
+        {
+            if (bqId is not { } resolved)
+            {
+                return ValidationFailed(BoquilhasValidationErrors.BqContextNotFound);
+            }
+
+            var result = await service.GetPendingRegistersAsync(resolved, cancellationToken);
+
+            return result is BoquilhasResult.PendingRegistersFound(var registers)
+                ? Results.Ok(new PendingRegistersResponse(
+                    registers.Select(register => new PendingRegisterResponse(
+                        register.BoquilhasId,
+                        register.ToolId,
+                        register.ToolReference,
+                        register.ToolLot,
+                        register.Version,
+                        register.CreatedAt,
+                        register.MovementCount,
+                        register.Outstanding))
+                        .ToArray()))
+                : MapResult(result);
         });
 
         // Route 5 — append one movement (Saída / Entrada / Entrada sem reparação).
@@ -390,6 +478,8 @@ public static class BoquilhasEndpoints
             rows.Select(row => new RegisterItemResponse(
                 row.BoquilhasId,
                 row.BqId,
+                row.ToolId,
+                row.IsPending,
                 row.Reference,
                 row.Lot,
                 row.ProductionNumber,
@@ -466,6 +556,33 @@ public static class BoquilhasEndpoints
                 repairer.Name))
                 .ToArray())),
 
+        BoquilhasResult.AssociationCandidatesFound(var candidates) =>
+            Results.Ok(new AssociationCandidatesResponse(
+                candidates.Select(candidate => new AssociationCandidateResponse(
+                    candidate.BqId,
+                    candidate.JobOnId,
+                    candidate.Reference,
+                    candidate.ProductionNumber,
+                    candidate.Machine,
+                    candidate.ProductionDate))
+                    .ToArray())),
+
+        BoquilhasResult.PendingRegistersFound(var registers) =>
+            Results.Ok(new PendingRegistersResponse(
+                registers.Select(register => new PendingRegisterResponse(
+                    register.BoquilhasId,
+                    register.ToolId,
+                    register.ToolReference,
+                    register.ToolLot,
+                    register.Version,
+                    register.CreatedAt,
+                    register.MovementCount,
+                    register.Outstanding))
+                    .ToArray())),
+
+        BoquilhasResult.Associated(var associatedId, var version, var bqId) =>
+            Results.Ok(new AssociatedResponse(associatedId, version, bqId)),
+
         BoquilhasResult.ValidationFailed(var errors) => ValidationFailed(errors),
 
         BoquilhasResult.NotFound(var id) => Results.NotFound(new { reason = "not-found", id }),
@@ -487,23 +604,35 @@ public static class BoquilhasEndpoints
     {
         BoquilhasRefusalReason.StaleVersion => "stale-version",
         BoquilhasRefusalReason.RegisterExists => "register-exists",
+        BoquilhasRefusalReason.AlreadyAssociated => "already-associated",
+        BoquilhasRefusalReason.AssociationMismatch => "association-mismatch",
         _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, "Unknown refusal reason."),
     };
 
     private static FichaResponse ToFicha(RegisterFichaReadModel ficha) => new(
         ficha.BoquilhasId,
         ficha.BqId,
+        ficha.ToolId,
+        ficha.IsPending,
         ficha.Reference,
         ficha.Lot,
         ficha.Outstanding,
         ficha.CreatedByUserId,
         ficha.CreatedAt,
+        ficha.Version,
         ficha.Anchor is { } anchor
             ? new AnchorResponse(
                 anchor.ToolId,
                 anchor.FrozenToolType,
                 anchor.FrozenToolReference,
                 anchor.FrozenToolLot)
+            : null,
+        ficha.PendingTool is { } pendingTool
+            ? new PendingToolResponse(
+                pendingTool.ToolId,
+                pendingTool.ToolType,
+                pendingTool.ToolReference,
+                pendingTool.ToolLot)
             : null,
         ficha.Production is { } production
             ? new ProductionContextResponse(
@@ -561,8 +690,15 @@ public static class BoquilhasEndpoints
     // Transport shapes (route matrix 1–12)
     // ---------------------------------------------------------------------------------------------
 
-    /// <summary>Route 4 create carrier: the REAL production BQ context. The backend resolves the actor.</summary>
-    public sealed record CreateRegisterRequest(Guid BqId);
+    /// <summary>
+    /// Route 4 create carrier: EXACTLY ONE anchor — <c>BqId</c> (the REAL production BQ context)
+    /// XOR <c>PendingToolId</c> (the transitional pré-JobOn canonical BQ Tool, §34.1). The JSON
+    /// members are <c>bqId</c>/<c>pendingToolId</c>; the backend resolves the actor.
+    /// </summary>
+    public sealed record CreateRegisterRequest(Guid? BqId, Guid? PendingToolId);
+
+    /// <summary>§34 associação carrier: the explicit candidate <c>bq_id</c> + the observed register version.</summary>
+    public sealed record AssociateRegisterRequest(Guid BqId, int ExpectedVersion);
 
     /// <summary>Route 5 append carrier: the movement facts.</summary>
     public sealed record AppendMovementRequest(
@@ -588,10 +724,12 @@ public static class BoquilhasEndpoints
     /// <summary>Route 1 response.</summary>
     public sealed record RegisterListResponse(IReadOnlyList<RegisterItemResponse> Rows, int Total);
 
-    /// <summary>One route 1 row.</summary>
+    /// <summary>One route 1 row (a pending row carries the transitional Tool anchor).</summary>
     public sealed record RegisterItemResponse(
         Guid BoquilhasId,
-        Guid BqId,
+        Guid? BqId,
+        Guid? ToolId,
+        bool IsPending,
         string? Reference,
         string? Lot,
         string? ProductionNumber,
@@ -604,13 +742,17 @@ public static class BoquilhasEndpoints
     /// <summary>Route 2 response.</summary>
     public sealed record FichaResponse(
         Guid BoquilhasId,
-        Guid BqId,
+        Guid? BqId,
+        Guid? ToolId,
+        bool IsPending,
         string? Reference,
         string? Lot,
         int Outstanding,
         Guid CreatedByUserId,
         DateTimeOffset CreatedAt,
+        int Version,
         AnchorResponse? Anchor,
+        PendingToolResponse? PendingTool,
         ProductionContextResponse? Production,
         IReadOnlyList<MovementResponse> Movements);
 
@@ -620,6 +762,13 @@ public static class BoquilhasEndpoints
         string FrozenToolType,
         string FrozenToolReference,
         string FrozenToolLot);
+
+    /// <summary>The transitional pré-JobOn Tool facts of a pending route 2 ficha (§34.1).</summary>
+    public sealed record PendingToolResponse(
+        Guid ToolId,
+        string ToolType,
+        string ToolReference,
+        string ToolLot);
 
     /// <summary>The real production context of a route 2 ficha.</summary>
     public sealed record ProductionContextResponse(
@@ -703,6 +852,35 @@ public static class BoquilhasEndpoints
     /// <summary>Route 9 response: the REAL bq_id created/updated by Job On's own code.</summary>
     /// <remarks>The transport token is <c>jobonId</c> (the accepted P2-T04 convention).</remarks>
     public sealed record BqAssociatedResponse(Guid JobonId, Guid BqId, int Version);
+
+    /// <summary>§34.candidates response: the REAL BQ contexts resolving to the pending anchor Tool.</summary>
+    public sealed record AssociationCandidatesResponse(IReadOnlyList<AssociationCandidateResponse> Candidates);
+
+    /// <summary>One §34.candidates row (a REAL bq_contexts row + the REAL Job On facts).</summary>
+    public sealed record AssociationCandidateResponse(
+        Guid BqId,
+        Guid JobonId,
+        string Reference,
+        string ProductionNumber,
+        string Machine,
+        DateOnly? ProductionDate);
+
+    /// <summary>§34.pending response: the pré-JobOn registers of the production's canonical Tool.</summary>
+    public sealed record PendingRegistersResponse(IReadOnlyList<PendingRegisterResponse> Registers);
+
+    /// <summary>One §34.pending row (light packet: register facts + the anchor Tool facts; history only when opened).</summary>
+    public sealed record PendingRegisterResponse(
+        Guid BoquilhasId,
+        Guid ToolId,
+        string ToolReference,
+        string ToolLot,
+        int Version,
+        DateTimeOffset CreatedAt,
+        int MovementCount,
+        int Outstanding);
+
+    /// <summary>§34.associate response: the SAME boquilhas_id, now <c>bq_id → jobon_id</c>.</summary>
+    public sealed record AssociatedResponse(Guid BoquilhasId, int Version, Guid BqId);
 
     /// <summary>Route 10 response.</summary>
     public sealed record AssignmentsResponse(IReadOnlyList<AssignmentResponse> Assignments);

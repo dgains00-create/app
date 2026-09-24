@@ -55,12 +55,13 @@ internal static class P2T07ProductionScan
         "src/DMO.Infrastructure/Migrations/20260924051151_BoquilhasDomain.Designer.cs",
     ];
 
-    /// <summary>The new P2-T07 Web surfaces.</summary>
+    /// <summary>The P2-T07 Web surfaces (incl. the §34.3 Boquilhas Definições endpoint surface).</summary>
     public static IReadOnlyList<string> WebSourcePaths { get; } =
         P2T04ProductionScan.FilesUnder("src/DMO.Web/Pages/Boquilhas", ".cs", ".cshtml")
             .Concat(
             [
                 "src/DMO.Web/Endpoints/BoquilhasEndpoints.cs",
+                "src/DMO.Web/Endpoints/BoquilhasDefinicoesEndpoints.cs",
             ])
             .ToList();
 
@@ -114,6 +115,7 @@ internal static class P2T07ProductionScan
         "src/DMO.Infrastructure/Migrations/20260924051151_BoquilhasDomain",
         "src/DMO.Web/Pages/Boquilhas/",
         "src/DMO.Web/Endpoints/BoquilhasEndpoints.cs",
+        "src/DMO.Web/Endpoints/BoquilhasDefinicoesEndpoints.cs",
         "src/DMO.Web/wwwroot/css/dmo-boquilhas.css",
         "src/DMO.Web/wwwroot/js/dmo-boquilhas.js",
     ];
@@ -148,16 +150,14 @@ internal static class P2T07ProductionScan
         string.Concat("Hist", "\u00f3rico", " Global"),
     ];
 
-    /// <summary>The settings/administration tokens of the P2-T05 boundary (BND-B1/N1/R4): Boquilhas
-    /// administers neither the repairer register nor the assignments.</summary>
+    /// <summary>The settings/administration tokens of the §34.3 boundary (N1/R4): Boquilhas owns the
+    /// repairer family (<c>Boquilhas > Definições</c> — the repairer register + the machine
+    /// assignments, moved from Controlo by the Owner clarification), so the old "no repairer
+    /// administration" tokens are SUPERSEDED and removed; what remains forbidden in the Boquilhas
+    /// sources is the CONTROL settings surface (PDF directory, email lists/templates — still
+    /// Controlo-owned) and the glass-density settings (Controlo).</summary>
     public static IReadOnlyList<string> SettingsTokens { get; } =
     [
-        string.Concat("Defini", "\u00e7", "\u00f5es"),
-        string.Concat("Defini", "coes"),
-        string.Concat("Repairer", "Created"),
-        string.Concat("Repairer", "Renamed"),
-        string.Concat("MachineAssignment", "Set"),
-        string.Concat("MachineAssignment", "Cleared"),
         string.Concat("GlassDensity", "Settings"),
         string.Concat("PdfDirectory", "Settings"),
         string.Concat("EmailList"),

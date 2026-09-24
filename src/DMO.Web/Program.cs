@@ -158,14 +158,17 @@ try
     // registers availability (contract §13.3).
     builder.Services.AddScoped<IControloApproveService, ControloApproveService>();
 
-    // ---- P2-T07 Boquilhas: Registo + Novo + Histórico ------------------------------------------
+    // ---- P2-T07 Boquilhas: Registo + Novo + Histórico + Definições ----------------------------
     // The aggregate/movement service composing the closed P2-T04/P2-T05 application contracts
-    // (Tool/Job On/repairer/assignments) and the Boquilhas repository. No policy, no availability
-    // entry, no destination route and no second registry is added here: every P2-T07 route is
-    // server-gated by the accepted `boquilhas` policy and stays denied to every caller until
-    // P2-T10 registers availability (contract §13.3). The repository and the one additive
-    // dependency-probe line are registered in AddPersistenceFoundation (§27).
+    // (Tool/Job On/repairer/assignments) and the Boquilhas repository; the Definições service
+    // owns the repairer family (Owner clarification P2-T07 §34.3 — same physical tables, moved
+    // ownership/service/UI only). No policy, no availability entry, no destination route and no
+    // second registry is added here: every P2-T07 route is server-gated by the accepted
+    // `boquilhas` policy and stays denied to every caller until P2-T10 registers availability
+    // (contract §13.3). The repository and the one additive dependency-probe line are registered
+    // in AddPersistenceFoundation (§27).
     builder.Services.AddScoped<IBoquilhasService, BoquilhasService>();
+    builder.Services.AddScoped<IBoquilhasDefinicoesService, BoquilhasDefinicoesService>();
 
     // One ADMIN-only policy (dmo.administration) + scoped handler; deliberately outside the
     // Module policy namespace. Administration is ADMIN-account functionality, not a Module.
@@ -221,5 +224,6 @@ app.MapControloCreateEndpoints();
 app.MapControloDefinicoesEndpoints();
 app.MapControloApproveEndpoints();
 app.MapBoquilhasEndpoints();
+app.MapBoquilhasDefinicoesEndpoints();
 
 return await StartupCommands.RunHostAsync(app);

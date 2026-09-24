@@ -6,20 +6,26 @@ namespace DMO.Application.Boquilhas;
 /// The Boquilhas command/query carriers and the closed result set.
 /// </summary>
 /// <remarks>
-/// Authority: P2-T07 OWNER CLARIFICATION (the production movement register), preserving the useful
-/// edit/audit/dates/repairer behaviors.
+/// Authority: P2-T07 OWNER CLARIFICATION (the production movement register), §34 (the
+/// transitional pré-JobOn register on the canonical <c>tool_id</c> and the human-confirmed
+/// association at the matching <c>bq_id</c>), preserving the useful edit/audit/dates/repairer
+/// behaviors.
 /// <para>
 /// Identity discipline: <c>boquilhas_id</c> and <c>movement_id</c> never appear in any carrier as a
 /// client-supplied value <b>for creation</b> — the backend allocates both inside the write
-/// transactions. Every register anchors the REAL production association (<c>bq_id</c>, never a fake
-/// Job On / fake bq id / <c>production_id</c>). Movement type and <c>recorded_at</c> are immutable
-/// and appear in no edit carrier. There is no lifecycle carrier: no close/reopen/opening-facts
-/// commands exist.</para>
+/// transactions. Every register anchors exactly ONE real relation: the REAL production BQ context
+/// (<c>bq_id</c>, never a fake Job On / fake bq id / <c>production_id</c>) XOR the provisional
+/// canonical BQ <c>tool_id</c> (pré-JobOn, §34.1; never a minted Tool identity). Movement type and
+/// <c>recorded_at</c> are immutable and appear in no edit carrier. There is no lifecycle carrier:
+/// no close/reopen/opening-facts commands exist.</para>
 /// <para>
 /// <b>Superseded (Owner clarification):</b> the open/closed lifecycle commands (close/reopen/
-/// opening-facts), the standalone anchor, the initial-quantity Início and the balance-relative
-/// carriers (Saída ≤ Disponível / Irreparável ≤ Em reparação / expected-excess facts) are removed.
-/// The register creation carries NO quantity.</para>
+/// opening-facts), the PERMANENT standalone anchor, the initial-quantity Início and the
+/// balance-relative carriers (Saída ≤ Disponível / Irreparável ≤ Em reparação / expected-excess
+/// facts) are removed. The register creation carries NO quantity. The only standalone-like state
+/// is the TRANSITIONAL pré-JobOn anchor of §34: pending registers carry <c>pending_tool_id</c>
+/// (lowercased command member) and the association command carries the explicit candidate
+/// <c>bq_id</c> + the observed register version.</para>
 /// </remarks>
 
 // ------------------------------------------------------------------ queries
@@ -53,12 +59,27 @@ public sealed record BoquilhasHistoryQuery(
 // ------------------------------------------------------------------ commands
 
 /// <summary>
-/// The register creation command (route 4): creates the register IDENTITY of one REAL production
-/// BQ context — no quantity movement is ever manufactured to establish existence.
+/// The register creation command (route 4): creates the register IDENTITY of EXACTLY ONE anchor —
+/// <see cref="BqId"/> (a REAL production BQ context) XOR <see cref="PendingToolId"/> (the
+/// transitional pré-JobOn canonical BQ Tool, §34.1) — no quantity movement is ever manufactured
+/// to establish existence. <c>bq_id</c>/<c>pending_tool_id</c> are the lowercase JSON members.
 /// </summary>
 public sealed record CreateBoquilhaRegisterCommand(
-    Guid BqId,
+    Guid? BqId,
+    Guid? PendingToolId,
     Guid CreatedByUserId);
+
+/// <summary>
+/// The pré-JobOn association command (§34.1 rule 2, mirroring the accepted Peso associate of
+/// P2-T05 §4.4): binds the SAME <c>boquilhas_id</c> to the explicit candidate <c>bq_id</c> whose
+/// <c>bq_contexts.tool_id</c> equals the register's pending <c>tool_id</c> (the anchor must match;
+/// no inference rule). The observed register <see cref="ExpectedVersion"/> guards the write; on
+/// success the provisional Tool anchor is cleared and the version bumps once.
+/// </summary>
+public sealed record AssociateBoquilhasCommand(
+    Guid BoquilhasId,
+    Guid BqId,
+    int ExpectedVersion);
 
 /// <summary>
 /// The movement-append command (route 5): one of the closed three type tokens, a positive
@@ -101,12 +122,13 @@ public sealed record AssociateBqCommand(
 // ---------------------------------------------------------------- repository write units
 
 /// <summary>
-/// The register-creation unit of <c>IBoquilhasRepository.CreatedAsync</c>: the production anchor
-/// (a REAL <c>bq_contexts</c> row) and the backend actor; the register identity row carries NO
-/// quantity event.
+/// The register-creation unit of <c>IBoquilhasRepository.CreatedAsync</c>: EXACTLY ONE anchor (the
+/// REAL <c>bq_contexts</c> row XOR the provisional canonical BQ <c>tool_id</c>) and the backend
+/// actor; the register identity row carries NO quantity event.
 /// </summary>
 public sealed record BoqCreateUnit(
-    Guid BqId,
+    Guid? BqId,
+    Guid? PendingToolId,
     Guid CreatedByUserId);
 
 /// <summary>
@@ -151,6 +173,19 @@ public enum BoquilhasRefusalReason
 
     /// <summary>A register for this BQ context already exists. (409 <c>register-exists</c>)</summary>
     RegisterExists,
+
+    /// <summary>
+    /// The register is already production-linked; association is offered only while pending.
+    /// (409 <c>already-associated</c>)
+    /// </summary>
+    AlreadyAssociated,
+
+    /// <summary>
+    /// The candidate <c>bq_id</c> does not resolve to the register's pending <c>tool_id</c> — the
+    /// anchor must match by the same UUID; the application never guesses. (409
+    /// <c>association-mismatch</c>)
+    /// </summary>
+    AssociationMismatch,
 }
 
 /// <summary>
@@ -197,11 +232,35 @@ public abstract record BoquilhasResult
     /// <summary>The BQ context was created/updated by Job On's own code; the real <c>bq_id</c> is returned.</summary>
     public sealed record BqAssociated(Guid JobOnId, Guid BqId, int JobOnVersion) : BoquilhasResult;
 
-    /// <summary>The six current machine → repairer assignments (consumed read, route 10).</summary>
+    /// <summary>
+    /// The six current machine → repairer assignments (consumed read, route 10).
+    /// </summary>
     public sealed record AssignmentsFound(IReadOnlyList<MachineRepairerAssignmentReadModel> Assignments) : BoquilhasResult;
 
     /// <summary>The repairer register (consumed read, route 11).</summary>
     public sealed record RepairersFound(IReadOnlyList<RepairerReadModel> Repairers) : BoquilhasResult;
+
+    /// <summary>
+    /// The BQ association candidates of a PENDING register (§34.1 rule 2): every REAL
+    /// <c>bq_contexts</c> row whose <c>tool_id</c> equals the register's provisional anchor — the
+    /// surface presents them and the operator confirms; never auto-selected.
+    /// </summary>
+    public sealed record AssociationCandidatesFound(
+        IReadOnlyList<BqAssociationCandidateReadModel> Candidates) : BoquilhasResult;
+
+    /// <summary>
+    /// The pending registers of a production BQ context (§34.1 rule 2, the Job-On-incoming
+    /// direction): the pré-JobOn registers whose provisional <c>tool_id</c> equals the context's
+    /// canonical <c>tool_id</c> — presented for a possible human-confirmed association.
+    /// </summary>
+    public sealed record PendingRegistersFound(
+        IReadOnlyList<PendingRegisterCandidateReadModel> Registers) : BoquilhasResult;
+
+    /// <summary>
+    /// The SAME <c>boquilhas_id</c> was bound to the real <c>bq_id</c> (§34.1 rule 3): the
+    /// provisional Tool anchor was cleared, the register version bumped once, history untouched.
+    /// </summary>
+    public sealed record Associated(Guid BoquilhasId, int Version, Guid BqId) : BoquilhasResult;
 
     /// <summary>The exact contracted validation codes; nothing was written.</summary>
     public sealed record ValidationFailed(IReadOnlyList<string> Errors) : BoquilhasResult;

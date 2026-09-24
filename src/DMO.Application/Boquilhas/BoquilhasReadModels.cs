@@ -4,15 +4,19 @@ namespace DMO.Application.Boquilhas;
 
 /// <summary>
 /// The Boquilhas read models: the register list row, the local Histórico movement row, the
-/// register ficha, the movement audit item and the consumed repairer/assignment reads.
+/// register ficha, the movement audit item, the consumed repairer/assignment reads and the §34
+/// association reads (pending-register candidates and BQ-association candidates).
 /// </summary>
 /// <remarks>
-/// Authority: P2-T07 OWNER CLARIFICATION (the production movement register).
+/// Authority: P2-T07 OWNER CLARIFICATION (the production movement register), §34 (the
+/// transitional pré-JobOn anchor + the association reads — both keyed by the canonical
+/// <c>tool_id</c> UUID, light packets, no global scans).
 /// <para>
 /// The outstanding repair quantity is always a <b>derived projection</b> computed by replay at
 /// read time — never stored and never a second balance authority. Reference/lot/production facts
-/// are traversal facts through the REAL <c>bq_contexts → job_ons</c> chain: the frozen BQ triple
-/// plus the real production facts — never a copy on the register.</para>
+/// are traversal facts through the REAL <c>bq_contexts → job_ons</c> chain (production-linked) or
+/// the canonical <c>tools</c> row (pending): the frozen BQ triple plus the real production facts —
+/// never a copy on the register.</para>
 /// <para>
 /// <b>Superseded (Owner clarification):</b> the balance buckets (Disponível / Em reparação /
 /// Irreparável / Entrada excecional), the lifecycle state token and the machine set read shapes
@@ -22,7 +26,8 @@ namespace DMO.Application.Boquilhas;
 /// <summary>One register-list row (route 1): the production context + the derived outstanding.</summary>
 public sealed record RegisterListItem(
     Guid BoquilhasId,
-    Guid BqId,
+    Guid? BqId,
+    Guid? ToolId,
     string? Reference,
     string? Lot,
     string? ProductionNumber,
@@ -32,15 +37,18 @@ public sealed record RegisterListItem(
     int MovementCount,
     DateTimeOffset? LastMovementAt)
 {
-    /// <summary>Whether the row carries the REAL production context (always true — every register
-    /// belongs to a real Job On/BQ context).</summary>
+    /// <summary>Whether the row is still in the transitional pré-JobOn state (production facts absent).</summary>
+    public bool IsPending => BqId is null;
+
+    /// <summary>Whether the row carries the REAL production context.</summary>
     public bool HasProductionContext => ProductionNumber is not null;
 }
 
 /// <summary>The route 1 result carrier item.</summary>
 public sealed record RegisterListItemReadModel(
     Guid BoquilhasId,
-    Guid BqId,
+    Guid? BqId,
+    Guid? ToolId,
     string? Reference,
     string? Lot,
     string? ProductionNumber,
@@ -48,7 +56,11 @@ public sealed record RegisterListItemReadModel(
     DateOnly? ProductionDate,
     int Outstanding,
     int MovementCount,
-    DateTimeOffset? LastMovementAt);
+    DateTimeOffset? LastMovementAt)
+{
+    /// <summary>Whether the row is still in the transitional pré-JobOn state.</summary>
+    public bool IsPending => BqId is null;
+}
 
 /// <summary>
 /// One local Histórico row (route 12): ONE MOVEMENT with its register's production context —
@@ -92,21 +104,27 @@ public sealed record HistoryMovementItemReadModel(
     string? ProductionMachine);
 
 /// <summary>
-/// The register ficha read model (route 2): the production context, the movement ledger and the
-/// derived outstanding — NO lifecycle state.
+/// The register ficha read model (route 2): the production context (or the transitional pré-JobOn
+/// Tool facts), the movement ledger and the derived outstanding — NO lifecycle state.
 /// </summary>
 public sealed record RegisterFichaReadModel(
     Guid BoquilhasId,
-    Guid BqId,
+    Guid? BqId,
+    Guid? ToolId,
     string? Reference,
     string? Lot,
     int Outstanding,
     Guid CreatedByUserId,
     DateTimeOffset CreatedAt,
+    int Version,
     AnchorContextReadModel? Anchor,
+    PendingToolFactsReadModel? PendingTool,
     ProductionContextReadModel? Production,
     IReadOnlyList<MovementReadModel> Movements)
 {
+    /// <summary>Whether the register is still in the transitional pré-JobOn state.</summary>
+    public bool IsPending => BqId is null;
+
     /// <summary>The movement-type label of one ledger row (presentation only).</summary>
     public string Label(string movementType) =>
         MovementKindTokens.Parse(movementType) is { } kind
@@ -115,14 +133,25 @@ public sealed record RegisterFichaReadModel(
 }
 
 /// <summary>
-/// The anchor context of a register: the frozen BQ triple (presented as historical/production
-/// fact) with the direct canonical Tool relation — never a copy on the register.
+/// The anchor context of a production-linked register: the frozen BQ triple (presented as
+/// historical/production fact) with the direct canonical Tool relation — never a copy on the
+/// register.
 /// </summary>
 public sealed record AnchorContextReadModel(
     Guid ToolId,
     string FrozenToolType,
     string FrozenToolReference,
     string FrozenToolLot);
+
+/// <summary>
+/// The transitional pré-JobOn Tool facts of a pending register (§34.1): the canonical BQ Tool
+/// anchor (the direct <c>tools</c> row) — the identity the association is later proven by.
+/// </summary>
+public sealed record PendingToolFactsReadModel(
+    Guid ToolId,
+    string ToolType,
+    string ToolReference,
+    string ToolLot);
 
 /// <summary>
 /// The real production context of the register (via <c>bq_id → job_ons</c>): applying a movement
@@ -180,3 +209,56 @@ public sealed record MachineRepairerAssignmentReadModel(
 
 /// <summary>One repairer-register read (route 11; consumed, never administered).</summary>
 public sealed record RepairerReadModel(Guid RepairerId, string Name);
+
+// ------------------------------------------------------------------ §34 association reads
+
+/// <summary>
+/// One BQ association candidate of a PENDING register (§34.1 rule 2): a REAL <c>bq_contexts</c>
+/// row whose <c>tool_id</c> equals the register's provisional anchor, with the REAL Job On
+/// production facts. Candidates are never synthesized, never ranked and never auto-selected.
+/// </summary>
+public sealed record BqAssociationCandidate(
+    Guid BqId,
+    Guid JobOnId,
+    string Reference,
+    string ProductionNumber,
+    string Machine,
+    DateOnly? ProductionDate);
+
+/// <summary>The route carrier of <see cref="BqAssociationCandidate"/>.</summary>
+public sealed record BqAssociationCandidateReadModel(
+    Guid BqId,
+    Guid JobOnId,
+    string Reference,
+    string ProductionNumber,
+    string Machine,
+    DateOnly? ProductionDate);
+
+/// <summary>
+/// One pending (pré-JobOn) register candidate of a production BQ context (§34.1 rule 2, the
+/// Job-On-incoming direction): the SAME canonical <c>tool_id</c> UUID proves the Tool; the machine
+/// line is NOT part of the identity — it only helps the operator recognize the row. The light
+/// packet carries the register facts (incl. the observed version for the guarded association
+/// write) + the canonical Tool's current reference/lot and the derived movement facts; the
+/// movement history itself is only fetched when opened.
+/// </summary>
+public sealed record PendingRegisterCandidate(
+    Guid BoquilhasId,
+    Guid ToolId,
+    string ToolReference,
+    string ToolLot,
+    int Version,
+    DateTimeOffset CreatedAt,
+    int MovementCount,
+    int Outstanding);
+
+/// <summary>The route carrier of <see cref="PendingRegisterCandidate"/>.</summary>
+public sealed record PendingRegisterCandidateReadModel(
+    Guid BoquilhasId,
+    Guid ToolId,
+    string ToolReference,
+    string ToolLot,
+    int Version,
+    DateTimeOffset CreatedAt,
+    int MovementCount,
+    int Outstanding);

@@ -189,22 +189,106 @@ public sealed class BoquilhasValidatorTests
         Assert.Contains(BoquilhasValidationErrors.QuantityNotPositive, BoquilhasValidator.Validate(command));
     }
 
-    // ---- register creation ------------------------------------------------------------------
+    // ---- register creation (EXACTLY ONE anchor: bq_id XOR pending_tool_id, §34.1) ---------------
 
     [Fact]
     public void Create_EmptyBqId_IsRefused()
     {
-        var command = new CreateBoquilhaRegisterCommand(Guid.Empty, Guid.NewGuid());
+        var command = new CreateBoquilhaRegisterCommand(
+            BqId: Guid.Empty,
+            PendingToolId: null,
+            CreatedByUserId: Guid.NewGuid());
 
-        Assert.Contains(BoquilhasValidationErrors.BqContextNotFound, BoquilhasValidator.Validate(command));
+        var errors = BoquilhasValidator.Validate(command);
+        Assert.Contains(BoquilhasValidationErrors.BqContextNotFound, errors);
     }
 
     [Fact]
     public void Create_RealBqId_IsValid()
     {
-        var command = new CreateBoquilhaRegisterCommand(Guid.NewGuid(), Guid.NewGuid());
+        var command = new CreateBoquilhaRegisterCommand(
+            BqId: Guid.NewGuid(),
+            PendingToolId: null,
+            CreatedByUserId: Guid.NewGuid());
 
         Assert.Empty(BoquilhasValidator.Validate(command));
+    }
+
+    /// <summary>§34.1 rule 1 — the transitional pré-JobOn branch: exactly ONE anchor.</summary>
+    [Fact]
+    public void Create_PendingToolId_IsValid()
+    {
+        var command = new CreateBoquilhaRegisterCommand(
+            BqId: null,
+            PendingToolId: Guid.NewGuid(),
+            CreatedByUserId: Guid.NewGuid());
+
+        Assert.Empty(BoquilhasValidator.Validate(command));
+    }
+
+    [Fact]
+    public void Create_NoAnchor_IsRefused()
+    {
+        var command = new CreateBoquilhaRegisterCommand(
+            BqId: null,
+            PendingToolId: null,
+            CreatedByUserId: Guid.NewGuid());
+
+        Assert.Contains(BoquilhasValidationErrors.AnchorConflict, BoquilhasValidator.Validate(command));
+    }
+
+    [Fact]
+    public void Create_TwoAnchors_IsRefused()
+    {
+        var command = new CreateBoquilhaRegisterCommand(
+            BqId: Guid.NewGuid(),
+            PendingToolId: Guid.NewGuid(),
+            CreatedByUserId: Guid.NewGuid());
+
+        Assert.Contains(BoquilhasValidationErrors.AnchorConflict, BoquilhasValidator.Validate(command));
+    }
+
+    [Fact]
+    public void Create_EmptyPendingToolId_IsRefused()
+    {
+        var command = new CreateBoquilhaRegisterCommand(
+            BqId: null,
+            PendingToolId: Guid.Empty,
+            CreatedByUserId: Guid.NewGuid());
+
+        Assert.Contains(BoquilhasValidationErrors.ToolNotFound, BoquilhasValidator.Validate(command));
+    }
+
+    // ---- §34 association command --------------------------------------------------------------
+
+    [Fact]
+    public void Associate_ShapeRules_AreEnforced()
+    {
+        Assert.Contains(
+            BoquilhasValidationErrors.FilterInvalid,
+            BoquilhasValidator.Validate(new AssociateBoquilhasCommand(
+                BoquilhasId: Guid.Empty,
+                BqId: Guid.NewGuid(),
+                ExpectedVersion: 1)));
+
+        Assert.Contains(
+            BoquilhasValidationErrors.BqContextNotFound,
+            BoquilhasValidator.Validate(new AssociateBoquilhasCommand(
+                BoquilhasId: Guid.NewGuid(),
+                BqId: Guid.Empty,
+                ExpectedVersion: 1)));
+
+        Assert.Contains(
+            BoquilhasValidationErrors.FilterInvalid,
+            BoquilhasValidator.Validate(new AssociateBoquilhasCommand(
+                BoquilhasId: Guid.NewGuid(),
+                BqId: Guid.NewGuid(),
+                ExpectedVersion: 0)));
+
+        Assert.Empty(BoquilhasValidator.Validate(new AssociateBoquilhasCommand(
+            BoquilhasId: Guid.NewGuid(),
+            BqId: Guid.NewGuid(),
+            ExpectedVersion: 1)));
     }
 
     // ---- history filters --------------------------------------------------------------------

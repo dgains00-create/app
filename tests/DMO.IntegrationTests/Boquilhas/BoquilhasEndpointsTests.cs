@@ -645,13 +645,17 @@ public sealed class BoquilhasEndpointsTests
     private sealed record FichaEnvelope(FichaResponse? Ficha);
     private sealed record FichaResponse(
         Guid BoquilhasId,
-        Guid BqId,
+        Guid? BqId,
+        Guid? ToolId,
+        bool IsPending,
         string? Reference,
         string? Lot,
         int Outstanding,
         Guid CreatedByUserId,
         DateTimeOffset CreatedAt,
+        int Version,
         AnchorResponse? Anchor,
+        PendingToolResponse? PendingTool,
         ProductionContextResponse? Production,
         IReadOnlyList<MovementResponse> Movements);
     private sealed record AnchorResponse(
@@ -659,6 +663,11 @@ public sealed class BoquilhasEndpointsTests
         string FrozenToolType,
         string FrozenToolReference,
         string FrozenToolLot);
+    private sealed record PendingToolResponse(
+        Guid ToolId,
+        string ToolType,
+        string ToolReference,
+        string ToolLot);
     private sealed record ProductionContextResponse(
         string Reference,
         string ProductionNumber,
@@ -714,7 +723,9 @@ public sealed class BoquilhasEndpointsTests
     private sealed record RegisterListEnvelope(IReadOnlyList<RegisterRowResponse> Rows, int Total);
     private sealed record RegisterRowResponse(
         Guid BoquilhasId,
-        Guid BqId,
+        Guid? BqId,
+        Guid? ToolId,
+        bool IsPending,
         string? Reference,
         string? Lot,
         string? ProductionNumber,

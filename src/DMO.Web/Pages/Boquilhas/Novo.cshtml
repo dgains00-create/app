@@ -49,6 +49,22 @@
                     data-dmo-associate-bq="true"
                     disabled
                     hidden>Associar BQ</button>
+
+            @* ---- §34.1 rule 2, the Job-On-incoming direction: pending registers of the SAME tool.
+               The adapter fetches /boquilhas/pending-registers?bqId= when the BQ context is present
+               and presents each candidate with an EXPLICIT per-row confirmation (nunca automático). *@
+            <div class="dmo-boquilhas__pending" data-dmo-pending-registers="true" hidden>
+                <h3 class="dmo-boquilhas__title">Registos pré-JobOn da mesma ferramenta</h3>
+                <p class="dmo-boquilhas__hint">
+                    Existem registos iniciados antes desta produção com a mesma ferramenta BQ (o mesmo
+                    tool_id). Pode associar um registo existente a esta produção — com confirmação
+                    explícita — ou criar um registo novo.
+                </p>
+                <p class="dmo-boquilhas__empty" data-dmo-pending-registers-empty="true" hidden>
+                    Sem registos pré-JobOn desta ferramenta.
+                </p>
+                <div data-dmo-pending-register-rows="true"></div>
+            </div>
         </div>
     </div>
 
@@ -108,6 +124,19 @@
             </p>
             <span class="dmo-boquilhas__actions">
                 <button type="button" class="dmo-boquilhas__button" data-dmo-create-submit="true">Criar registo</button>
+            </span>
+        </fieldset>
+
+        @* ---- §34.1 rule 1: the TRANSITIONAL pré-JobOn branch (the provisional tool_id anchor) -*@
+        <fieldset class="dmo-boquilhas__entry" data-dmo-create-pending="true">
+            <legend class="dmo-boquilhas__legend">Criar registo pré-JobOn</legend>
+            <p class="dmo-boquilhas__hint">
+                Sem produção associada: o registo fica provisoriamente ancorado na ferramenta BQ
+                (tool_id) selecionada na lista de ferramentas. Quando existir um contexto de produção
+                com a mesma ferramenta, o registo é apresentado para associação — com confirmação.
+            </p>
+            <span class="dmo-boquilhas__actions">
+                <button type="button" class="dmo-boquilhas__button" data-dmo-create-pending-submit="true">Criar registo pré-JobOn</button>
             </span>
         </fieldset>
 

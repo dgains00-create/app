@@ -1,13 +1,18 @@
 // P2-T07 Boquilhas — page-owned interaction adapter (OWNER CLARIFICATION, production movement
-// register). Loaded on /boquilhas (index), /boquilhas/novo (novo) and /boquilhas/historico.
+// register, §34 pré-JobOn association). Loaded on /boquilhas (index), /boquilhas/novo (novo),
+// /boquilhas/historico and /boquilhas/definicoes (definicoes).
 //
 // Surface rules (the accepted arbitration everywhere):
 //  - tables are SELECTION surfaces: single click selects, double click opens (via the page-owned
 //    opaque-key → route map; no per-row action buttons);
 //  - all mutating actions live OUTSIDE the tables: "Registar movimento" and "Guardar edição" on
-//    the index surface, "Associar BQ"/"Criar registo" on the novo surface;
+//    the index surface, "Associar BQ"/"Criar registo"/"Criar registo pré-JobOn" on the novo
+//    surface, "Adicionar"/"Renomear"/"Guardar"/"Limpar" on the definicoes surface;
 //  - the movement selector exposes EXACTLY the three types (saida | entrada | entrada_sem_reparacao);
 //    no Início, no Irreparável, no lifecycle action exists anywhere;
+//  - §34 association is ALWAYS human-confirmed (an explicit per-row confirmation dialog): the
+//    candidates are never auto-selected and the association is never silent; the same canonical
+//    tool_id UUID is the only identity proof (never reference/lote/máquina/texto);
 //  - a refused/stale response is presented ONCE (no auto-retry) and a stale movement version
 //    enters the accepted conflict presentation (D2) with the explicit "Recarregar estado atual"
 //    recovery — reloading the page state, never an automatic retry;
@@ -168,12 +173,111 @@
         }
     }
 
+    // ---- §34 association (index surface): the candidates of a PENDING register ---------------
+    // The candidates are the REAL bq_contexts rows whose tool_id equals the pending anchor
+    // (/boquilhas/registers/{id}/association-candidates). Every association is HUMAN-CONFIRMED:
+    // the operator confirms the explicit production before the POST; nothing is ever silent.
+    function wireAssociationPanel(panel, boquilhasId) {
+        var candidatesRegion = panel.querySelector("[data-dmo-association-candidates]");
+        var version = parseInt(panel.getAttribute("data-dmo-boquilhas-version"), 10) || 1;
+
+        if (!candidatesRegion) {
+            return;
+        }
+
+        send("/boquilhas/registers/" + encodeURIComponent(boquilhasId) + "/association-candidates")
+            .then(function (response) {
+                if (!response.ok) {
+                    handleFailure(response);
+                    return Promise.resolve(null);
+                }
+
+                return response.json();
+            })
+            .then(function (payload) {
+                if (!payload) {
+                    return;
+                }
+
+                var candidates = payload.candidates || [];
+
+                candidatesRegion.textContent = "";
+                while (candidatesRegion.firstChild) {
+                    candidatesRegion.removeChild(candidatesRegion.firstChild);
+                }
+
+                if (candidates.length === 0) {
+                    var empty = document.createElement("p");
+                    empty.className = "dmo-boquilhas__empty";
+                    empty.textContent = "Sem produções candidatas: a associação é apresentada quando existir um contexto BQ com a mesma ferramenta (o mesmo tool_id).";
+                    candidatesRegion.appendChild(empty);
+                    return;
+                }
+
+                candidates.forEach(function (candidate) {
+                    var row = document.createElement("div");
+                    row.className = "dmo-boquilhas__candidate";
+
+                    var facts = document.createElement("span");
+                    facts.className = "dmo-boquilhas__candidate-facts";
+                    facts.textContent = candidate.reference + " — " + candidate.productionNumber +
+                        " (" + candidate.machine + ")" +
+                        (candidate.productionDate ? " — " + candidate.productionDate : "");
+                    row.appendChild(facts);
+
+                    var associate = document.createElement("button");
+                    associate.className = "dmo-boquilhas__button";
+                    associate.type = "button";
+                    associate.setAttribute("data-dmo-associate-register", candidate.bqId);
+                    associate.textContent = "Associar a esta produção";
+                    row.appendChild(associate);
+
+                    associate.addEventListener("click", function () {
+                        // The explicit human confirmation of the §34 association.
+                        var confirmed = window.confirm(
+                            "Associar o registo pré-JobOn à produção " +
+                            candidate.reference + " — " + candidate.productionNumber +
+                            " (" + candidate.machine + ")? O registo mantém o mesmo número e todo o histórico.");
+
+                        if (!confirmed) {
+                            return;
+                        }
+
+                        send("/boquilhas/registers/" + encodeURIComponent(boquilhasId) + "/associate", {
+                            method: "POST",
+                            body: JSON.stringify({
+                                bqId: candidate.bqId,
+                                expectedVersion: version
+                            })
+                        }).then(function (response) {
+                            if (response.ok) {
+                                window.location.reload();
+                                return;
+                            }
+
+                            handleFailure(response);
+                        }, function () {
+                            renderError("Não foi possível contactar o servidor.");
+                        });
+                    });
+                });
+            }, function () {
+                renderError("Não foi possível contactar o servidor.");
+            });
+    }
+
     function wireIndexRegister(register) {
         var boquilhasId = register.getAttribute("data-dmo-boquilhas-id");
         var movementTable = register.querySelector("[data-dmo-movement-table]");
         var entry = register.querySelector("[data-dmo-movement-entry]");
         var editRegion = SURFACE.querySelector("[data-dmo-boquilhas-region='detail']");
         var editForm = editRegion ? editRegion.querySelector("[data-dmo-edit-form]") : null;
+
+        // §34: the human-confirmed association panel of a pending register.
+        var associationPanel = register.querySelector("[data-dmo-association-panel]");
+        if (associationPanel) {
+            wireAssociationPanel(associationPanel, boquilhasId);
+        }
 
         // The movement-entry resolutions (consumed reads; never administered here).
         var resolutions = {};
@@ -325,8 +429,99 @@
         var selectedJobOn = SURFACE.querySelector("[data-dmo-selected-jobon]");
         var selectedJobOnVersion = SURFACE.querySelector("[data-dmo-selected-jobon-version]");
 
+        // §34.1 rule 2 (Job-On-incoming): the pending registers of the production's canonical Tool.
+        var pendingPanel = SURFACE.querySelector("[data-dmo-pending-registers]");
+        var pendingRows = SURFACE.querySelector("[data-dmo-pending-register-rows]");
+        var pendingEmpty = SURFACE.querySelector("[data-dmo-pending-registers-empty]");
+
         var jobOnId = null;
         var jobOnVersion = 0;
+
+        // ---- §34.1 rule 2: the pending registers of THE SAME tool_id (never a global scan) ----
+        // The light packet is fetched only when the production context (bq_id) is present; each
+        // candidate requires the explicit human confirmation before the association POST.
+        function loadPendingRegisters(bqId) {
+            if (!pendingPanel || !pendingRows || !pendingEmpty) {
+                return;
+            }
+
+            send("/boquilhas/pending-registers?bqId=" + encodeURIComponent(bqId))
+                .then(function (response) {
+                    if (!response.ok) {
+                        handleFailure(response);
+                        return Promise.resolve(null);
+                    }
+
+                    return response.json();
+                })
+                .then(function (payload) {
+                    if (!payload) {
+                        return;
+                    }
+
+                    var registers = payload.registers || [];
+
+                    pendingPanel.hidden = false;
+                    pendingEmpty.hidden = registers.length > 0;
+                    pendingRows.textContent = "";
+                    while (pendingRows.firstChild) {
+                        pendingRows.removeChild(pendingRows.firstChild);
+                    }
+
+                    registers.forEach(function (register) {
+                        var row = document.createElement("div");
+                        row.className = "dmo-boquilhas__candidate";
+
+                        var facts = document.createElement("span");
+                        facts.className = "dmo-boquilhas__candidate-facts";
+                        facts.textContent = register.toolReference + " — lote " + register.toolLot +
+                            " · registado em " + register.createdAt + " UTC · " +
+                            register.movementCount + " movimento(s) · pendente " + register.outstanding;
+                        row.appendChild(facts);
+
+                        var associate = document.createElement("button");
+                        associate.className = "dmo-boquilhas__button";
+                        associate.type = "button";
+                        associate.setAttribute("data-dmo-associate-pending", register.boquilhasId);
+                        associate.textContent = "Associar este registo";
+                        row.appendChild(associate);
+
+                        associate.addEventListener("click", function () {
+                            // The explicit human confirmation of the §34 association: the same
+                            // tool_id proves the Tool; only the operator decides the production.
+                            var confirmed = window.confirm(
+                                "Associar o registo pré-JobOn " + register.boquilhasId +
+                                " (" + register.toolReference + " — lote " + register.toolLot + ") " +
+                                "a esta produção? O registo mantém o mesmo número e todo o histórico.");
+
+                            if (!confirmed) {
+                                return;
+                            }
+
+                            send("/boquilhas/registers/" +
+                                encodeURIComponent(register.boquilhasId) + "/associate", {
+                                method: "POST",
+                                body: JSON.stringify({
+                                    bqId: bqId,
+                                    expectedVersion: register.version
+                                })
+                            }).then(function (response) {
+                                if (response.ok) {
+                                    window.location.href = "/boquilhas?boquilhasId=" +
+                                        encodeURIComponent(register.boquilhasId);
+                                    return;
+                                }
+
+                                handleFailure(response);
+                            }, function () {
+                                renderError("Não foi possível contactar o servidor.");
+                            });
+                        });
+                    });
+                }, function () {
+                    renderError("Não foi possível contactar o servidor.");
+                });
+        }
 
         // ---- reference → productions (explicit selection) ----------------------------------
         var searchSubmit = SURFACE.querySelector("[data-dmo-production-search-submit]");
@@ -415,9 +610,17 @@
                         if (selectedBq) {
                             selectedBq.value = bq.contextId;
                         }
+
+                        // §34.1 rule 2: the pending registers of the SAME tool_id are fetched
+                        // ONLY when the production context (bq_id) is present.
+                        loadPendingRegisters(bq.contextId);
                     } else {
                         if (selectedBq) {
                             selectedBq.value = "";
+                        }
+
+                        if (pendingPanel) {
+                            pendingPanel.hidden = true;
                         }
                     }
 
@@ -636,6 +839,10 @@
                     bqPresent.hidden = false;
                     bqMissing.hidden = true;
                     associateBq.hidden = true;
+
+                    // §34.1 rule 2: the BQ context now exists — the pending registers of the
+                    // same tool_id become presentable.
+                    loadPendingRegisters(payload.bqId);
                 }, function () {
                     renderError("A associação ao contexto BQ falhou.");
                 });
@@ -675,5 +882,148 @@
                 });
             });
         }
+
+        // ---- §34.1 rule 1: the TRANSITIONAL pré-JobOn register (provisional tool_id anchor) --
+        var createPendingSubmit = SURFACE.querySelector("[data-dmo-create-pending-submit]");
+        if (createPendingSubmit) {
+            createPendingSubmit.addEventListener("click", function () {
+                var toolId = selectedTool ? selectedTool.value : "";
+
+                if (!toolId) {
+                    renderError("Selecione primeiro a ferramenta BQ na lista de ferramentas.");
+                    return;
+                }
+
+                send("/boquilhas/registers", {
+                    method: "POST",
+                    body: JSON.stringify({ pendingToolId: toolId })
+                }).then(function (response) {
+                    if (!response.ok) {
+                        handleFailure(response);
+                        return Promise.resolve(null);
+                    }
+
+                    return response.json();
+                }).then(function (payload) {
+                    if (!payload) {
+                        return;
+                    }
+
+                    // Success: open the pending register (identity only; zero movements).
+                    window.location.href = "/boquilhas?boquilhasId=" + encodeURIComponent(payload.boquilhasId);
+                }, function () {
+                    renderError("A criação do registo pré-JobOn falhou.");
+                });
+            });
+        }
+    }
+
+    // ------------------------------------------------------------------ definicoes surface
+
+    if (MODE === "definicoes") {
+        wireDefinicoes();
+    }
+
+    // The Boquilhas > Definições adapter: the repairer register + the independent machine
+    // assignments (Owner clarification P2-T07 §34.3). Every write posts the
+    // /boquilhas/definicoes routes; success reloads the page state (D2 recovery stays the same).
+    function wireDefinicoes() {
+        // ---- repairers: add (POST) / rename (PUT, version-guarded) -------------------------
+        var addButton = SURFACE.querySelector("[data-dmo-repairer-add]");
+        if (addButton) {
+            addButton.addEventListener("click", function () {
+                var name = value("[data-dmo-repairer-new-name]");
+
+                send("/boquilhas/definicoes/repairers", {
+                    method: "POST",
+                    body: JSON.stringify({ name: name })
+                }).then(function (response) {
+                    if (response.ok) {
+                        window.location.reload();
+                        return;
+                    }
+
+                    handleFailure(response);
+                }, function () {
+                    renderError("Não foi possível contactar o servidor.");
+                });
+            });
+        }
+
+        SURFACE.querySelectorAll("[data-dmo-repairer-rename-save]").forEach(function (button) {
+            var repairerId = button.getAttribute("data-dmo-repairer-rename-save");
+            var input = SURFACE.querySelector("[data-dmo-repairer-rename='" + repairerId + "']");
+            var version = input
+                ? parseInt(input.getAttribute("data-dmo-repairer-version"), 10) || 1
+                : 1;
+
+            button.addEventListener("click", function () {
+                var name = input ? input.value : "";
+
+                send("/boquilhas/definicoes/repairers/" + encodeURIComponent(repairerId), {
+                    method: "PUT",
+                    body: JSON.stringify({ expectedVersion: version, name: name })
+                }).then(function (response) {
+                    if (response.ok) {
+                        window.location.reload();
+                        return;
+                    }
+
+                    handleFailure(response);
+                }, function () {
+                    renderError("Não foi possível contactar o servidor.");
+                });
+            });
+        });
+
+        // ---- machine assignments: set (PUT with repairerId) / clear (PUT with null) ----------
+        function submitAssignment(machine, repairerId) {
+            var select = SURFACE.querySelector("[data-dmo-assignment-repairer='" + machine + "']");
+            var expectedVersion = select
+                ? parseInt(select.getAttribute("data-dmo-assignment-version"), 10) || 1
+                : 1;
+
+            send("/boquilhas/definicoes/machine-assignments/" + encodeURIComponent(machine), {
+                method: "PUT",
+                body: JSON.stringify({
+                    repairerId: repairerId,
+                    expectedVersion: expectedVersion
+                })
+            }).then(function (response) {
+                if (response.ok) {
+                    window.location.reload();
+                    return;
+                }
+
+                handleFailure(response);
+            }, function () {
+                renderError("Não foi possível contactar o servidor.");
+            });
+        }
+
+        SURFACE.querySelectorAll("[data-dmo-assignment-set]").forEach(function (button) {
+            var machine = button.getAttribute("data-dmo-assignment-set");
+            var select = SURFACE.querySelector("[data-dmo-assignment-repairer='" + machine + "']");
+
+            button.addEventListener("click", function () {
+                var repairerId = select ? select.value : "";
+                submitAssignment(machine, repairerId ? repairerId : null);
+            });
+        });
+
+        SURFACE.querySelectorAll("[data-dmo-assignment-clear]").forEach(function (button) {
+            var machine = button.getAttribute("data-dmo-assignment-clear");
+
+            button.addEventListener("click", function () {
+                var confirmed = window.confirm(
+                    "Limpar a atribuição de reparador da máquina " + machine + "?");
+
+                if (!confirmed) {
+                    return;
+                }
+
+                submitAssignment(machine, null);
+            });
+        });
     }
 })();

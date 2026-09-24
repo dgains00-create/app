@@ -9,10 +9,10 @@
 <script src="~/js/dmo-controlo.js" defer></script>
 
 @*
-    P2-T05 Definições surface (contract §9, §8.7; routes 12–17; post-closure glass-density
+    P2-T05 Definições surface (contract §9, §8.7; routes 15–17; post-closure glass-density
     correction contract §5.3 adds section 6 + routes 18/19).
 
-    One page, six sections (Q-SURF default), inside the Controlo Create working area — NOT a
+    One page, four sections (Q-SURF default), inside the Controlo Create working area — NOT a
     destination, NOT a Module, NOT registered anywhere. Gated by exactly the same `controlo-create`
     policy as every P2-T05 route; only the backend decides (AUT1/AUT2/AC-G1/AC-G2).
 
@@ -27,6 +27,11 @@
     shows the two fixed canonical entries NNPB/PS with the unit g/cm³; a save submits ONE
     processo's value (positive, ≤ 4 decimal places) with the observed version (Owner rule:
     the Tool does not own an editable density).
+
+    Superseded (Owner clarification P2-T07 §34.3 / P2-T05 §31.3): the former sections 1–2
+    (reparadores + reparador por máquina) are REMOVED from this page — the repairer family now
+    belongs to `Boquilhas > Definições` (same physical tables; the Boquilhas surface owns their
+    operation). The PDF/email/glass-density sections are NOT moved and remain here.
 *@
 <section class="dmo-controlo dmo-controlo--definicoes" data-dmo-controlo-surface="definicoes" data-dmo-controlo-root="true">
     @if (Model.LookupFailed)
@@ -36,78 +41,6 @@
                      "Não foi possível obter as definições operacionais.",
                      "Definições")" />
     }
-
-    @* ---- Section 1 — Reparadores (register: name only; add / rename / select; NO delete) ---- *@
-    <div class="dmo-controlo__region" data-dmo-controlo-region="repairers" aria-label="Reparadores">
-        <h2 class="dmo-controlo__section-title">Reparadores</h2>
-        <div class="dmo-controlo__settings-scroll" role="region" tabindex="0" aria-label="Lista de reparadores">
-            <table class="dmo-controlo__settings-table" data-dmo-repairers-table="true">
-                <thead>
-                    <tr><th>Nome</th><th>Versão</th><th>Renomear</th></tr>
-                </thead>
-                <tbody>
-                    @foreach (var repairer in Model.Repairers)
-                    {
-                        <tr data-dmo-repairer-row="@repairer.RepairerId">
-                            <td data-dmo-repairer-name="@repairer.RepairerId">@repairer.Name</td>
-                            <td>@repairer.Version</td>
-                            <td>
-                                <input class="dmo-controlo__input dmo-controlo__input--compact"
-                                       type="text"
-                                       value="@repairer.Name"
-                                       data-dmo-repairer-rename="@repairer.RepairerId"
-                                       data-dmo-repairer-version="@repairer.Version"
-                                       aria-label="Novo nome do reparador" />
-                                <button class="dmo-controlo__button" type="button" data-dmo-repairer-rename-save="@repairer.RepairerId">Renomear</button>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-        <div class="dmo-controlo__settings-form" data-dmo-repairer-add-region="true">
-            <label class="dmo-controlo__label" for="dmo-controlo-repairer-name">Novo reparador</label>
-            <input class="dmo-controlo__input" id="dmo-controlo-repairer-name" type="text" data-dmo-repairer-new-name="true" />
-            <button class="dmo-controlo__button" type="button" data-dmo-repairer-add="true">Adicionar</button>
-        </div>
-    </div>
-
-    @* ---- Section 2 — Reparador por máquina (B1 B2 B3 C1 C2 C3, independent; no grouping) ---- *@
-    <div class="dmo-controlo__region" data-dmo-controlo-region="machine-assignments" aria-label="Reparador por máquina">
-        <h2 class="dmo-controlo__section-title">Reparador por máquina</h2>
-        <div class="dmo-controlo__settings-scroll" role="region" tabindex="0" aria-label="Atribuições por máquina">
-            <table class="dmo-controlo__settings-table" data-dmo-assignments-table="true">
-                <thead>
-                    <tr><th>Máquina</th><th>Reparador</th><th>Guardar</th><th>Limpar</th></tr>
-                </thead>
-                <tbody>
-                    @foreach (var machine in Model.MachineAssignments)
-                    {
-                        var assignedName = Model.Repairers.FirstOrDefault(repairer => repairer.RepairerId.Value == machine.RepairerId)?.Name ?? "—";
-                        <tr data-dmo-assignment-row="@machine.Machine">
-                            <td>@machine.Machine</td>
-                            <td>
-                                <select class="dmo-controlo__input dmo-controlo__input--select"
-                                        data-dmo-assignment-repairer="@machine.Machine"
-                                        data-dmo-assignment-version="@machine.Version"
-                                        aria-label="Reparador da máquina @machine.Machine">
-                                    <option value="" selected="@(machine.RepairerId is null)">— sem reparador —</option>
-                                    @foreach (var repairer in Model.Repairers)
-                                    {
-                                        <option value="@repairer.RepairerId.Value"
-                                                selected="@(machine.RepairerId == repairer.RepairerId.Value)">@repairer.Name</option>
-                                    }
-                                </select>
-                            </td>
-                            <td><button class="dmo-controlo__button" type="button" data-dmo-assignment-set="@machine.Machine">Guardar</button></td>
-                            <td><button class="dmo-controlo__button" type="button" data-dmo-assignment-clear="@machine.Machine">Limpar</button></td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-        <p class="dmo-controlo__hint">Cada máquina tem a sua própria atribuição; não existe agrupamento por linha, e alterar uma máquina não altera as outras.</p>
-    </div>
 
     @* ---- Section 3 — Diretório de PDF/documentos (server-host path; configure/change/check, Q-PDF) ---- *@
     <div class="dmo-controlo__region" data-dmo-controlo-region="pdf-directory" aria-label="Diretório de PDF/documentos">

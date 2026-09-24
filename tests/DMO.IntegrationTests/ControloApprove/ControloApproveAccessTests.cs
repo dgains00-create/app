@@ -32,13 +32,15 @@ public sealed class ControloApproveAccessTests
     ];
 
     /// <summary>The Core P2-T05 routes a Create-only caller MAY reach (positive control) and an
-    /// Approve-only caller must NOT reach (AC-A3) — a representative subset incl. Definições.</summary>
+    /// Approve-only caller must NOT reach (AC-A3) — a representative subset incl. Definições; the
+    /// repairer surface row points at the MOVED gate (<c>Boquilhas > Definições</c>, §34.3 — an
+    /// approve-only caller is denied there too, server-side).</summary>
     private static readonly (string Path, bool RequiresBody)[] CreateRoutes =
     [
         ("/controlo/create", false),
         ("/controlo/create/definicoes", false),
         ("/controlo/create/pesos", true),
-        ("/controlo/create/definicoes/repairers", false),
+        ("/boquilhas/definicoes/repairers", false),
         ("/controlo/create/definicoes/glass-densities", false),
     ];
 

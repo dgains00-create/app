@@ -12,19 +12,28 @@ namespace DMO.Application.Boquilhas;
 
 /// <summary>
 /// The Boquilhas application service: the production movement register — register identity
-/// creation, the three-type movement ledger, edit/audit on the SAME movement, the derived
-/// outstanding and the local Histórico — composing the closed P2-T04/P2-T05 application contracts.
+/// creation (REAL BQ context XOR the transitional pré-JobOn Tool anchor, P2-T07 §34), the
+/// three-type movement ledger, edit/audit on the SAME movement, the derived outstanding, the local
+/// Histórico and the human-confirmed §34 association — composing the closed P2-T04/P2-T05
+/// application contracts.
 /// </summary>
 /// <remarks>
-/// Authority: P2-T07 OWNER CLARIFICATION (the production movement register), preserving: the
-/// production association (every register belongs to a REAL Job On/BQ context; movements remain
-/// valid AFTER the production end date — the production stays the historical context), the
-/// movement vocabulary (Saída / Entrada / Entrada sem reparação), the derived outstanding formula
-/// (Σ Saída − Σ Entrada − Σ Entrada sem reparação; negative is a valid visible projection), the
-/// edit/audit single-event semantics, the immutable dates and the repairer historical preservation.
+/// Authority: P2-T07 OWNER CLARIFICATION (the production movement register), §34 (the transitional
+/// pré-JobOn register on the canonical <c>tool_id</c>; the association presented when a <c>bq_id</c>
+/// whose <c>bq_contexts.tool_id</c> equals the pending anchor arrives; the SAME
+/// <c>boquilhas_id</c> passes to <c>bq_id → jobon_id</c> only after human confirmation — the same
+/// accepted Peso associate pattern of P2-T05 §4.4: the anchor must match, no inference rule),
+/// preserving: the production association (every settled register belongs to a REAL Job On/BQ
+/// context; movements remain valid AFTER the production end date — the production stays the
+/// historical context), the movement vocabulary (Saída / Entrada / Entrada sem reparação), the
+/// derived outstanding formula (Σ Saída − Σ Entrada − Σ Entrada sem reparação; negative is a valid
+/// visible projection), the edit/audit single-event semantics, the immutable dates and the
+/// repairer historical preservation.
 /// <para>
-/// There is NO lifecycle: no close/reopen/opening-facts operation, no status, no one-active rule,
-/// no standalone anchor, and the register creation never manufactures a quantity event. The
+/// There is NO lifecycle: no close/reopen/opening-facts operation, no status, no one-active rule
+/// and no PERMANENT standalone anchor — the only standalone-like state is the transitional §34
+/// pré-JobOn anchor (pending registers are presented with their matching candidates and are never
+/// auto-associated). The register creation never manufactures a quantity event. The
 /// Web layer never queries the database directly; the service never calls a P2-T05/P2-T04/P2-T06-
 /// gated HTTP route. Every persisted-state refusal is a typed <see cref="BoquilhasResult"/>;
 /// actor/time facts are backend-authored and never client-supplied.</para>
@@ -33,6 +42,7 @@ public sealed class BoquilhasService : IBoquilhasService
 {
     private readonly IBoquilhasRepository _boquilhas;
     private readonly IJobOnService _jobOns;
+    private readonly IToolRepository _tools;
     private readonly IRepairerRepository _repairers;
     private readonly IMachineRepairerAssignmentRepository _assignments;
     private readonly IBoquilhasContextRead _bqContexts;
@@ -42,6 +52,7 @@ public sealed class BoquilhasService : IBoquilhasService
     public BoquilhasService(
         IBoquilhasRepository boquilhas,
         IJobOnService jobOns,
+        IToolRepository tools,
         IRepairerRepository repairers,
         IMachineRepairerAssignmentRepository assignments,
         IBoquilhasContextRead bqContexts,
@@ -49,12 +60,14 @@ public sealed class BoquilhasService : IBoquilhasService
     {
         ArgumentNullException.ThrowIfNull(boquilhas);
         ArgumentNullException.ThrowIfNull(jobOns);
+        ArgumentNullException.ThrowIfNull(tools);
         ArgumentNullException.ThrowIfNull(repairers);
         ArgumentNullException.ThrowIfNull(assignments);
         ArgumentNullException.ThrowIfNull(bqContexts);
         ArgumentNullException.ThrowIfNull(currentAccount);
         _boquilhas = boquilhas;
         _jobOns = jobOns;
+        _tools = tools;
         _repairers = repairers;
         _assignments = assignments;
         _bqContexts = bqContexts;
@@ -83,6 +96,7 @@ public sealed class BoquilhasService : IBoquilhasService
             rows.Select(row => new RegisterListItemReadModel(
                 row.BoquilhasId,
                 row.BqId,
+                row.ToolId,
                 row.Reference,
                 row.Lot,
                 row.ProductionNumber,
@@ -192,19 +206,38 @@ public sealed class BoquilhasService : IBoquilhasService
             return new BoquilhasResult.ValidationFailed(errors);
         }
 
-        // Production association: the register anchors a REAL bq_contexts row (never a fake
-        // production/bq id). The repository re-asserts the same check authoritatively inside the
-        // create transaction.
-        if (await _bqContexts.GetBqContextAsync(command.BqId, cancellationToken) is null)
+        // EXACTLY ONE anchor. Production association: the register anchors a REAL bq_contexts row
+        // (never a fake production/bq id). Pré-JobOn (§34.1): the provisional anchor is a REAL
+        // canonical BQ Tool — never a minted identity, never a fake Job On. The repository
+        // re-asserts the anchor existence authoritatively inside the create transaction.
+        if (command.BqId is { } bqId)
         {
-            return new BoquilhasResult.ValidationFailed(
-                [BoquilhasValidationErrors.BqContextNotFound]);
+            if (await _bqContexts.GetBqContextAsync(bqId, cancellationToken) is null)
+            {
+                return new BoquilhasResult.ValidationFailed(
+                    [BoquilhasValidationErrors.BqContextNotFound]);
+            }
+        }
+        else
+        {
+            var tool = await _tools.GetByIdAsync(command.PendingToolId!.Value, cancellationToken);
+            if (tool is null)
+            {
+                return new BoquilhasResult.ValidationFailed(
+                    [BoquilhasValidationErrors.ToolNotFound]);
+            }
+
+            if (tool.Type != ToolType.Bq)
+            {
+                return new BoquilhasResult.ValidationFailed(
+                    [BoquilhasValidationErrors.ToolTypeMismatch]);
+            }
         }
 
         try
         {
             var created = await _boquilhas.CreatedAsync(
-                new BoqCreateUnit(command.BqId, command.CreatedByUserId),
+                new BoqCreateUnit(command.BqId, command.PendingToolId, command.CreatedByUserId),
                 cancellationToken);
 
             return new BoquilhasResult.RegisterCreated(created.BoquilhasId.Value);
@@ -217,6 +250,151 @@ public sealed class BoquilhasService : IBoquilhasService
         {
             return Map(exception);
         }
+    }
+
+    // ------------------------------------------------------------------ association (P2-T07 §34.1 rules 2–3)
+
+    /// <inheritdoc />
+    public async Task<BoquilhasResult> AssociateAsync(
+        AssociateBoquilhasCommand command,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        var errors = BoquilhasValidator.Validate(command);
+        if (errors.Count > 0)
+        {
+            return new BoquilhasResult.ValidationFailed(errors);
+        }
+
+        var register = await _boquilhas.GetByIdAsync(command.BoquilhasId, cancellationToken);
+        if (register is null)
+        {
+            return new BoquilhasResult.NotFound(command.BoquilhasId);
+        }
+
+        // Association is offered only while pending (§34.1 rule 2): a production-linked register
+        // is never silently re-associated — the provisional anchor is never kept as a concurrent
+        // operational authority.
+        if (!register.IsPending)
+        {
+            return Refuse(
+                BoquilhasRefusalReason.AlreadyAssociated,
+                "Este registo já está associado a uma produção; a associação só é oferecida enquanto o registo está pendente.");
+        }
+
+        if (register.Version != command.ExpectedVersion)
+        {
+            return Refuse(
+                BoquilhasRefusalReason.StaleVersion,
+                $"O registo foi alterado depois de observado (versão esperada {command.ExpectedVersion}, atual {register.Version}); nada foi associado.");
+        }
+
+        // The candidate bq_id must exist (BQ_CONTEXT_NOT_FOUND) and must resolve to the register's
+        // pending tool_id (ASSOCIATION_MISMATCH) — the SAME canonical UUID proves the SAME Tool
+        // (§34.1 rule 2; the anchor must match; no inference rule, never a guess by
+        // reference/lote/máquina/texto).
+        var target = await _bqContexts.GetBqContextAsync(command.BqId, cancellationToken);
+        if (target is null)
+        {
+            return new BoquilhasResult.ValidationFailed(
+                [BoquilhasValidationErrors.BqContextNotFound]);
+        }
+
+        if (target.ToolId != register.ToolId)
+        {
+            return Refuse(
+                BoquilhasRefusalReason.AssociationMismatch,
+                "O contexto BQ indicado não corresponde ao tool_id pendente deste registo; a associação foi recusada (a aplicação nunca adivinha).");
+        }
+
+        try
+        {
+            // The repository performs the guarded SAME-row UPDATE (bq_id set, provisional tool
+            // anchor cleared, version + 1) in one transaction — no new aggregate, no copied
+            // movements, no fake Job On.
+            var associated = await _boquilhas.AssociatedAsync(
+                command.BoquilhasId,
+                command.BqId,
+                command.ExpectedVersion,
+                cancellationToken);
+
+            return new BoquilhasResult.Associated(
+                associated.BoquilhasId.Value,
+                associated.Version,
+                associated.BqId!.Value);
+        }
+        catch (ConcurrencyConflictException exception)
+        {
+            return Refuse(BoquilhasRefusalReason.StaleVersion, exception.Message);
+        }
+        catch (BoquilhasPersistenceException exception)
+        {
+            return Map(exception);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<BoquilhasResult> GetAssociationCandidatesAsync(
+        Guid boquilhasId,
+        CancellationToken cancellationToken)
+    {
+        var register = await _boquilhas.GetByIdAsync(boquilhasId, cancellationToken);
+        if (register is null)
+        {
+            return new BoquilhasResult.NotFound(boquilhasId);
+        }
+
+        // A production-linked register has no candidates: the association point is past. The
+        // truthful empty is returned (the surface presents no association panel for it).
+        if (!register.IsPending)
+        {
+            return new BoquilhasResult.AssociationCandidatesFound([]);
+        }
+
+        var candidates = await _boquilhas.ListBqAssociationCandidatesAsync(
+            register.ToolId!.Value,
+            cancellationToken);
+
+        return new BoquilhasResult.AssociationCandidatesFound(
+            candidates.Select(candidate => new BqAssociationCandidateReadModel(
+                candidate.BqId,
+                candidate.JobOnId,
+                candidate.Reference,
+                candidate.ProductionNumber,
+                candidate.Machine,
+                candidate.ProductionDate))
+                .ToList());
+    }
+
+    /// <inheritdoc />
+    public async Task<BoquilhasResult> GetPendingRegistersAsync(
+        Guid bqId,
+        CancellationToken cancellationToken)
+    {
+        // The §34.1 rule-2 read in the Job-On-incoming direction: the context arrives as bq_id →
+        // tool_id (NEVER "which Job On do I belong to?" — no global scan); the pending registers
+        // of THAT canonical Tool are the specific query result.
+        var context = await _bqContexts.GetBqContextAsync(bqId, cancellationToken);
+        if (context is null)
+        {
+            return new BoquilhasResult.ValidationFailed(
+                [BoquilhasValidationErrors.BqContextNotFound]);
+        }
+
+        var pending = await _boquilhas.ListPendingRegistersAsync(context.ToolId, cancellationToken);
+
+        return new BoquilhasResult.PendingRegistersFound(
+            pending.Select(candidate => new PendingRegisterCandidateReadModel(
+                candidate.BoquilhasId,
+                candidate.ToolId,
+                candidate.ToolReference,
+                candidate.ToolLot,
+                candidate.Version,
+                candidate.CreatedAt,
+                candidate.MovementCount,
+                candidate.Outstanding))
+                .ToList());
     }
 
     // ------------------------------------------------------------------ append (route 5)
@@ -528,36 +706,59 @@ public sealed class BoquilhasService : IBoquilhasService
     /// <summary>
     /// Builds the register ficha: the register facts plus the production context via the REAL
     /// <c>bq_id → bq_contexts → job_ons</c> chain (frozen triple + production facts) — the accepted
-    /// read-only composition pattern (no foreign writes, no cross-module HTTP).
+    /// read-only composition pattern (no foreign writes, no cross-module HTTP) — or, while the
+    /// register is pending (§34), the canonical Tool facts of the provisional anchor.
     /// </summary>
     private async Task<RegisterFichaReadModel> BuildFichaAsync(
         BoquilhaRegister register,
         CancellationToken cancellationToken)
     {
         AnchorContextReadModel? anchor = null;
+        PendingToolFactsReadModel? pendingTool = null;
         ProductionContextReadModel? production = null;
         string? reference = null;
         string? lot = null;
 
-        var context = await _bqContexts.GetBqContextAsync(register.BqId, cancellationToken);
-        if (context is not null)
+        if (register.IsPending)
         {
-            anchor = new AnchorContextReadModel(
-                context.ToolId,
-                context.ToolType,
-                context.ToolReference,
-                context.ToolLot);
-            reference = context.ToolReference;
-            lot = context.ToolLot;
-
-            var jobOnResult = await _jobOns.GetAsync(context.JobOnId, cancellationToken);
-            if (jobOnResult is JobOnResult.Ficha(var jobOnFicha))
+            // The transitional pré-JobOn state: the canonical BQ Tool row IS the anchor (§34.1).
+            if (register.ToolId is { } toolId)
             {
-                production = new ProductionContextReadModel(
-                    jobOnFicha.Reference,
-                    jobOnFicha.ProductionNumber,
-                    jobOnFicha.Machine,
-                    jobOnFicha.ProductionDate);
+                var tool = await _tools.GetByIdAsync(toolId, cancellationToken);
+                if (tool is not null)
+                {
+                    pendingTool = new PendingToolFactsReadModel(
+                        tool.ToolId.Value,
+                        ToolTokens.ToToken(tool.Type),
+                        tool.Reference,
+                        tool.Lot);
+                    reference = tool.Reference;
+                    lot = tool.Lot;
+                }
+            }
+        }
+        else if (register.BqId is { } bqId)
+        {
+            var context = await _bqContexts.GetBqContextAsync(bqId, cancellationToken);
+            if (context is not null)
+            {
+                anchor = new AnchorContextReadModel(
+                    context.ToolId,
+                    context.ToolType,
+                    context.ToolReference,
+                    context.ToolLot);
+                reference = context.ToolReference;
+                lot = context.ToolLot;
+
+                var jobOnResult = await _jobOns.GetAsync(context.JobOnId, cancellationToken);
+                if (jobOnResult is JobOnResult.Ficha(var jobOnFicha))
+                {
+                    production = new ProductionContextReadModel(
+                        jobOnFicha.Reference,
+                        jobOnFicha.ProductionNumber,
+                        jobOnFicha.Machine,
+                        jobOnFicha.ProductionDate);
+                }
             }
         }
 
@@ -590,12 +791,15 @@ public sealed class BoquilhasService : IBoquilhasService
         return new RegisterFichaReadModel(
             register.BoquilhasId.Value,
             register.BqId,
+            register.ToolId,
             reference,
             lot,
             register.Outstanding,
             register.CreatedByUserId,
             register.CreatedAt,
+            register.Version,
             anchor,
+            pendingTool,
             production,
             movements);
     }
@@ -645,10 +849,15 @@ public sealed class BoquilhasService : IBoquilhasService
             BoquilhasPersistenceFailureReason.RegisterExists => Refuse(
                 BoquilhasRefusalReason.RegisterExists,
                 "Já existe um registo de Boquilhas para esta produção; nada foi criado."),
+            BoquilhasPersistenceFailureReason.AlreadyAssociated => Refuse(
+                BoquilhasRefusalReason.AlreadyAssociated,
+                "Este registo já está associado a uma produção; a associação só é oferecida enquanto o registo está pendente."),
             BoquilhasPersistenceFailureReason.ConstraintViolation => new BoquilhasResult.ValidationFailed(
                 [exception.ValidatorToken ?? BoquilhasValidationErrors.FilterInvalid]),
             BoquilhasPersistenceFailureReason.BqContextNotFound => new BoquilhasResult.ValidationFailed(
                 [BoquilhasValidationErrors.BqContextNotFound]),
+            BoquilhasPersistenceFailureReason.ToolNotFound => new BoquilhasResult.ValidationFailed(
+                [BoquilhasValidationErrors.ToolNotFound]),
             BoquilhasPersistenceFailureReason.RepairerNotFound => new BoquilhasResult.ValidationFailed(
                 [BoquilhasValidationErrors.RepairerNotFound]),
             _ => throw new ArgumentOutOfRangeException(

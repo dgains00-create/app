@@ -13,33 +13,40 @@ namespace DMO.Infrastructure.Persistence;
 
 /// <summary>
 /// <see cref="IBoquilhasRepository"/> implementation over the single application persistence
-/// context: the register identity, the movement history, the filtered list/history queries and
-/// the guarded movement edit.
+/// context: the register identity, the movement history, the filtered list/history queries, the
+/// guarded movement edit and the §34 pré-JobOn anchor + association write.
 /// </summary>
 /// <remarks>
 /// <para>
 /// Authority: P2-T07 OWNER CLARIFICATION. Boquilhas is a historical movement register associated
 /// with a REAL production: the register row (<c>boquilhas</c>) merely identifies the production/BQ
-/// context (one register per <c>bq_id</c>, plain UNIQUE key) and manufactures NO quantity event;
-/// movements are recorded while the production runs AND after it has ended (the production stays
-/// the historical context — no end-date rejection exists anywhere). The ledger is a historical
-/// fact set: the outstanding repair quantity is derived by replay at read time
-/// (Σ Saída − Σ Entrada − Σ Entrada sem reparação) and never stored.
+/// context (one register per <c>bq_id</c>, plain UNIQUE key) — or, transitionally, the canonical
+/// BQ <c>tool_id</c> while no Job On exists (P2-T07 §34.1: the pré-JobOn anchor; <c>bq_id</c> NULL,
+/// DB CHECK <c>boquilhas_anchor_check</c>: exactly one anchor) — and manufactures NO quantity
+/// event; movements are recorded while the production runs AND after it has ended (the production
+/// stays the historical context — no end-date rejection exists anywhere).
+/// </para>
+/// <para>
+/// The §34 association write is the ONLY register-row UPDATE: the same <c>boquilhas_id</c> passes
+/// to the REAL <c>bq_id</c> whose <c>bq_contexts.tool_id</c> equals the pending anchor, the
+/// provisional <c>tool_id</c> is cleared and <c>version</c> bumps once; movements already recorded
+/// keep their facts — nothing is migrated, rewritten or replayed (§34.1 rule 3).
 /// </para>
 /// <para>
 /// <b>Superseded (Owner clarification):</b> NO lifecycle state machine exists — no status
 /// active/closed, no close/reopen operations, no close snapshots/reopening rows, no
 /// one-active-aggregate-per-anchor invariant, NO ACTIVE partial unique indexes and NO
-/// <c>23505 → ActiveAggregateExists</c> mapping (and no replace-with-another-lock): the problem
-/// those solved no longer exists. Appends are unversioned inserts (the derived sum cannot be
-/// corrupted by races). Edits keep the per-movement optimistic-concurrency token + the
-/// before/after audit row, all in one transaction (no second quantity event).
+/// <c>23505 → ActiveAggregateExists</c> mapping: the PERMANENT standalone model is removed; the
+/// only standalone-like state is the transitional §34 pré-JobOn anchor. Appends are unversioned
+/// inserts (the derived sum cannot be corrupted by races). Edits keep the per-movement
+/// optimistic-concurrency token + the before/after audit row, all in one transaction (no second
+/// quantity event).
 /// </para>
 /// <para>
 /// Constraint mapping (binding rules): 23514 → the same validator token (never a 500); 23505 on
 /// the register's <c>bq_id</c> unique key → <c>Refused(RegisterExists)</c>; 23503 on the
 /// anchor/repairer FKs → the typed anchor tokens. The History/list traversal follows the accepted
-/// read-only entity-set composition pattern over <c>bq_contexts</c>/<c>job_ons</c>.
+/// read-only entity-set composition pattern over <c>bq_contexts</c>/<c>tools</c>/<c>job_ons</c>.
 /// </para>
 /// </remarks>
 public sealed class BoquilhasRepository : IBoquilhasRepository
@@ -69,6 +76,8 @@ public sealed class BoquilhasRepository : IBoquilhasRepository
     private IQueryable<JobOnEntity> JobOns => _context.Set<JobOnEntity>();
 
     private IQueryable<RepairerEntity> Repairers => _context.Set<RepairerEntity>();
+
+    private IQueryable<ToolEntity> Tools => _context.Set<ToolEntity>();
 
     // ================================================================== reads
 
@@ -172,6 +181,78 @@ public sealed class BoquilhasRepository : IBoquilhasRepository
             .ToListAsync(cancellationToken);
     }
 
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<BqAssociationCandidate>> ListBqAssociationCandidatesAsync(
+        Guid toolId,
+        CancellationToken cancellationToken)
+    {
+        // The §34.1 rule-2 candidate read (light packet): ONE context-specific statement keyed by
+        // the register's own provisional tool_id — every REAL bq_contexts row with that canonical
+        // UUID, joined to the REAL Job On production facts. No global scan, no load-then-filter.
+        return await (from context in BqContexts.AsNoTracking()
+                      join occurrence in JobOns.AsNoTracking()
+                          on context.JobOnId equals occurrence.JobOnId
+                      where context.ToolId == toolId
+                      orderby occurrence.Reference, occurrence.ProductionNumber
+                      select new BqAssociationCandidate(
+                          context.BqId,
+                          occurrence.JobOnId,
+                          occurrence.Reference,
+                          occurrence.ProductionNumber,
+                          occurrence.Machine,
+                          occurrence.ProductionDate))
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<PendingRegisterCandidate>> ListPendingRegistersAsync(
+        Guid toolId,
+        CancellationToken cancellationToken)
+    {
+        // The §34.1 rule-2 read (Job-On-incoming direction): ONE context-specific statement keyed
+        // by the canonical tool_id — the pending (pré-JobOn) registers of that Tool with the
+        // canonical Tool's current reference/lot. The derived movement facts come from the bounded
+        // batched ledger read below; the history itself is only fetched when opened.
+        var rows = await (from register in Registers.AsNoTracking()
+                          join tool in Tools.AsNoTracking()
+                              on register.ToolId equals tool.ToolId
+                          where register.ToolId == toolId && register.BqId == null
+                          orderby register.CreatedAt, register.BoquilhasId
+                          select new { register, tool })
+            .ToListAsync(cancellationToken);
+
+        if (rows.Count == 0)
+        {
+            return [];
+        }
+
+        var registerIds = rows.Select(row => row.register.BoquilhasId).ToList();
+
+        var ledgers = await Movements.AsNoTracking()
+            .Where(movement => registerIds.Contains(movement.BoquilhasId))
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(row =>
+            {
+                var ledger = ledgers
+                    .Where(movement => movement.BoquilhasId == row.register.BoquilhasId)
+                    .Select(Project)
+                    .ToList();
+
+                return new PendingRegisterCandidate(
+                    row.register.BoquilhasId,
+                    row.register.ToolId!.Value,
+                    row.tool.Reference,
+                    row.tool.Lot,
+                    row.register.Version,
+                    row.register.CreatedAt,
+                    ledger.Count,
+                    OutstandingProjection.Replay(ledger));
+            })
+            .ToList();
+    }
+
     // ================================================================== create — the register identity (route 4)
 
     /// <inheritdoc />
@@ -187,17 +268,34 @@ public sealed class BoquilhasRepository : IBoquilhasRepository
 
         try
         {
-            // Production association, authoritatively inside the transaction: the register anchors
-            // a REAL bq_contexts row (never a fake production/bq id).
-            var contextExists = await BqContexts
-                .AsNoTracking()
-                .AnyAsync(context => context.BqId == unit.BqId, cancellationToken);
-
-            if (!contextExists)
+            // EXACTLY ONE anchor, authoritatively inside the transaction (§34.1). Production
+            // association: the register anchors a REAL bq_contexts row (never a fake production/bq
+            // id). Pré-JobOn: the provisional anchor is a REAL canonical tools row (FK backstop).
+            if (unit.BqId is { } bqId)
             {
-                throw new BoquilhasPersistenceException(
-                    BoquilhasPersistenceFailureReason.BqContextNotFound,
-                    "O contexto BQ indicado não existe; nada foi criado.");
+                var contextExists = await BqContexts
+                    .AsNoTracking()
+                    .AnyAsync(context => context.BqId == bqId, cancellationToken);
+
+                if (!contextExists)
+                {
+                    throw new BoquilhasPersistenceException(
+                        BoquilhasPersistenceFailureReason.BqContextNotFound,
+                        "O contexto BQ indicado não existe; nada foi criado.");
+                }
+            }
+            else
+            {
+                var toolExists = await Tools
+                    .AsNoTracking()
+                    .AnyAsync(tool => tool.ToolId == unit.PendingToolId, cancellationToken);
+
+                if (!toolExists)
+                {
+                    throw new BoquilhasPersistenceException(
+                        BoquilhasPersistenceFailureReason.ToolNotFound,
+                        "A ferramenta pendente indicada não existe; nada foi criado.");
+                }
             }
 
             // The single register identity row — NO quantity movement is manufactured to
@@ -208,6 +306,8 @@ public sealed class BoquilhasRepository : IBoquilhasRepository
             {
                 BoquilhasId = registerId,
                 BqId = unit.BqId,
+                ToolId = unit.PendingToolId,
+                Version = 1,
                 CreatedByUserId = unit.CreatedByUserId,
                 CreatedAt = now,
             });
@@ -218,6 +318,77 @@ public sealed class BoquilhasRepository : IBoquilhasRepository
             return await GetByIdAsync(registerId, cancellationToken)
                 ?? throw new InvalidOperationException(
                     $"The created register '{registerId}' could not be read back after commit.");
+        }
+        catch (DbUpdateException exception) when (TryMapWriteFailure(exception, out var failure))
+        {
+            await SafeRollbackAsync(transaction, cancellationToken);
+            _context.ChangeTracker.Clear();
+            throw failure;
+        }
+    }
+
+    // ================================================================== association (P2-T07 §34.1 rules 2–3)
+
+    /// <inheritdoc />
+    public async Task<BoquilhaRegister> AssociatedAsync(
+        Guid boquilhasId,
+        Guid bqId,
+        int expectedVersion,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            var register = await Registers
+                .FirstOrDefaultAsync(candidate => candidate.BoquilhasId == boquilhasId, cancellationToken)
+                ?? throw new ConcurrencyConflictException(
+                    $"O registo '{boquilhasId}' já não existe; nada foi associado.");
+
+            // Association is offered only while pending (§34.1 rule 2): a production-linked
+            // register is never silently re-associated and the provisional anchor is never kept as
+            // a concurrent authority.
+            if (register.BqId is not null)
+            {
+                throw new BoquilhasPersistenceException(
+                    BoquilhasPersistenceFailureReason.AlreadyAssociated,
+                    "Este registo já está associado a uma produção; a associação só é oferecida enquanto o registo está pendente.");
+            }
+
+            if (register.Version != expectedVersion)
+            {
+                throw new ConcurrencyConflictException(
+                    $"O registo '{boquilhasId}' foi alterado em concorrência " +
+                    $"(versão esperada {expectedVersion}, atual {register.Version}); " +
+                    "recarregue e tente novamente.");
+            }
+
+            // The candidate bq_id must resolve to a REAL bq_contexts row (its tool_id equality
+            // with the pending anchor is re-asserted by the application service; the FK is the
+            // authoritative backstop).
+            var contextExists = await BqContexts
+                .AsNoTracking()
+                .AnyAsync(context => context.BqId == bqId, cancellationToken);
+
+            if (!contextExists)
+            {
+                throw new BoquilhasPersistenceException(
+                    BoquilhasPersistenceFailureReason.BqContextNotFound,
+                    "O contexto BQ indicado não existe; nada foi associado.");
+            }
+
+            // The SAME register row: bq_id set, provisional tool anchor cleared, version + 1.
+            // Movements already recorded keep their facts — nothing is migrated or rewritten.
+            register.BqId = bqId;
+            register.ToolId = null;
+            register.Version += 1;
+
+            await SaveAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            return await GetByIdAsync(boquilhasId, cancellationToken)
+                ?? throw new InvalidOperationException(
+                    $"The associated register '{boquilhasId}' could not be read back after commit.");
         }
         catch (DbUpdateException exception) when (TryMapWriteFailure(exception, out var failure))
         {
@@ -260,7 +431,8 @@ public sealed class BoquilhasRepository : IBoquilhasRepository
             // A Saída records WHO repairs and ON WHICH line: machine + repairer required. Entradas
             // (repaired OR unrepaired returns) are plain factual returns — never validated against
             // a derived quantity and never refused because the production has ended (the
-            // production stays the historical context).
+            // production stays the historical context). Movements are equally valid on a pending
+            // (§34) register — the movement's own facts are the record.
             if (kind == MovementKind.Saida)
             {
                 if (unit.Machine is null)
@@ -503,7 +675,8 @@ public sealed class BoquilhasRepository : IBoquilhasRepository
     // ================================================================== query composition
 
     /// <summary>The register list predicates (route 1): optional reference/lot traversal through
-    /// the REAL frozen BQ triple.</summary>
+    /// the REAL frozen BQ triple (a pending register has no triple and is not matched by a
+    /// traversal filter).</summary>
     private IQueryable<BoquilhaEntity> ApplyListPredicates(BoquilhasListQuery query)
     {
         var filtered = Registers.AsNoTracking();
@@ -577,9 +750,9 @@ public sealed class BoquilhasRepository : IBoquilhasRepository
     }
 
     /// <summary>
-    /// Composes the register list rows: the production context traversal, the movement count /
-    /// last movement and the derived outstanding — batched reads, no N+1 (the accepted
-    /// <c>ComposeRowsAsync</c> pattern).
+    /// Composes the register list rows: the production context traversal (or the pending Tool
+    /// facts), the movement count / last movement and the derived outstanding — batched reads, no
+    /// N+1 (the accepted <c>ComposeRowsAsync</c> pattern).
     /// </summary>
     private async Task<IReadOnlyList<RegisterListItem>> ComposeListRowsAsync(
         IReadOnlyList<BoquilhaEntity> page,
@@ -613,6 +786,7 @@ public sealed class BoquilhasRepository : IBoquilhasRepository
                 return new RegisterListItem(
                     register.BoquilhasId,
                     register.BqId,
+                    register.ToolId,
                     traversal?.Reference,
                     traversal?.Lot,
                     traversal?.ProductionNumber,
@@ -668,8 +842,10 @@ public sealed class BoquilhasRepository : IBoquilhasRepository
     }
 
     /// <summary>
-    /// The production-context traversal facts of one page: the frozen BQ triple and the REAL Job On
-    /// production facts through <c>bq_id → bq_contexts → job_ons</c> — batched reads only.
+    /// The context traversal facts of one page: for production-linked registers the frozen BQ
+    /// triple and the REAL Job On production facts through <c>bq_id → bq_contexts → job_ons</c>; for
+    /// pending (§34) registers the canonical Tool's current reference/lot (the live <c>tools</c>
+    /// row — the anchor itself, never a copy) — batched reads only.
     /// </summary>
     private async Task<Dictionary<Guid, TraversalFacts>> LoadTraversalFactsAsync(
         IReadOnlyList<BoquilhaEntity> page,
@@ -682,44 +858,97 @@ public sealed class BoquilhasRepository : IBoquilhasRepository
             return facts;
         }
 
-        var bqIds = page.Select(register => register.BqId).ToList();
+        var bqIds = page
+            .Where(register => register.BqId is not null)
+            .Select(register => register.BqId!.Value)
+            .ToList();
 
-        var contexts = await BqContexts.AsNoTracking()
-            .Where(context => bqIds.Contains(context.BqId))
-            .Select(context => new { context.BqId, context.JobOnId, context.ToolReference, context.ToolLot })
-            .ToListAsync(cancellationToken);
+        Dictionary<Guid, BqContextTraversal>? contexts = null;
 
-        var jobOnIds = contexts.Select(context => context.JobOnId).Distinct().ToList();
-
-        var productions = await JobOns.AsNoTracking()
-            .Where(occurrence => jobOnIds.Contains(occurrence.JobOnId))
-            .Select(occurrence => new
-            {
-                occurrence.JobOnId,
-                occurrence.Reference,
-                occurrence.ProductionNumber,
-                occurrence.Machine,
-                occurrence.ProductionDate,
-            })
-            .ToListAsync(cancellationToken);
-
-        foreach (var register in page)
+        if (bqIds.Count > 0)
         {
-            var context = contexts.FirstOrDefault(candidate => candidate.BqId == register.BqId);
-            if (context is null)
+            contexts = await BqContexts.AsNoTracking()
+                .Where(context => bqIds.Contains(context.BqId))
+                .Select(context => new
+                {
+                    context.BqId,
+                    context.JobOnId,
+                    context.ToolReference,
+                    context.ToolLot,
+                })
+                .ToDictionaryAsync(context => context.BqId, context => new BqContextTraversal(
+                    context.ToolReference, context.ToolLot, context.JobOnId), cancellationToken);
+
+            var jobOnIds = contexts.Values.Select(context => context.JobOnId).Distinct().ToList();
+
+            var productions = await JobOns.AsNoTracking()
+                .Where(occurrence => jobOnIds.Contains(occurrence.JobOnId))
+                .Select(occurrence => new
+                {
+                    occurrence.JobOnId,
+                    occurrence.Reference,
+                    occurrence.ProductionNumber,
+                    occurrence.Machine,
+                    occurrence.ProductionDate,
+                })
+                .ToListAsync(cancellationToken);
+
+            foreach (var register in page)
             {
-                continue;
+                if (register.BqId is not { } bqId
+                    || contexts is null
+                    || !contexts.TryGetValue(bqId, out var context))
+                {
+                    continue;
+                }
+
+                var production = productions.FirstOrDefault(candidate => candidate.JobOnId == context.JobOnId);
+
+                facts[register.BoquilhasId] = new TraversalFacts(
+                    context.Reference,
+                    context.Lot,
+                    production?.Reference,
+                    production?.ProductionNumber,
+                    production?.Machine,
+                    production?.ProductionDate);
             }
+        }
 
-            var production = productions.FirstOrDefault(candidate => candidate.JobOnId == context.JobOnId);
+        // The pending (§34) registers: the canonical Tool facts of the provisional anchor.
+        var toolIds = page
+            .Where(register => register.BqId is null && register.ToolId is not null)
+            .Select(register => register.ToolId!.Value)
+            .Distinct()
+            .ToList();
 
-            facts[register.BoquilhasId] = new TraversalFacts(
-                context.ToolReference,
-                context.ToolLot,
-                production?.Reference,
-                production?.ProductionNumber,
-                production?.Machine,
-                production?.ProductionDate);
+        if (toolIds.Count > 0)
+        {
+            var tools = await Tools.AsNoTracking()
+                .Where(tool => toolIds.Contains(tool.ToolId))
+                .Select(tool => new { tool.ToolId, tool.Reference, tool.Lot })
+                .ToListAsync(cancellationToken);
+
+            foreach (var register in page)
+            {
+                if (register.BqId is not null || register.ToolId is not { } toolId || facts.ContainsKey(register.BoquilhasId))
+                {
+                    continue;
+                }
+
+                var tool = tools.FirstOrDefault(candidate => candidate.ToolId == toolId);
+                if (tool is null)
+                {
+                    continue;
+                }
+
+                facts[register.BoquilhasId] = new TraversalFacts(
+                    tool.Reference,
+                    tool.Lot,
+                    ProductionReference: null,
+                    ProductionNumber: null,
+                    ProductionMachine: null,
+                    ProductionDate: null);
+            }
         }
 
         return facts;
@@ -744,6 +973,8 @@ public sealed class BoquilhasRepository : IBoquilhasRepository
         return new BoquilhaRegister(
             BoquilhasId.From(entity.BoquilhasId),
             entity.BqId,
+            entity.ToolId,
+            entity.Version,
             entity.CreatedByUserId,
             entity.CreatedAt,
             movementRows);
@@ -830,6 +1061,18 @@ public sealed class BoquilhasRepository : IBoquilhasRepository
 
                 if (string.Equals(
                         postgresException.ConstraintName,
+                        BoquilhaEntityConfiguration.ToolForeignKeyConstraintName,
+                        StringComparison.Ordinal))
+                {
+                    failure = new BoquilhasPersistenceException(
+                        BoquilhasPersistenceFailureReason.ToolNotFound,
+                        "A ferramenta pendente referenciada deixou de existir; nada foi guardado.",
+                        exception);
+                    return true;
+                }
+
+                if (string.Equals(
+                        postgresException.ConstraintName,
                         BoquilhaMovementEntityConfiguration.RepairerForeignKeyConstraintName,
                         StringComparison.Ordinal))
                 {
@@ -849,7 +1092,7 @@ public sealed class BoquilhasRepository : IBoquilhasRepository
     /// <summary>
     /// The 23514 constraint-name → validator-token table: every validator-backed CHECK maps to the
     /// SAME token the validator raises first. Internal-invariant CHECKs that no application path
-    /// can violate (version) are deliberately not mapped — the accepted P2-T06 posture.
+    /// can violate (version, anchor XOR) are deliberately not mapped — the accepted P2-T06 posture.
     /// </summary>
     private static bool TryMapCheckViolation(string? constraintName, out string token)
     {
@@ -898,6 +1141,8 @@ public sealed class BoquilhasRepository : IBoquilhasRepository
             // The transaction is already aborted by the server.
         }
     }
+
+    private sealed record BqContextTraversal(string Reference, string Lot, Guid JobOnId);
 
     private sealed record TraversalFacts(
         string Reference,

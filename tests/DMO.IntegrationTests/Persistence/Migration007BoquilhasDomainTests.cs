@@ -34,11 +34,14 @@ public sealed class Migration007BoquilhasDomainTests
     /// <summary>EF's own migration bookkeeping table (never a product table).</summary>
     private const string MigrationHistoryTable = "__EFMigrationsHistory";
 
-    /// <summary>The seventh migration (this slice owns it — the corrected OWNER pair).</summary>
+    /// <summary>The seventh migration (this slice owns the corrected OWNER pair).</summary>
     private const string BoquilhasMigrationId = "20260924051151_BoquilhasDomain";
 
     /// <summary>The migration the seventh applies ON TOP of (the Down target).</summary>
     private const string ControloApproveMigrationId = "20260923171223_ControloApproveDomain";
+
+    /// <summary>The eighth migration — the §34 OWNER-clarification delta (pré-JobOn anchor).</summary>
+    private const string BoquilhasPreJobonMigrationId = "20260924130151_BoquilhasPreJobonAssociation";
 
     /// <summary>The THREE final Boquilhas tables.</summary>
     private static readonly string[] ThreeTables =
@@ -48,7 +51,7 @@ public sealed class Migration007BoquilhasDomainTests
         "boquilhas",
     ];
 
-    /// <summary>The seven migrations, in generation order.</summary>
+    /// <summary>The eight migrations, in generation order.</summary>
     private static readonly string[] AllMigrationIds =
     [
         "20260922001736_AccountAndTemplateFoundation",
@@ -58,13 +61,14 @@ public sealed class Migration007BoquilhasDomainTests
         "20260923122429_GlassDensitySettings",
         ControloApproveMigrationId,
         BoquilhasMigrationId,
+        BoquilhasPreJobonMigrationId,
     ];
 
     /// <summary>
-    /// MG1 (AC-MG1, corrected) — applying all seven migrations to a reset schema leaves exactly the
-    /// seven contracted migrations in <c>__EFMigrationsHistory</c> and 24 raw tables (23 product
-    /// tables: 20 closed + exactly THREE Boquilhas tables, plus EF's history row — the final table
-    /// count to report).
+    /// MG1 (AC-MG1, corrected) — applying all eight migrations to a reset schema leaves exactly the
+    /// eight contracted migrations in <c>__EFMigrationsHistory</c> and 24 raw tables (23 product
+    /// tables: 20 closed + exactly THREE Boquilhas tables — migration 008 alters the register, it
+    /// adds no table — plus EF's history row — the final table count to report).
     /// </summary>
     [SkippableFact]
     public async Task MG1_ExactlyThreeNewTablesAndTheSeventhMigrationAreApplied()
@@ -156,10 +160,12 @@ public sealed class Migration007BoquilhasDomainTests
     }
 
     /// <summary>
-    /// MG2 (AC-MG2, corrected) — the three tables' columns/CHECKs/FKs match the register model: the
-    /// exact column sets (no <c>status</c>/<c>tool_id</c>/opening-facts on <c>boquilhas</c>; no
-    /// expected/excess on movements), the exact CHECK names (the closed three-type set, the
-    /// Saída-required rule) and <c>confdeltype='r'</c> (no cascade).
+    /// MG2 (AC-MG2, corrected; §34 delta) — the three tables' columns/CHECKs/FKs match the register
+    /// model: the exact column sets (the register identity row with the TRANSITIONAL pré-JobOn
+    /// anchor — <c>tool_id</c> nullable + <c>bq_id</c> nullable by the exactly-one-anchor CHECK of
+    /// migration 008 — and no <c>status</c>/opening-facts; no expected/excess on movements), the
+    /// exact CHECK names (the closed three-type set, the Saída-required rule, the anchor XOR and
+    /// the version token) and <c>confdeltype='r'</c> (no cascade).
     /// </summary>
     [SkippableFact]
     public async Task MG2_TheBoquilhasConstraintsMatchTheRegisterModelExactly()
@@ -170,7 +176,8 @@ public sealed class Migration007BoquilhasDomainTests
         await PersistenceTestDatabase.ResetSchemaAsync(context);
         await PersistenceTestDatabase.ApplyMigrationsAsync(context);
 
-        // Columns of boquilhas (exact set, exact nullability) — the register identity row only.
+        // Columns of boquilhas (exact set, exact nullability) — the register identity row with
+        // the §34 transitional anchor (migration 008): bq_id XOR tool_id, NEVER both/neither.
         var boquilhasColumns = await QueryStringsAsync(
             context,
             "SELECT column_name, is_nullable FROM information_schema.columns " +
@@ -178,7 +185,9 @@ public sealed class Migration007BoquilhasDomainTests
         var expectedBoquilhasColumns = new Dictionary<string, bool>(StringComparer.Ordinal)
         {
             ["boquilhas_id"] = false,
-            ["bq_id"] = false, // production association is MANDATORY after the Owner clarification
+            ["bq_id"] = true, // NULL while the register is in the transitional pré-JobOn state (§34)
+            ["tool_id"] = true, // the provisional canonical BQ Tool anchor (§34)
+            ["version"] = false, // the sole register-write (the association) optimistic token (§34)
             ["created_by_user_id"] = false,
             ["created_at"] = false,
         };
@@ -191,10 +200,16 @@ public sealed class Migration007BoquilhasDomainTests
 
         // No lifecycle/opening-fact column survives.
         Assert.DoesNotContain(boquilhasColumns, line => line.StartsWith("status|", StringComparison.Ordinal));
-        Assert.DoesNotContain(boquilhasColumns, line => line.StartsWith("tool_id|", StringComparison.Ordinal));
         Assert.DoesNotContain(boquilhasColumns, line => line.StartsWith("opening_date|", StringComparison.Ordinal));
         Assert.DoesNotContain(boquilhasColumns, line => line.StartsWith("utilisation_percent|", StringComparison.Ordinal));
-        Assert.DoesNotContain(boquilhasColumns, line => line.StartsWith("version|", StringComparison.Ordinal));
+
+        // The §34 anchor CHECK of migration 008: exactly ONE anchor (the DB backstop of the
+        // validator's XOR rule; tool_id and bq_id can never be two concurrent authorities).
+        var registerChecks = await QueryStringsAsync(
+            context,
+            "SELECT conname FROM pg_constraint WHERE conrelid = 'boquilhas'::regclass AND contype = 'c'");
+        Assert.Contains("boquilhas_anchor_check", registerChecks);
+        Assert.Contains("boquilhas_version_check", registerChecks);
 
         // CHECK constraints of boquilha_movements (the closed three-type set + Saída-required).
         var movementChecks = await QueryStringsAsync(
@@ -213,15 +228,17 @@ public sealed class Migration007BoquilhasDomainTests
             Assert.Contains(expected, movementChecks);
         }
 
-        // All six FKs are RESTRICT (confdeltype 'r'), never cascade (2 on boquilhas +
-        // 3 on boquilha_movements + 2 on boquilha_movement_audit = 7).
+        // All FKs are RESTRICT (confdeltype 'r'), never cascade (2 on boquilhas +
+        // 3 on boquilha_movements + 2 on boquilha_movement_audit + the §34 delta's Tool anchor FK
+        // on boquilhas (FK_boquilhas_tools_tool_id) = 8).
         var fks = await QueryStringsAsync(
             context,
             "SELECT conrelid::regclass::text, conname, confdeltype FROM pg_constraint " +
             "WHERE contype = 'f' AND conrelid IN ('boquilhas'::regclass, " +
             "'boquilha_movements'::regclass, 'boquilha_movement_audit'::regclass)");
-        Assert.Equal(7, fks.Count);
+        Assert.Equal(8, fks.Count);
         Assert.All(fks, line => Assert.EndsWith("|r", line, StringComparison.Ordinal));
+        Assert.Contains(fks, line => line.Contains("FK_boquilhas_tools_tool_id", StringComparison.Ordinal));
     }
 
     /// <summary>

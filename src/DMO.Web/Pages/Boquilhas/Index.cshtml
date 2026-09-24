@@ -78,8 +78,9 @@
 
             <div class="dmo-boquilhas__ficha-head" data-dmo-boquilhas-ficha-head="true">
                 <h2 class="dmo-boquilhas__title">
-                    Boquilhas @ficha.BoquilhasId — @(ficha.Reference ?? "(sem contexto)")
+                    Boquilhas @ficha.BoquilhasId — @(ficha.Reference ?? (ficha.IsPending ? "pré-JobOn" : "(sem contexto)"))
                 </h2>
+                <a class="dmo-boquilhas__link" href="/boquilhas/definicoes">Definições</a>
             </div>
 
             @* Production context (REAL facts; the register belongs to this production always) *@
@@ -90,6 +91,11 @@
                     <div class="dmo-boquilhas__fact"><dt>Produção</dt><dd data-dmo-panel-production="true">@production.ProductionNumber</dd></div>
                     <div class="dmo-boquilhas__fact"><dt>Máquina</dt><dd data-dmo-panel-machine="true">@production.Machine</dd></div>
                     <div class="dmo-boquilhas__fact"><dt>Data de produção</dt><dd data-dmo-panel-production-date="true">@(production.ProductionDate?.ToString("yyyy-MM-dd") ?? "—")</dd></div>
+                }
+                else if (ficha.PendingTool is { } pendingTool)
+                {
+                    <div class="dmo-boquilhas__fact"><dt>Estado</dt><dd data-dmo-pending-state="true">Registo pré-JobOn — sem produção associada</dd></div>
+                    <div class="dmo-boquilhas__fact"><dt>Ferramenta BQ (âncora provisória)</dt><dd data-dmo-pending-tool="true">@pendingTool.ToolReference — lote @pendingTool.ToolLot</dd></div>
                 }
                 else
                 {
@@ -105,6 +111,25 @@
             <dl class="dmo-boquilhas__facts" data-dmo-boquilhas-facts="true">
                 <div class="dmo-boquilhas__fact"><dt>Pendente de reparação</dt><dd data-dmo-outstanding="true" class="@(ficha.Outstanding < 0 ? "dmo-boquilhas__negative" : "")">@ficha.Outstanding</dd></div>
             </dl>
+
+            @* ---- §34: the human-confirmed association panel of a PENDING register ----------------
+               The candidates are the REAL bq_contexts rows whose tool_id equals the pending anchor;
+               the operator confirms each association explicitly (never automatic; the anchor must
+               match by the same UUID; máquina/linha is only context, never identity). *@
+            @if (ficha.IsPending)
+            {
+                <div class="dmo-boquilhas__region" data-dmo-association-panel="true" aria-label="Associar à produção"
+                     data-dmo-boquilhas-version="@ficha.Version">
+                    <h3 class="dmo-boquilhas__title">Associar à produção</h3>
+                    <p class="dmo-boquilhas__hint">
+                        Este registo foi iniciado antes de existir um Job On. Quando existir uma produção com a
+                        mesma ferramenta BQ (o mesmo tool_id), a associação é apresentada aqui e exige
+                        confirmação do operador — nunca é automática. O registo mantém o mesmo número e todo
+                        o histórico de movimentos.
+                    </p>
+                    <div class="dmo-boquilhas__candidates" data-dmo-association-candidates="true"></div>
+                </div>
+            }
 
             @* Movement ledger (single click selects; double click opens its edit/detail) *@
             <div class="dmo-boquilhas__ledger-scroll" role="region" tabindex="0" aria-label="Movimentos">

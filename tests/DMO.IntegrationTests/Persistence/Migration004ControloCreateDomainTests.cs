@@ -60,6 +60,7 @@ public sealed class Migration004ControloCreateDomainTests
         "20260923122429_GlassDensitySettings",
         "20260923171223_ControloApproveDomain",
         "20260924051151_BoquilhasDomain",
+        "20260924130151_BoquilhasPreJobonAssociation",
     ];
 
     /// <summary>The 22 contracted CHECK constraints of the eight tables (Â§17.1).</summary>
@@ -388,13 +389,13 @@ public sealed class Migration004ControloCreateDomainTests
         await PersistenceTestDatabase.ApplyMigrationsAsync(context);
 
         // P2-T07 (disclosed extension): SEVEN migrations are applied with the database up to date.
-        Assert.Equal(7, (await context.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(8, (await context.Database.GetAppliedMigrationsAsync()).Count());
 
         // The second application is a complete no-op: it must not throw and leaves nothing pending.
         await PersistenceTestDatabase.ApplyMigrationsAsync(context);
 
         Assert.Empty(await context.Database.GetPendingMigrationsAsync());
-        Assert.Equal(7, (await context.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(8, (await context.Database.GetAppliedMigrationsAsync()).Count());
     }
 
     private static IReadOnlyList<string> Sorted(IReadOnlyList<string> values) =>

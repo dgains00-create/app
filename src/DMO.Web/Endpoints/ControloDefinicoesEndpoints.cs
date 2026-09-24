@@ -1,15 +1,15 @@
 using DMO.Application.Access;
 using DMO.Application.ControloCreate;
 using DMO.Domain.Controlo;
-using DMO.Domain.Tools;
 using DMO.Web.Authorization;
 
 namespace DMO.Web.Endpoints;
 
 /// <summary>
 /// Minimal API surface of <c>Controlo_Create → Definições</c> (P2-T05 contract §21.3 routes
-/// 13–17; route 12 is the Razor page <c>Pages/Controlo/Definicoes</c>; post-closure glass-density
-/// correction contract §5.3 routes 18–19).
+/// 15–17 — the PDF directory, the email lists and the email templates; route 12 is the Razor page
+/// <c>Pages/Controlo/Definicoes</c>; post-closure glass-density correction contract §5.3 routes
+/// 18–19).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -18,6 +18,12 @@ namespace DMO.Web.Endpoints;
 /// caller is denied every one of them server-side (§21.5, AC-G2); the shared <c>controlo</c>
 /// destination never merges grants. Definições is a surface inside the Controlo Create working
 /// area — not a destination, not a Module, not registered anywhere (§9.1, AC-Y1).</para>
+/// <para>
+/// <b>Superseded (Owner clarification P2-T07 §34.3 / P2-T05 §31.3):</b> the repairer register and
+/// the machine → repairer assignment routes (the old routes 13/14) are REMOVED from this surface —
+/// the repairer family now belongs to <c>Boquilhas > Definições</c> (the physical
+/// <c>repairers</c>/<c>machine_repairer_assignments</c> tables stay where they are; the Boquilhas
+/// surface owns their operation). The PDF/email/document settings are NOT moved and remain here.</para>
 /// <para>
 /// The endpoints perform no domain decision: they bind transport shapes, call the application
 /// service and switch on the closed settings result set. Every persisted-state refusal is a 409
@@ -52,127 +58,6 @@ public static class ControloDefinicoesEndpoints
 
         var group = app.MapGroup(DefinicoesBasePath)
             .RequireAuthorization(ModuleAuthorizationPolicies.PolicyName(ModuleCatalog.ControloCreate));
-
-        // Route 13 — repairers: list / add / rename (name is the only required data; the same
-        // repairer_id is retained across the rename; no delete path exists, AC-D3).
-        group.MapGet("/repairers", async (
-            IControloDefinicoesService service,
-            CancellationToken cancellationToken) =>
-        {
-            var result = await service.ListRepairersAsync(cancellationToken);
-
-            return result is SettingsResult.RepairersFound(var repairers)
-                ? Results.Ok(new RepairersResponse(
-                    repairers
-                        .Select(repairer => new RepairerItemResponse(
-                            repairer.RepairerId.Value,
-                            repairer.Name,
-                            repairer.Version))
-                        .ToArray()))
-                : MapResult(result);
-        });
-
-        group.MapPost("/repairers", async (
-            CreateRepairerRequest? body,
-            IControloDefinicoesService service,
-            ILogger<LoggerCategory> logger,
-            CancellationToken cancellationToken) =>
-        {
-            if (body is null)
-            {
-                return ValidationFailed(ControloDefinicoesValidationErrors.NameRequired);
-            }
-
-            var command = new CreateRepairerCommand(body.Name ?? string.Empty);
-
-            return await ExecuteAsync(
-                token => service.CreateRepairerAsync(command, token),
-                logger,
-                cancellationToken,
-                success: result => result is SettingsResult.RepairerCreated(var id, var version)
-                    ? Results.Created(
-                        $"{DefinicoesBasePath}/repairers/{id}",
-                        new RepairerCreatedResponse(id, version))
-                    : null);
-        });
-
-        group.MapPut("/repairers/{repairerId:guid}", async (
-            Guid repairerId,
-            RenameRepairerRequest? body,
-            IControloDefinicoesService service,
-            ILogger<LoggerCategory> logger,
-            CancellationToken cancellationToken) =>
-        {
-            if (body is null)
-            {
-                return ValidationFailed(ControloDefinicoesValidationErrors.NameRequired);
-            }
-
-            var command = new RenameRepairerCommand(
-                repairerId,
-                body.ExpectedVersion,
-                body.Name ?? string.Empty);
-
-            return await ExecuteAsync(
-                token => service.RenameRepairerAsync(command, token),
-                logger,
-                cancellationToken,
-                success: result => result is SettingsResult.RepairerRenamed(var id, var version)
-                    ? Results.Ok(new RepairerRenamedResponse(id, version))
-                    : null);
-        });
-
-        // Route 14 — machine assignments: list all six / set-change-clear ONE independently. A null
-        // repairer id clears the assignment (explicit operator action); the other five machines are
-        // never touched (MAC2–MAC4/AC-E2).
-        group.MapGet("/machine-assignments", async (
-            IControloDefinicoesService service,
-            CancellationToken cancellationToken) =>
-        {
-            var result = await service.ListMachineAssignmentsAsync(cancellationToken);
-
-            return result is SettingsResult.AssignmentsFound(var assignments)
-                ? Results.Ok(new MachineAssignmentsResponse(
-                    MachineCode.All
-                        .Select(machine => new MachineAssignmentItemResponse(
-                            machine.Value,
-                            assignments
-                                .FirstOrDefault(assignment => assignment.Machine.Value == machine.Value)
-                                ?.RepairerId.Value,
-                            assignments
-                                .FirstOrDefault(assignment => assignment.Machine.Value == machine.Value)
-                                ?.Version))
-                        .ToArray()))
-                : MapResult(result);
-        });
-
-        group.MapPut("/machine-assignments/{machine}", async (
-            string machine,
-            SetMachineAssignmentRequest? body,
-            IControloDefinicoesService service,
-            ILogger<LoggerCategory> logger,
-            CancellationToken cancellationToken) =>
-        {
-            if (body is null)
-            {
-                return ValidationFailed(ControloDefinicoesValidationErrors.MachineUnknown);
-            }
-
-            var command = new SetMachineAssignmentCommand(
-                machine,
-                body.RepairerId,
-                body.ExpectedVersion);
-
-            return await ExecuteAsync(
-                token => service.SetMachineAssignmentAsync(command, token),
-                logger,
-                cancellationToken,
-                success: result => result is SettingsResult.AssignmentSet(var setMachine, var version)
-                    ? Results.Ok(new MachineAssignmentResponse(setMachine, version))
-                    : result is SettingsResult.AssignmentCleared(var clearedMachine)
-                        ? Results.Ok(new MachineAssignmentResponse(clearedMachine, Version: 0))
-                        : null);
-        });
 
         // Route 15 — PDF directory: read (not-configured is explicit) / configure-change / check
         // (server-side, typed vocabulary only; the browser only edits/submits the configuration).
@@ -535,39 +420,6 @@ public static class ControloDefinicoesEndpoints
 
     private static IResult MapResult(SettingsResult result) => result switch
     {
-        SettingsResult.RepairersFound(var repairers) => Results.Ok(new RepairersResponse(
-            repairers
-                .Select(repairer => new RepairerItemResponse(
-                    repairer.RepairerId.Value,
-                    repairer.Name,
-                    repairer.Version))
-                .ToArray())),
-
-        SettingsResult.RepairerCreated(var id, var version) => Results.Created(
-            $"{DefinicoesBasePath}/repairers/{id}",
-            new RepairerCreatedResponse(id, version)),
-
-        SettingsResult.RepairerRenamed(var id, var version) => Results.Ok(
-            new RepairerRenamedResponse(id, version)),
-
-        SettingsResult.AssignmentsFound(var assignments) => Results.Ok(new MachineAssignmentsResponse(
-            MachineCode.All
-                .Select(machine => new MachineAssignmentItemResponse(
-                    machine.Value,
-                    assignments
-                        .FirstOrDefault(assignment => assignment.Machine.Value == machine.Value)
-                        ?.RepairerId.Value,
-                    assignments
-                        .FirstOrDefault(assignment => assignment.Machine.Value == machine.Value)
-                        ?.Version))
-                .ToArray())),
-
-        SettingsResult.AssignmentSet(var machine, var version) => Results.Ok(
-            new MachineAssignmentResponse(machine, version)),
-
-        SettingsResult.AssignmentCleared(var machine) => Results.Ok(
-            new MachineAssignmentResponse(machine, Version: 0)),
-
         SettingsResult.PdfDirectoryFound(var view) => Results.Ok(new PdfDirectoryResponse(
             view is null ? null : view.BaseDirectory,
             view?.Version)),
@@ -701,36 +553,6 @@ public static class ControloDefinicoesEndpoints
     // ---------------------------------------------------------------------------------------------
     // Transport shapes
     // ---------------------------------------------------------------------------------------------
-
-    /// <summary>Route 13 add-repairer carrier: name is the only required data (§10.1).</summary>
-    public sealed record CreateRepairerRequest(string? Name);
-
-    /// <summary>Route 13 rename-repairer carrier.</summary>
-    public sealed record RenameRepairerRequest(int ExpectedVersion, string? Name);
-
-    /// <summary>Route 13 list response.</summary>
-    public sealed record RepairersResponse(IReadOnlyList<RepairerItemResponse> Repairers);
-
-    /// <summary>One repairer of the list.</summary>
-    public sealed record RepairerItemResponse(Guid RepairerId, string Name, int Version);
-
-    /// <summary>Route 13 add response.</summary>
-    public sealed record RepairerCreatedResponse(Guid RepairerId, int Version);
-
-    /// <summary>Route 13 rename response.</summary>
-    public sealed record RepairerRenamedResponse(Guid RepairerId, int Version);
-
-    /// <summary>Route 14 one-machine assignment carrier: a null repairer id clears the assignment.</summary>
-    public sealed record SetMachineAssignmentRequest(Guid? RepairerId, int? ExpectedVersion);
-
-    /// <summary>Route 14 list response (all six machines; absent = no repairer assigned).</summary>
-    public sealed record MachineAssignmentsResponse(IReadOnlyList<MachineAssignmentItemResponse> Assignments);
-
-    /// <summary>One machine's current assignment.</summary>
-    public sealed record MachineAssignmentItemResponse(string Machine, Guid? RepairerId, int? Version);
-
-    /// <summary>Route 14 set/clear response.</summary>
-    public sealed record MachineAssignmentResponse(string Machine, int Version);
 
     /// <summary>Route 15 configure/change carrier (server-host absolute path).</summary>
     public sealed record SetPdfDirectoryRequest(string? BaseDirectory, int? ExpectedVersion);

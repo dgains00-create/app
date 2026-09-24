@@ -21,14 +21,17 @@ namespace DMO.IntegrationTests.Boquilhas;
 /// PostgreSQL database. The schema itself is proven separately by the env-gated DB-class tests.
 /// </para>
 /// <para>
-/// The register model of the OWNER CLARIFICATION: <c>boquilhas_id</c> is the register identity of
-/// one REAL production/BQ context (one register per <c>bq_id</c>, in-memory enforced), created
-/// WITHOUT any quantity movement; movements are the closed three types; the outstanding is derived
-/// by replay, never stored; appends are unversioned; the edit is the guarded same-row UPDATE plus
-/// the audit row (one transaction, no second quantity event); there is NO lifecycle state machine.
-/// Every write is built in locals and committed only at the end, so a forced failure leaves
-/// NOTHING behind — the same unit-of-work the real repository implements with database
-/// transactions.</para>
+/// The register model of the OWNER CLARIFICATION, §34: <c>boquilhas_id</c> is the register identity
+/// of EXACTLY ONE anchor — one REAL production/BQ context (<c>bq_id</c>, one register per
+/// <c>bq_id</c>, in-memory enforced) XOR the transitional pré-JobOn canonical BQ <c>tool_id</c>
+/// (<c>bq_id</c> NULL; the association is offered only when a <c>bq_contexts</c> row carries the
+/// SAME canonical UUID; the SAME <c>boquilhas_id</c> passes to <c>bq_id → jobon_id</c> with the
+/// version bumped once) — created WITHOUT any quantity movement; movements are the closed three
+/// types; the outstanding is derived by replay, never stored; appends are unversioned; the edit is
+/// the guarded same-row UPDATE plus the audit row (one transaction, no second quantity event);
+/// there is NO lifecycle state machine and NO permanent standalone. Every write is built in locals
+/// and committed only at the end, so a forced failure leaves NOTHING behind — the same unit-of-work
+/// the real repository implements with database transactions.</para>
 /// </remarks>
 internal sealed class P2T07TestStore :
     IBoquilhasRepository,
@@ -126,9 +129,24 @@ internal sealed class P2T07TestStore :
         return (jobOn.JobOnId.Value, bqId);
     }
 
-    /// <summary>Directly seeds a register with a ledger (test arrangement; server semantics not bypassed).</summary>
+    /// <summary>Directly seeds a PRODUCTION-LINKED register with a ledger (test arrangement; server
+    /// semantics not bypassed).</summary>
     public BoquilhaRegister SeedRegister(
         Guid bqId,
+        params (MovementKind Kind, int Quantity, DateOnly BusinessDate, string? Machine, Guid? RepairerId)[] movements) =>
+        SeedRegisterCore(bqId, ToolId: null, Version: 1, movements);
+
+    /// <summary>Directly seeds a TRANSITIONAL pré-JobOn (pending) register with a ledger (§34.1;
+    /// test arrangement; server semantics not bypassed).</summary>
+    public BoquilhaRegister SeedPendingRegister(
+        Guid toolId,
+        params (MovementKind Kind, int Quantity, DateOnly BusinessDate, string? Machine, Guid? RepairerId)[] movements) =>
+        SeedRegisterCore(BqId: null, toolId, Version: 1, movements);
+
+    private BoquilhaRegister SeedRegisterCore(
+        Guid? BqId,
+        Guid? ToolId,
+        int Version,
         params (MovementKind Kind, int Quantity, DateOnly BusinessDate, string? Machine, Guid? RepairerId)[] movements)
     {
         var created = DateTimeOffset.Parse("2026-09-01T08:00:00Z");
@@ -157,7 +175,9 @@ internal sealed class P2T07TestStore :
 
         var register = new BoquilhaRegister(
             BoquilhasId.From(registerId),
-            bqId,
+            BqId,
+            ToolId,
+            Version,
             P2T07TestHost.ActorUserId,
             created,
             rows);
@@ -265,8 +285,19 @@ internal sealed class P2T07TestStore :
 
     public Task<Repairer> RenamedAsync(Repairer repairer, CancellationToken cancellationToken)
     {
-        _repairers[repairer.RepairerId.Value] = repairer;
-        return Task.FromResult(repairer);
+        if (!_repairers.TryGetValue(repairer.RepairerId.Value, out var persisted))
+        {
+            throw new ConcurrencyConflictException("The repairer no longer exists.");
+        }
+
+        if (persisted.Version != repairer.Version)
+        {
+            throw new ConcurrencyConflictException("The repairer was modified concurrently.");
+        }
+
+        var stored = repairer with { Version = persisted.Version + 1 };
+        _repairers[stored.RepairerId.Value] = stored;
+        return Task.FromResult(stored);
     }
 
     public Task<MachineRepairerAssignment?> GetByMachineAsync(string machine, CancellationToken cancellationToken) =>
@@ -279,12 +310,31 @@ internal sealed class P2T07TestStore :
         MachineRepairerAssignment assignment,
         CancellationToken cancellationToken)
     {
-        _assignments[assignment.Machine.Value] = assignment;
-        return Task.FromResult(assignment);
+        if (_assignments.TryGetValue(assignment.Machine.Value, out var persisted)
+            && persisted.Version != assignment.Version)
+        {
+            throw new ConcurrencyConflictException(
+                $"The assignment of machine '{assignment.Machine}' was modified concurrently.");
+        }
+
+        // Upsert semantics of the real repository: version 1 on the first set, +1 on a change.
+        var stored = _assignments.ContainsKey(assignment.Machine.Value)
+            ? assignment with { Version = assignment.Version + 1 }
+            : assignment with { Version = 1 };
+
+        _assignments[assignment.Machine.Value] = stored;
+        return Task.FromResult(stored);
     }
 
     public Task ClearedAsync(string machine, int expectedVersion, CancellationToken cancellationToken)
     {
+        if (_assignments.TryGetValue(machine, out var persisted)
+            && persisted.Version != expectedVersion)
+        {
+            throw new ConcurrencyConflictException(
+                $"The assignment of machine '{machine}' was modified concurrently.");
+        }
+
         _assignments.Remove(machine);
         return Task.CompletedTask;
     }
@@ -456,27 +506,39 @@ internal sealed class P2T07TestStore :
         BoqCreateUnit unit,
         CancellationToken cancellationToken)
     {
-        // Production association first (the service re-checks the same fact).
-        if (ResolveContext(unit.BqId) is null)
+        // EXACTLY ONE anchor (§34.1): the REAL bq_contexts row XOR the provisional canonical Tool.
+        if (unit.BqId is { } bqId)
         {
-            throw new BoquilhasPersistenceException(
-                BoquilhasPersistenceFailureReason.BqContextNotFound,
-                "O contexto BQ indicado não existe; nada foi criado.");
-        }
+            // Production association first (the service re-checks the same fact).
+            if (ResolveContext(bqId) is null)
+            {
+                throw new BoquilhasPersistenceException(
+                    BoquilhasPersistenceFailureReason.BqContextNotFound,
+                    "O contexto BQ indicado não existe; nada foi criado.");
+            }
 
-        if (_registers.Values.Any(register => register.BqId == unit.BqId))
+            if (_registers.Values.Any(register => register.BqId == bqId))
+            {
+                throw new BoquilhasPersistenceException(
+                    BoquilhasPersistenceFailureReason.RegisterExists,
+                    "Já existe um registo de Boquilhas para esta produção; nada foi criado.");
+            }
+        }
+        else if (!_tools.ContainsKey(unit.PendingToolId!.Value))
         {
             throw new BoquilhasPersistenceException(
-                BoquilhasPersistenceFailureReason.RegisterExists,
-                "Já existe um registo de Boquilhas para esta produção; nada foi criado.");
+                BoquilhasPersistenceFailureReason.ToolNotFound,
+                "A ferramenta pendente indicada não existe; nada foi criado.");
         }
 
         var register = new BoquilhaRegister(
             BoquilhasId.From(Guid.NewGuid()),
             unit.BqId,
+            unit.PendingToolId,
+            Version: 1,
             unit.CreatedByUserId,
             DateTimeOffset.UtcNow,
-            []);
+            Movements: []);
 
         if (FailCreate)
         {
@@ -489,6 +551,150 @@ internal sealed class P2T07TestStore :
         return register;
     }
 
+    public async Task<BoquilhaRegister> AssociatedAsync(
+        Guid boquilhasId,
+        Guid bqId,
+        int expectedVersion,
+        CancellationToken cancellationToken)
+    {
+        if (!_registers.TryGetValue(boquilhasId, out var register))
+        {
+            throw new ConcurrencyConflictException($"O registo '{boquilhasId}' já não existe; nada foi associado.");
+        }
+
+        // Association is offered only while pending (§34.1 rule 2).
+        if (!register.IsPending)
+        {
+            throw new BoquilhasPersistenceException(
+                BoquilhasPersistenceFailureReason.AlreadyAssociated,
+                "Este registo já está associado a uma produção; a associação só é oferecida enquanto o registo está pendente.");
+        }
+
+        if (register.Version != expectedVersion)
+        {
+            throw new ConcurrencyConflictException(
+                $"O registo '{boquilhasId}' foi alterado em concorrência " +
+                $"(versão esperada {expectedVersion}, atual {register.Version}); recarregue e tente novamente.");
+        }
+
+        if (ResolveContext(bqId) is null)
+        {
+            throw new BoquilhasPersistenceException(
+                BoquilhasPersistenceFailureReason.BqContextNotFound,
+                "O contexto BQ indicado não existe; nada foi associado.");
+        }
+
+        if (_registers.Values.Any(existing => existing.BqId == bqId))
+        {
+            throw new BoquilhasPersistenceException(
+                BoquilhasPersistenceFailureReason.RegisterExists,
+                "Já existe um registo de Boquilhas para esta produção; nada foi criado.");
+        }
+
+        // The SAME register row: bq_id set, provisional anchor cleared, version + 1; the
+        // movement history keeps every fact.
+        var associated = register with
+        {
+            BqId = bqId,
+            ToolId = null,
+            Version = register.Version + 1,
+        };
+
+        _registers[boquilhasId] = associated;
+
+        return associated;
+    }
+
+    // ---- IBoquilhasRepository: §34 reads (keyed by the canonical tool_id; no global scans) ---
+
+    public Task<IReadOnlyList<BqAssociationCandidate>> ListBqAssociationCandidatesAsync(
+        Guid toolId,
+        CancellationToken cancellationToken)
+    {
+        var candidates = new List<BqAssociationCandidate>();
+
+        foreach (var context in ContextsByTool(toolId))
+        {
+            if (!_jobOnFacts.TryGetValue(context.JobOnId, out var facts))
+            {
+                continue;
+            }
+
+            candidates.Add(new BqAssociationCandidate(
+                context.BqId,
+                context.JobOnId,
+                facts.Reference,
+                facts.ProductionNumber,
+                facts.Machine.Value,
+                facts.ProductionDate));
+        }
+
+        IReadOnlyList<BqAssociationCandidate> result = candidates
+            .OrderBy(candidate => candidate.Reference)
+            .ThenBy(candidate => candidate.ProductionNumber)
+            .ToList();
+
+        return Task.FromResult(result);
+    }
+
+    public Task<IReadOnlyList<PendingRegisterCandidate>> ListPendingRegistersAsync(
+        Guid toolId,
+        CancellationToken cancellationToken)
+    {
+        var rows = _registers.Values
+            .Where(register => register.IsPending && register.ToolId == toolId)
+            .OrderBy(register => register.CreatedAt)
+            .ThenBy(register => register.BoquilhasId.Value)
+            .Select(register => new PendingRegisterCandidate(
+                register.BoquilhasId.Value,
+                register.ToolId!.Value,
+                _tools[register.ToolId!.Value].Reference,
+                _tools[register.ToolId!.Value].Lot,
+                register.Version,
+                register.CreatedAt,
+                register.Movements.Count,
+                register.Outstanding))
+            .ToList();
+
+        IReadOnlyList<PendingRegisterCandidate> result = rows;
+        return Task.FromResult(result);
+    }
+
+    /// <summary>The REAL <c>bq_contexts</c> rows resolving to the canonical Tool (seeded mirrors
+    /// first, then the LIVE rows created through the real <c>IJobOnService.UpdateAsync</c> flow;
+    /// deduplicated by <c>bq_id</c> — one row per real context, exactly like the single table).</summary>
+    private IEnumerable<BqContextRead> ContextsByTool(Guid toolId)
+    {
+        var seen = new HashSet<Guid>();
+
+        foreach (var context in _bqContexts.Values)
+        {
+            if (context.ToolId == toolId && seen.Add(context.BqId))
+            {
+                yield return context;
+            }
+        }
+
+        foreach (var jobOnId in JobOnToolStore.JobOnIds())
+        {
+            foreach (var context in JobOnToolStore.ContextsOf(jobOnId))
+            {
+                if (context.ContextType == ToolContextType.Bq
+                    && context.ToolId.Value == toolId
+                    && seen.Add(context.ContextId))
+                {
+                    yield return new BqContextRead(
+                        context.ContextId,
+                        jobOnId,
+                        context.ToolId.Value,
+                        DMO.Application.Tools.ToolTokens.ToToken(context.Frozen.Type),
+                        context.Frozen.Reference,
+                        context.Frozen.Lot);
+                }
+            }
+        }
+    }
+
     public async Task<BoquilhaMovement> AppendMovementAsync(
         BoqAppendUnit unit,
         CancellationToken cancellationToken)
@@ -498,7 +704,9 @@ internal sealed class P2T07TestStore :
             throw new ConcurrencyConflictException($"O registo '{unit.BoquilhasId}' já não existe; nada foi guardado.");
         }
 
-        if (ResolveContext(register.BqId) is null)
+        // A PRODUCTION-LINKED register's context must still resolve; a pending (§34) register
+        // has no bq_context yet by contract and appends are equally valid on it.
+        if (register.BqId is { } anchoredBqId && ResolveContext(anchoredBqId) is null)
         {
             throw new BoquilhasPersistenceException(
                 BoquilhasPersistenceFailureReason.BqContextNotFound,
@@ -679,14 +887,45 @@ internal sealed class P2T07TestStore :
         new(
             register.BoquilhasId.Value,
             register.BqId,
-            _bqContexts.TryGetValue(register.BqId, out var context) ? context.ToolReference : null,
-            _bqContexts.TryGetValue(register.BqId, out var bqContext) ? bqContext.ToolLot : null,
-            ProductionNumberOf(register.BqId),
-            ProductionMachineOf(register.BqId),
-            ProductionDateOf(register.BqId),
+            register.ToolId,
+            ReferenceOf(register),
+            LotOf(register),
+            register.BqId is { } bqId ? ProductionNumberOf(bqId) : null,
+            register.BqId is { } productionBqId ? ProductionMachineOf(productionBqId) : null,
+            register.BqId is { } datedBqId ? ProductionDateOf(datedBqId) : null,
             register.Outstanding,
             register.Movements.Count,
             register.Movements.Count == 0 ? null : register.Ledger.Max(movement => movement.RecordedAt));
+
+    /// <summary>The traversal reference: the frozen BQ triple (production-linked) or the canonical
+    /// Tool's current reference (pending §34 register).</summary>
+    private string? ReferenceOf(BoquilhaRegister register)
+    {
+        if (register.BqId is { } bqId
+            && _bqContexts.TryGetValue(bqId, out var context))
+        {
+            return context.ToolReference;
+        }
+
+        return register.ToolId is { } toolId && _tools.TryGetValue(toolId, out var tool)
+            ? tool.Reference
+            : null;
+    }
+
+    /// <summary>The traversal lot: the frozen BQ triple (production-linked) or the canonical
+    /// Tool's current lot (pending §34 register).</summary>
+    private string? LotOf(BoquilhaRegister register)
+    {
+        if (register.BqId is { } bqId
+            && _bqContexts.TryGetValue(bqId, out var context))
+        {
+            return context.ToolLot;
+        }
+
+        return register.ToolId is { } toolId && _tools.TryGetValue(toolId, out var tool)
+            ? tool.Lot
+            : null;
+    }
 
     private string? ProductionNumberOf(Guid bqId) =>
         _bqContexts.TryGetValue(bqId, out var context)

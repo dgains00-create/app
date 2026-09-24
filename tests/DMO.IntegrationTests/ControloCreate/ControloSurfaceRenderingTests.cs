@@ -60,13 +60,15 @@ public sealed class ControloSurfaceRenderingTests
     }
 
     /// <summary>
-    /// LAY2 (contract §26.4; post-closure correction §5.3) — proves AC-N1: the rendered Definições
-    /// page keeps the SIX section titles in their structural order (the glass-density section is
-    /// the approved correction addition), and the larger-desktop composition is preserved by the
-    /// static rule that the linked <c>dmo-controlo.css</c> carries no breakpoint rule.
+    /// LAY2 (contract §26.4; §34.3 delta) — proves AC-N1: the rendered Definições page keeps the
+    /// FOUR remaining section titles in their structural order (the repairer family — the former
+    /// first two sections — MOVED to <c>Boquilhas > Definições</c> per the Owner clarification
+    /// P2-T07 §34.3 / P2-T05 §31.3; the glass-density section is the approved correction addition),
+    /// and the larger-desktop composition is preserved by the static rule that the linked
+    /// <c>dmo-controlo.css</c> carries no breakpoint rule.
     /// </summary>
     [Fact]
-    public async Task LAY2_DefinicoesPageRendersTheSixSectionsInOrderAndLinksTheBreakpointFreeStylesheet()
+    public async Task LAY2_DefinicoesPageRendersTheFourSectionsInOrderAndLinksTheBreakpointFreeStylesheet()
     {
         var composition = new P2T05TestComposition();
 
@@ -79,8 +81,6 @@ public sealed class ControloSurfaceRenderingTests
         var html = await response.Content.ReadAsStringAsync();
 
         AssertInOrder(html,
-            "Reparadores",
-            "Reparador por máquina",
             "Diretório de PDF/documentos",
             "Listas de email",
             "Templates de email",
@@ -108,11 +108,12 @@ public sealed class ControloSurfaceRenderingTests
     }
 
     /// <summary>
-    /// LAY3 (contract §26.4; post-closure correction §5.3) — proves AC-N1: the results table
-    /// (Create markup) and the FIVE settings tables (Definições markup — the glass-density table
-    /// is the approved correction addition) are wrapped in keyboard-reachable local overflow
-    /// containers (<c>role="region"</c> + <c>tabindex="0"</c>), and no required column is hidden:
-    /// every results heading is present in full.
+    /// LAY3 (contract §26.4; §34.3 delta) — proves AC-N1: the results table (Create markup) and
+    /// the THREE remaining settings tables (Definições markup — the repairers/assignments tables
+    /// MOVED to <c>Boquilhas > Definições</c>; the glass-density table is the approved correction
+    /// addition) are wrapped in keyboard-reachable local overflow containers
+    /// (<c>role="region"</c> + <c>tabindex="0"</c>), and no required column is hidden: every
+    /// results heading is present in full.
     /// </summary>
     [Fact]
     public void LAY3_ResultsAndSettingsTablesUseKeyboardReachableLocalOverflowContainers()
@@ -135,8 +136,9 @@ public sealed class ControloSurfaceRenderingTests
             < createMarkup.IndexOf("data-dmo-results-table", StringComparison.Ordinal),
             "The results table must be rendered INSIDE its scroll container.");
 
-        // The five settings tables each sit inside a keyboard-reachable local scroll container, in
-        // the same sequence as their regions.
+        // The three remaining settings tables each sit inside a keyboard-reachable local scroll
+        // container, in the same sequence as their regions (the §34.3 delta removed the
+        // repairers/assignments sections — the repairer family moved to Boquilhas > Definições).
         var settingsScrolls = Regex.Matches(
                 definicoesMarkup,
                 "<div\\b[^>]*class=\"[^\"]*dmo-controlo__settings-scroll[^\"]*\"[^>]*>",
@@ -144,7 +146,7 @@ public sealed class ControloSurfaceRenderingTests
             .Cast<Match>()
             .ToArray();
 
-        Assert.Equal(5, settingsScrolls.Length);
+        Assert.Equal(3, settingsScrolls.Length);
         Assert.All(settingsScrolls, scroll =>
         {
             Assert.Contains("role=\"region\"", scroll.Value, StringComparison.Ordinal);
@@ -153,8 +155,6 @@ public sealed class ControloSurfaceRenderingTests
 
         var settingsTables = new[]
         {
-            "data-dmo-repairers-table",
-            "data-dmo-assignments-table",
             "data-dmo-lists-table",
             "data-dmo-templates-table",
             "data-dmo-glass-densities-table",

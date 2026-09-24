@@ -47,6 +47,7 @@ public sealed class Migration005GlassDensitySettingsTests
         "20260923122429_GlassDensitySettings",
         "20260923171223_ControloApproveDomain",
         "20260924051151_BoquilhasDomain",
+        "20260924130151_BoquilhasPreJobonAssociation",
     ];
 
     /// <summary>The complete public product-table register after all SEVEN migrations (disclosed P2-T06
@@ -282,7 +283,7 @@ public sealed class Migration005GlassDensitySettingsTests
         // A further re-run applies nothing.
         await PersistenceTestDatabase.ApplyMigrationsAsync(context);
         Assert.Empty(await context.Database.GetPendingMigrationsAsync());
-        Assert.Equal(7, (await context.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(8, (await context.Database.GetAppliedMigrationsAsync()).Count());
     }
 
     private static async Task ExecuteAsync(DmoDbContext context, string sql)

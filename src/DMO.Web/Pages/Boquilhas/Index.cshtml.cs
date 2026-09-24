@@ -158,7 +158,7 @@ public sealed class IndexModel : PageModel
         var tableRows = rows
             .Select(row => DenseTableRowPresentation.Create(
                 row.BoquilhasId.ToString(),
-                $"Boquilhas {row.BoquilhasId} — {row.Reference ?? "(sem contexto)"}",
+                $"Boquilhas {row.BoquilhasId} — {row.Reference ?? (row.IsPending ? "pré-JobOn" : "(sem contexto)")}",
                 [
                     DenseTableCellPresentation.Create(row.Reference ?? "—"),
                     DenseTableCellPresentation.Create(row.Lot ?? "—"),

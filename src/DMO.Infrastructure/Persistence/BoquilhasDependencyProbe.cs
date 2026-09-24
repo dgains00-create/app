@@ -49,8 +49,10 @@ public sealed class BoquilhasDependencyProbe : IJobOnDependencyProbe
             .ToList();
 
         // A Boquilhas register is production-linked exactly when it anchors a real bq_contexts row
-        // of the target occurrence (the ONLY anchor after the Owner clarification removed the
-        // standalone flow; its protection is the bq_contexts RESTRICT FK).
+        // of the target occurrence (the ONLY settled anchor; the transitional §34 pré-JobOn
+        // tool_id anchor has no Job On relation and never depends on the target — the standalone
+        // protection is the tools RESTRICT FK; a pending register is protected by nothing Job-On
+        // related).
         if (bqContextIds.Count == 0)
         {
             return JobOnDependencyReport.None(SourceName);
@@ -58,7 +60,7 @@ public sealed class BoquilhasDependencyProbe : IJobOnDependencyProbe
 
         var dependents = await _context.Set<BoquilhaEntity>()
             .AsNoTracking()
-            .Where(register => bqContextIds.Contains(register.BqId))
+            .Where(register => register.BqId != null && bqContextIds.Contains(register.BqId!.Value))
             .Select(register => new { register.BoquilhasId })
             .OrderBy(register => register.BoquilhasId)
             .ToListAsync(cancellationToken);

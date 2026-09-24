@@ -40,23 +40,26 @@ public sealed class P2T07RegressionTests
     // ------------------------------------------------------------------- route count / policies (AC-A1/A6)
 
     /// <summary>
-    /// A1/A6 — the P2-T07 route inventory is EXACTLY the final fifteen routes (3 pages + 12
-    /// minimal-API endpoints — RECALCULATED after removing close/reopen/opening-facts, never the
-    /// old eighteen), all carrying exactly the canonical <c>boquilhas</c> policy, with no alias
-    /// route and no second policy.
+    /// A1/A6 — the P2-T07 route inventory is EXACTLY the final twenty-four routes (4 pages + 20
+    /// minimal-API endpoints — RECALCULATED after the §34 delta: three new association endpoints
+    /// in <c>BoquilhasEndpoints</c> and the five <c>Boquilhas > Definições</c> endpoints in
+    /// <c>BoquilhasDefinicoesEndpoints</c>, the repairer family moved from Controlo per §34.3),
+    /// all carrying exactly the canonical <c>boquilhas</c> policy, with no alias route and no
+    /// second policy.
     /// </summary>
     [Fact]
-    public void A1A6_ExactlyFifteenRoutesAllCarryingTheCanonicalBoquilhasPolicy()
+    public void A1A6_ExactlyTwentyFourRoutesAllCarryingTheCanonicalBoquilhasPolicy()
     {
         var canonical = DMO.Web.Authorization.ModuleAuthorizationPolicies.PolicyName(ModuleCatalog.Boquilhas);
         Assert.Equal("dmo.module.boquilhas", canonical);
 
-        // The three Razor pages (routes 1–3) each declare the exactly pinned policy constant.
+        // The four Razor pages (routes 1–4) each declare the exactly pinned policy constant.
         var pages = new[]
         {
             typeof(DMO.Web.Pages.Boquilhas.IndexModel),
             typeof(DMO.Web.Pages.Boquilhas.NovoModel),
             typeof(DMO.Web.Pages.Boquilhas.HistoricoModel),
+            typeof(DMO.Web.Pages.Boquilhas.DefinicoesModel),
         };
 
         foreach (var page in pages)
@@ -72,21 +75,31 @@ public sealed class P2T07RegressionTests
     }
 
     /// <summary>
-    /// A6/R4 — the endpoint surface is EXACTLY the twelve routes (the old 15 is superseded), with
-    /// no close/reopen/opening-facts route, no second Tool search/create route, no settings route,
-    /// no repairer/assignment write route and no PDF/file/email/document/availability route.
+    /// A6/R4 — the Boquilhas endpoint surface is EXACTLY the twenty routes (15 in
+    /// <c>BoquilhasEndpoints.cs</c> + the five <c>Boquilhas > Definições</c> endpoints of
+    /// <c>BoquilhasDefinicoesEndpoints.cs</c>; the old 12 is superseded), with no close/reopen/
+    /// opening-facts route, no second Tool search/create route, no PDF/file/email/document/
+    /// availability route and no OTHER module's route vocabulary.
     /// </summary>
     [Fact]
-    public void A6R4_ExactlyTwelveEndpoints_NoLifecycleNoSettingsNoDocumentRoutes()
+    public void A6R4_ExactlyTwentyEndpoints_NoLifecycleNoDocumentRoutes()
     {
         var source = P2T04ProductionScan.Read("src/DMO.Web/Endpoints/BoquilhasEndpoints.cs");
         var code = P2T04ProductionScan.WithoutRazorComments(source);
 
-        // Exactly twelve route handlers: the MapGet/MapPost/MapPut calls of the group.
+        // Exactly fifteen route handlers in the register surface: the MapGet/MapPost/MapPut calls
+        // of the group (12 closed + the three §34 association routes).
         var handlers = Regex.Matches(source, @"group\.(Map(Get|Post|Put))\(")
             .Count;
 
-        Assert.Equal(12, handlers);
+        Assert.Equal(15, handlers);
+
+        // The Definições surface owns the repairer family (§34.3): exactly five handlers in the
+        // separated file (list/add/rename repairers; list/set-clear machine assignments).
+        var definitionsSource = P2T04ProductionScan.Read("src/DMO.Web/Endpoints/BoquilhasDefinicoesEndpoints.cs");
+        var definitionsHandlers = Regex.Matches(definitionsSource, @"group\.(Map(Get|Post|Put))\(")
+            .Count;
+        Assert.Equal(5, definitionsHandlers);
 
         // No lifecycle route survives: close/reopen/opening-facts are gone.
         foreach (var token in new[] { "/close", "/reopen", "opening-facts", "\"close\"", "\"reopen\"" })
@@ -97,11 +110,12 @@ public sealed class P2T07RegressionTests
                 $"The lifecycle route token '{token}' survived in the Boquilhas endpoint surface ({occurrences}).");
         }
 
-        // No other module route surface: no /ferramentas route (the only Tool search/create stays
-        // on the P2-T04 routes), no settings/definicoes route, no repairer/assignment write route
-        // and no PDF/file/email/document/send/availability route (the register-identity route IS
-        // a legitimate Boquilhas route and is excluded from this token set by construction).
-        foreach (var token in new[] { "/ferramentas", "\"settings", "definicoes", "\"pdf", "\"email", "\"document", "\"send", "\"availability" })
+        // No OTHER module route surface: no /ferramentas route (the only Tool search/create stays
+        // on the P2-T04 routes), no Controlo settings route and no PDF/file/email/document/send/
+        // availability route (the register-identity route IS a legitimate Boquilhas route and is
+        // excluded from this token set by construction; the repairer family is a legitimate
+        // Boquilhas surface after §34.3 and lives in the separated Definições endpoint file).
+        foreach (var token in new[] { "/ferramentas", "/controlo/", "\"pdf", "\"email", "\"document", "\"send", "\"availability" })
         {
             var occurrences = P2T04ProductionScan.SubstringOccurrences(code, token).Count;
             Assert.True(
@@ -111,6 +125,7 @@ public sealed class P2T07RegressionTests
 
         // No second policy: the group requires exactly the canonical policy constant.
         Assert.Contains("RequireAuthorization(Policy)", source, StringComparison.Ordinal);
+        Assert.Contains("RequireAuthorization(BoquilhasEndpoints.Policy)", definitionsSource, StringComparison.Ordinal);
     }
 
     // ------------------------------------------------------------------- superseded lifecycle absent
@@ -188,15 +203,18 @@ public sealed class P2T07RegressionTests
         }
     }
 
-    // ------------------------------------------------------------------- N1/R4 (no settings / no repairer administration)
+    // ------------------------------------------------------------------- N1/R4 (no Controlo/Admin settings leakage)
 
     /// <summary>
-    /// N1/R4 — no Boquilhas settings/Admin surface and no repairer/assignment administration: the
-    /// only consumed reads are the register list and the assignments list; no write route, member
-    /// or type exists in the P2-T07 surface.
+    /// N1/R4 (superseded boundary, §34.3) — Boquilhas now OWNS the repairer family
+    /// (<c>Boquilhas > Definições</c>: the repairer register + the machine assignments), so the
+    /// "no repairer administration" part of the old boundary is REMOVED by the Owner
+    /// clarification. What remains forbidden in the Boquilhas sources: the CONTROL settings
+    /// surface (PDF directory, email lists/templates — still owned by Controlo), the glass-density
+    /// settings (Controlo) and the Admin/availability vocabulary.
     /// </summary>
     [Fact]
-    public void N1R4_NoSettingsOrRepairerAdministrationSurfaceExists()
+    public void N1R4_NoControloOrAdminSettingsSurfaceExists()
     {
         foreach (var token in P2T07ProductionScan.SettingsTokens)
         {

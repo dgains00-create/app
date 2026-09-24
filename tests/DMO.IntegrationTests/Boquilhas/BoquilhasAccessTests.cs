@@ -20,6 +20,7 @@ public sealed class BoquilhasAccessTests
         "/boquilhas",
         "/boquilhas/novo",
         "/boquilhas/historico",
+        "/boquilhas/definicoes",
     ];
 
     private static readonly string[] EndpointRoutes =
@@ -27,11 +28,15 @@ public sealed class BoquilhasAccessTests
         "/boquilhas/registers",
         "/boquilhas/registers/00000000-0000-0000-0000-000000000001",
         "/boquilhas/registers/00000000-0000-0000-0000-000000000001/movements/00000000-0000-0000-0000-000000000002/audit",
+        "/boquilhas/registers/00000000-0000-0000-0000-000000000001/association-candidates",
+        "/boquilhas/pending-registers?bqId=00000000-0000-0000-0000-000000000003",
         "/boquilhas/productions?reference=X",
         "/boquilhas/jobons/00000000-0000-0000-0000-000000000003",
         "/boquilhas/machine-assignments",
         "/boquilhas/repairers",
         "/boquilhas/history",
+        "/boquilhas/definicoes/repairers",
+        "/boquilhas/definicoes/machine-assignments",
     ];
 
     /// <summary>
