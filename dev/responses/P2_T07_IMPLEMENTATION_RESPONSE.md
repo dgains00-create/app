@@ -276,3 +276,124 @@ IMPLEMENTATION REVIEW`.
 P2-T07 implementation stops here: **no independent verification, no Architect implementation
 review, no closure** were performed by this task. NEXT GATE: independent verification of P2-T07.
 P2-T08 / P2-T10 remain NOT AUTHORIZED; `CurrentBuildAvailable` stays `[]`.
+
+---
+
+## 21. OWNER CORRECTION — SIMPLIFY TO THE PRODUCTION MOVEMENT REGISTER (CORRECTION RECORD)
+
+**Authority:** a NEW OWNER CLARIFICATION issued after the implementation above was pushed but
+while P2-T07 is NOT closed. It **supersedes the affected rules** of the P2-T07 contract (recorded
+in contract §33). **The old independent-verification gate was NOT run before applying this
+correction.** This section documents exactly what changed.
+
+### 21.1 Superseded and removed (functional + persistence + tests)
+
+- **Standalone Boquilhas flow**: removed. Every register anchors a REAL Job On/BQ context
+  (`jobon_id → bq_id → tool_id`); no fake Job On/bq_id, no `production_id`, no duplicate Tool
+  identity. No standalone route/branch exists.
+- **The four-type movement set**: replaced by EXACTLY THREE types — `saida | entrada |
+  entrada_sem_reparacao` (Saída / Entrada / Entrada sem reparação). **Início** (never
+  manufactured; register creation is identity-only) and **Irreparável** (superseded by Entrada
+  sem reparação: a normal historical return that records the boquilhas were NOT repaired; never
+  marks/destroys/separates the Tool, never creates an irreparable bucket) are gone. `Editar`
+  stays an action, never a type.
+- **The open/closed lifecycle in full**: no `status` active/closed, no Close/Reopen actions
+  (routes, endpoints, actions, UI, service/repository members, entities/configurations, tests),
+  no close/reopen eligibility, no close snapshot, no reopening history.
+- **The B1 machinery**: the partial unique indexes
+  `IX_boquilhas_active_bq_id` / `IX_boquilhas_active_tool_id`, the scoped
+  23505 → `Refused(ActiveAggregateExists)` mapping, `HasActiveAggregateForAnchorAsync` and the
+  K6/K7/K8 create/create + create-vs-reopen race rows are **removed, NOT replaced by another
+  locking mechanism** — the invariant they enforced no longer exists.
+- **The four-bucket balance model + expected/excess facts + the register machine set/opening
+  facts**: removed. The single derived value is the outstanding
+  (`Σ Saída − Σ Entrada − Σ Entrada sem reparação`), replayed at read time, never stored;
+  negative is a valid visible projection; no Saída ≤ Disponível / Irreparável ≤ Em reparação
+  rules exist. `boquilha_machines` is gone; movements carry their own machine (one of B1..C3,
+  required on Saída) + the consumed repairer fact.
+- **After-the-production-end movements**: the previous contract never rejected them; this is now
+  an explicit tested invariant (production stays the historical context; the movement's own
+  `business_date`/`recorded_at` govern).
+
+### 21.2 Preserved unchanged
+
+edit SAME `movement_id` + before/after audit + backend actor/time + no second quantity event +
+`recorded_at` immutable; `business_date` editable; repairer resolution (machine → current
+assignment → suggested) with historical preservation and no administration; canonical Tool/Job On
+identities and the shared Tool orchestration (BQ candidates only, never auto-select, contextual
+create returns to origin); local Histórico (chronological movement history with the production
+context; every filter backend-applied; FILTER_INVALID discipline); shared table interaction
+(single-click select, double-click open, actions outside tables); fixed 1366×768 desktop; every
+route gated exactly `dmo.module.boquilhas`; `CurrentBuildAvailable` stays `[]`.
+
+### 21.3 Schema / migration strategy
+
+P2-T07 is NOT closed and migration 007 was never accepted, so the schema was corrected **cleanly**
+(no pile of compensating legacy tables): the unreviewed 20260924031924 pair was removed and
+regenerated (20260924051151_BoquilhasDomain) with the final register model:
+
+| Fact | Value |
+|---|---|
+| Final P2-T07 tables | **3** — `boquilhas` (register identity: `boquilhas_id`, `bq_id` NOT NULL UNIQUE → REAL `bq_contexts` row (one register per production/BQ context), `created_by_user_id`, `created_at`; no `status`/`tool_id`/opening facts/version), `boquilha_movements` (ledger: `movement_type` CHECK `('saida','entrada','entrada_sem_reparacao')`, positive quantity, `business_date`, immutable `recorded_at`, machine/repairer with the Saída-required CHECK, observations, movement `version` token), `boquilha_movement_audit` (per-edit before/after + backend actor/time) |
+| Removed lifecycle tables | `boquilha_close_snapshots`, `boquilha_reopenings`, `boquilha_machines` (gone entirely; `Down` removes exactly the three final tables) |
+| Indexes | the plain `boquilhas_bq_id_key` UNIQUE (one register per BQ context); **NO ACTIVE partial unique index**; the ledger order index |
+| Physical count | 20 closed product tables + 3 = **23 product tables**; 24 raw incl. `__EFMigrationsHistory` |
+
+### 21.4 Routes / identity / refusals
+
+- **Final route count: 15 = 3 pages + 12 endpoints** (recalculated after removing close, reopen
+  and opening-facts; NOT preserved at the old 18). Every route carries exactly
+  `dmo.module.boquilhas`.
+- Identity: `boquilhas_id` is the register's technical identity ONLY (no active/closed/reopened
+  meaning); the register is created with NO quantity event.
+- Refusals: `stale-version` (per-movement edit token only — appends are unversioned inserts; the
+  derived sum cannot be corrupted by races, so no aggregate version/lock exists) and
+  `register-exists` (the plain bq_id unique key, the ONLY 23505 mapping: one register per
+  production/BQ context). 23514 → the same validator token; 23503 → the typed anchor tokens.
+
+### 21.5 Verification (final runs)
+
+| Item | Result |
+|---|---|
+| Build (Rebuild) | 0 errors; only the pre-existing protected-file analyzer warnings |
+| Unit | **658/658** (new Boquilhas unit rows: vocabulary 3-type closed set, validator, OutstandingProjection replay incl. the Owner example Saída 10 / Entrada 4 / Entrada sem reparação 6 → 0) |
+| Integration (disposable PostgreSQL 16.15) | **633 passed / 0 failed / 2 pre-existing live-Supabase skips** |
+| Focused Boquilhas (unit + integration incl. the DB-class rows) | **67/67 Boquilhas-filter integration + unit rows** — production association (real bq_id, fake refused, one-register-per-BQ-context enforced), production-ended movement (27/09 → 29/09 valid), 3-type vocabulary (superseded types refused in-transaction with the validator token), replay (Owner example → 0; negative visible), Entrada sem reparação (returns quantity + explicit in history + Tool row untouched), edit (same row + one audit row + no double count), stale edit refused with nothing written, repairer history frozen, schema (no lifecycle tables/status/active indexes; 24 raw; real Down → 21 raw; re-apply idempotent) |
+| Migration cycle (real EF migrator) | apply all 7 → 24 raw; Down to migration 006 → 21 raw; re-apply → 24 raw; migrations 001–006 + `DmoDbContext.cs` byte-identical |
+| Auth negatives / negative-scope scans | green (A1–A6; N1–N7; no close/reopen/status/standalone/active tokens anywhere; no settings/PDF/email/availability; `CurrentBuildAvailable` `[]`) |
+| Frontend behavioral harness (node, real shipped JS, 9 scenarios) | PASS — stale-version conflict + explicit recovery on append/edit, register-exists/400 keep the errors presentation (no recovery control), picker never auto-selects, contextual create/cancel preserve origin |
+
+### 21.6 Test-suite posture
+
+The tests were **kept small** per the clarification: no 83-AC/86-row certification matrix was
+rebuilt; the surviving suite is the critical executable coverage (production association,
+production-ended movements, movement vocabulary, quantity replay, Entrada sem reparação
+semantics, edit/audit, repairer history, schema, access, negative scope) plus the preserved
+higher-order pins. The disclosed additive extensions now also cover: `P2T04TestStore` gains the
+two read-only arrangement members (`ContextsOf`/`JobOnIds`) so the Boquilhas composition resolves
+contexts created by the REAL association flow (registries updated in `P2T04ProductionScan`),
+`Migration003/004/005/006`, `MigrationRunnerTests` and `DatabaseConnectivityTests` pin the
+corrected 3-table/23-product/24-raw final schema, and the P2-T05 owned-surface extension tracks
+the corrected migration pair.
+
+### 21.7 Final corrected facts (report block)
+
+- **Owner-correction implementation SHA:** `caad792` (the correction commit on top of
+  `3ab6dd4`; the governance records of this response ride on top of it).
+- **final identity relationship:** `boquilhas_id → bq_id → jobon_id + tool_id` (REAL Job On/BQ
+  context; production-linked ONLY).
+- **final movement types:** `saida | entrada | entrada_sem_reparacao` (Saída / Entrada / Entrada
+  sem reparação) — no Início, no Irreparável.
+- **final outstanding formula:** `Σ(Saída) − Σ(Entrada) − Σ(Entrada sem reparação)`, derived by
+  replay, never stored.
+- **final tables:** 3 (`boquilhas`, `boquilha_movements`, `boquilha_movement_audit`); 23 product
+  tables overall, 24 raw.
+- **removed lifecycle tables:** `boquilha_close_snapshots`, `boquilha_reopenings`,
+  `boquilha_machines` — plus `status` and every lifecycle-only column/index.
+- **final route count:** 15 (3 pages + 12 endpoints), every one gated `dmo.module.boquilhas`.
+- **close/reopen present: NO. standalone flow present: NO. active-anchor partial indexes: NO.**
+- **CurrentBuildAvailable: []. working tree: clean at the response close.**
+
+**STOP:** the correction stops here — no independent verification, no Architect review, no
+closure, no P2-T08/T10 start, no availability registration. NEXT GATE: one independent review of
+the corrected P2-T07, then close if VERIFIED.

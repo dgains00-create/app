@@ -226,6 +226,46 @@ Histórico, 18 routes all gated `dmo.module.boquilhas`, and the full P2-T07 matr
 rows incl. K6/K7/K8 REAL PostgreSQL races). Full unit + integration suites green on a fresh
 disposable PostgreSQL.
 
-The workstream is **NOT self-verified and NOT closed**: it awaits independent verification and
-the Architect implementation review. `ModuleRegistrations.CurrentBuildAvailable` remains `[]`.
+The workstream is **NOT self-verified and NOT closed**: it awaits ONE independent review of the
+corrected P2-T07, then close if VERIFIED. `ModuleRegistrations.CurrentBuildAvailable` remains `[]`.
 **P2-T08 / P2-T10 remain NOT AUTHORIZED.**
+
+## 16. Owner clarification — the production movement register (correction record)
+
+**Status: IMPLEMENTED + OWNER CLARIFICATION CORRECTION APPLIED — AWAITING INDEPENDENT
+VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW.**
+
+A NEW OWNER CLARIFICATION (contract §33; implementation-response §21) **supersedes the affected
+rules** of the accepted contract — the old independent-verification gate was NOT run before this
+correction. Superseded: the standalone Boquilhas flow, the Início movement type, the Irreparável
+movement semantics, the open/closed lifecycle (status/close/reopen/close snapshots/reopening
+history), the B1 active-aggregate machinery (the ACTIVE partial unique indexes, their 23505
+mapping, the active pre-check, the K6–K8 race rows — NOT replaced by any lock) and the four-bucket
+balance model.
+
+Final model: Boquilhas is a **historical movement register associated with a REAL production** —
+`boquilhas_id → bq_id → jobon_id + tool_id` (production-linked only; movements valid AFTER the
+production end date); exactly THREE movement types `saida | entrada | entrada_sem_reparacao`
+(Saída / Entrada / Entrada sem reparação; Editar stays an action); the outstanding is derived by
+replay (`Σ Saída − Σ Entrada − Σ Entrada sem reparação`), never stored; the register identity is
+created WITHOUT any quantity event; edit/audit, dates, repairer resolution + historical
+preservation, shared Tool orchestration, Histórico, fixed desktop and the
+`dmo.module.boquilhas` gate are preserved.
+
+Correction executed: migration 007 was **corrected cleanly pre-closure** (the unreviewed
+20260924031924 pair replaced by 20260924051151_BoquilhasDomain): final schema **THREE tables**
+(`boquilhas` with the plain one-register-per-BQ-context unique key, `boquilha_movements` with the
+closed three-type + Saída-required CHECKs, `boquilha_movement_audit`); the lifecycle tables
+(`boquilha_close_snapshots`, `boquilha_reopenings`, `boquilha_machines`), the `status` column and
+every lifecycle-only index are gone; **23 product tables / 24 raw**; final route count **15 = 3
+pages + 12 endpoints** (close/reopen/opening-facts/standalone routes removed).
+
+Verification (fresh disposable PostgreSQL 16.15): build 0 errors; **unit 658/658**; **integration
+633 passed / 0 failed / 2 pre-existing live-Supabase skips**; focused Boquilhas 67/67 (production
+association incl. one-register-per-BQ-context, production-ended movements, 3-type vocabulary,
+replay incl. the Owner example → 0, Entrada sem reparação semantics, edit/audit single-event +
+stale refusals, repairer history, schema facts, real Down/re-apply); 9 node-adapter behavioral
+scenarios PASS; auth negatives and negative-scope scans green; `CurrentBuildAvailable` stays `[]`.
+
+**NEXT GATE: one independent review of the corrected P2-T07, then close if VERIFIED.** The
+workstream is NOT closed. **P2-T08 / P2-T10 remain NOT AUTHORIZED.**

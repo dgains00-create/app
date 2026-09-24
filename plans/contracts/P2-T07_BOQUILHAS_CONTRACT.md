@@ -1,5 +1,12 @@
 # P2-T07 — Boquilhas — BACKEND / INTERFACE CONTRACT
 
+> **OWNER CLARIFICATION (final functional rule):** **§33 below is a NEW OWNER CLARIFICATION that
+> SUPERSEDES every AFFECTED rule of this contract** — standalone Boquilhas, the Início movement
+> type, the Irreparável movement semantics, the open/closed lifecycle (status, close/reopen,
+> close snapshots, reopening history), the B1 active-aggregate race machinery (the two ACTIVE
+> partial unique indexes and their 23505 mapping) and the four-bucket balance model are replaced
+> by the production movement register model of §33. Rules not listed in §33.1 remain in force.
+
 **Workstream:** P2-T07 — Boquilhas (BQ external-repair quantity workflow; aggregate + movement
 ledger + edit-audit + close/reopen + local Histórico).
 **Task class:** contract authoring only. **No implementation, no migration, no Supabase change.**
@@ -2691,3 +2698,96 @@ P2-T07 CONTRACT CORRECTED (B1) — AWAITING FOCUSED ARCHITECT PLAN RE-REVIEW
 NOT IMPLEMENTED — NOT AUTHORIZED
 CurrentBuildAvailable = []
 ```
+
+---
+
+## 33. OWNER CLARIFICATION — FINAL FUNCTIONAL RULE (SUPERSEDES THE AFFECTED CONTRACT RULES)
+
+**Authority:** direct OWNER clarification after the P2-T07 implementation was pushed but while the
+workstream is NOT closed and migration 007 was NEVER accepted by independent verification. This
+section is a NEW OWNER CLARIFICATION and **supersedes every affected rule of this contract**: where
+any earlier section (including the §7.2 B1 correction) conflicts with this section, THIS section
+wins. The affected rules are **marked superseded** below; everything else (edit/audit single-event
+semantics, business_date ⊥ recorded_at, repairer historical preservation, shared Tool
+orchestration, fixed desktop, Histórico, authorization) is preserved as-is.
+
+### 33.1 Superseded rules (explicit list)
+
+The following rules and machinery are **REPLACED** as of this clarification; no implementation
+after this clarification may use them, and the existing unreviewed implementation is corrected to
+remove them (P2-T07 is not closed, so migration 007 is corrected CLEANLY — no compensating legacy
+tables, no second migration):
+
+1. **Standalone Boquilhas flow** — there is NO standalone (`tool_id`) anchor: every Boquilhas
+   register belongs to a REAL Job On / production (the existing real identity chain
+   `jobon_id → bq_id → tool_id`; no fake Job On, no fake bq_id, no `production_id`, no duplicate
+   Tool identity). The production is the context: movements may be recorded while the production
+   runs AND AFTER it has ended — a movement is never rejected because the production end date has
+   passed; the movement's own `business_date` records when the movement happened and historical
+   association remains with the original production/jobon_id.
+2. **Início as a movement type** — removed. Creating/accessing the register MUST NOT generate a
+   quantity movement merely to establish existence. If a register row must exist before the first
+   movement, it is created as identity only (no manufactured stock).
+3. **Irreparável as a movement type/name/meaning** — removed and REPLACED by
+   **Entrada sem reparação**: X boquilhas returned from the repairer but NOT repaired. It is a
+   normal historical movement record with a distinct meaning; it does NOT mark the Tool
+   irreparable, does NOT create a permanent Tool state, does NOT separate/destroy the Tool
+   identity and does NOT create an irreparable bucket/entity. It exists so the history clearly
+   records, e.g., "Entraram 6 T173 que não foram reparadas (não cobráveis)". No
+   billing/accounting mechanics are implemented in P2-T07.
+4. **The open/closed aggregate lifecycle** — removed in full: no `active`/`closed` status, no
+   Close action, no Reopen action, no close/reopen eligibility, no close snapshot, no reopening
+   history, no `boquilha_close_snapshots` table, no `boquilha_reopenings` table, no
+   active-anchor uniqueness and no active-aggregate pre-check.
+5. **The B1 active-aggregate race machinery** — SUPERSEDED because its underlying invariant no
+   longer exists: the partial unique indexes
+   `IX_boquilhas_active_bq_id`/`IX_boquilhas_active_tool_id`, the scoped
+   23505 → `Refused(ActiveAggregateExists)` mapping, `HasActiveAggregateForAnchorAsync` and the
+   K6/K7/K8 create/create + create-vs-reopen race tests are REMOVED. They are NOT replaced by
+   another locking mechanism — the problem they solved no longer exists.
+6. **The four-bucket balance model** — removed. The amounts are reconciled to the new owner model:
+   the ONLY derived value is the **outstanding repair quantity**,
+   `outstanding = Σ(Saída) − Σ(Entrada) − Σ(Entrada sem reparação)` (the old Disponível /
+   Em reparação / Irreparável / Entrada excecional buckets and the expected/excess facts are
+   gone; Entrada sem reparação RETURNS quantity from repair like an Entrada). The outstanding is
+   DERIVED BY REPLAY at read time and remains never-stored: movement facts remain the sole
+   authority and no second mutable balance source is created. A negative outstanding is a valid
+   visible projection (non-blocking).
+7. **The register machine set (`boquilha_machines`) and the opening facts** — removed with the
+   aggregate model: no register-level machine set, no opening date/utilisation/observations
+   fields on the register, no opening-facts route. The movement row still carries its own
+   `machine` (one of B1..C3, required on Saída) and the consumed repairer-resolved fact.
+
+### 33.2 The final functional rule (normative)
+
+Boquilhas is a **historical movement register associated with a REAL production**:
+
+- registration: production/BQ context → Boquilhas register identity (one register per BQ context,
+  plain unique key; no lifecycle state) → movements;
+- movements: exactly THREE operational movement types — **Saída** (moves quantity out to repair;
+  machine + repairer recorded), **Entrada** (returns repaired quantity), **Entrada sem
+  reparação** (returns quantity from repair, records the returned boquilhas were NOT repaired);
+  `Editar` remains an action, never a type;
+- quantity effect: `outstanding = Σ(Saída) − Σ(Entrada) − Σ(Entrada sem reparação)`, derived by
+  replay, never stored, never validated against a stock (no Saída ≤ Disponível rule, no
+  Irreparável ≤ Em reparação rule);
+- dates: `business_date` operator-editable (may be later than the production end date);
+  `recorded_at` immutable backend timestamp;
+- edit/audit, repairer resolution + historical preservation, Tool/Job On identities, Histórico
+  (production context + chronological movement history, vocabulary Saída/Entrada/Entrada sem
+  reparação only), routes all gated `dmo.module.boquilhas`, fixed 1366×768 desktop and the
+  negative scope (no settings, no PDF/email/files, no availability) — all PRESERVED per the
+  earlier sections of this contract;
+- schema: migration 007 corrected (pre-closure) to the final THREE tables
+  (boquilhas / boquilha_movements / boquilha_movement_audit) with no lifecycle-only structure;
+  final physical table count to be reported by the implementation: 23 product tables
+  (20 closed + 3), 24 raw incl. `__EFMigrationsHistory`.
+- routes: the final route matrix is recalculated: 12 endpoints + 3 pages = 15 (close/reopen/
+  opening-facts and standalone routes removed), NOT preserved at the old eighteen.
+
+### 33.3 Authorization record
+
+This clarification supersedes the affected contract rules pre-verification; it does NOT reopen any
+closed P2-T04/P2-T05/P2-T06 authority. The implementation record
+(`dev/responses/P2_T07_IMPLEMENTATION_RESPONSE.md`) is updated with this clarification as a
+correction section.
