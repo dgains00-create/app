@@ -123,8 +123,7 @@ beyond name, a machine grouping rule, a placeholder syntax, or exact email routi
 **P2-T05: CONTRACT ACCEPTED** (correction re-review ACCEPT `f54ac15a96797a0dd0c51cf85b9b179e16be4da3` /
 `ceb9ee9…`, dmo-work).
 **B2: RESOLVED — PLAN ACCEPT.**
-**P2-T05 IMPLEMENTATION: IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT
-IMPLEMENTATION REVIEW** (implementation response `dev/responses/P2_T05_IMPLEMENTATION_RESPONSE.md`).
+**P2-T05 IMPLEMENTATION: IMPLEMENTED — CLOSED** (implementation response `dev/responses/P2_T05_IMPLEMENTATION_RESPONSE.md`; the post-closure glass-density Owner correction and the water-temperature → water-density lookup correction are implemented and independently verified, VERIFIED `7afcb00…`).
 
 The B2 contract was authored at `plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md`
 (contract SHA `c1adae808af11e1a9d68c8ed98e074259339f065`; authoring response:
@@ -162,7 +161,8 @@ identity, no path identity, no resolution, never 404), **C4** the Appendix D.3 a
 provenance correction (the recorded `610c8b4…` is unretrievable; replaced by verified current
 heads plus the preserved dmo-work evidence record `dev/evidence/P2T05_DMO_MASTER_AUTHORITY_EVIDENCE.md`).
 
-The contract is **not** self-accepted: it awaits the Architect re-review per
+*(Recorded at authoring time — **HISTORICAL / SUPERSEDED** by the status update below.)* The
+contract is **not** self-accepted: it awaits the Architect re-review per
 `dmo-beta-master/WORKFLOW.md` step 6. Implementation is **NOT STARTED — NOT AUTHORIZED**.
 `ModuleRegistrations.CurrentBuildAvailable` remains `[]`. **P2-T05 is not marked started and no
 workstream after P2-T05 is authorized.**
@@ -171,9 +171,15 @@ workstream after P2-T05 is authorized.**
 > (`f54ac15a96797a0dd0c51cf85b9b179e16be4da3` / `ceb9ee9…`, dmo-work) returned **PLAN ACCEPT**;
 > P2-T05 implementation was authorized, executed against the accepted contract, and recorded in
 > `dev/responses/P2_T05_IMPLEMENTATION_RESPONSE.md`. The workstream is now
-> **IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW**;
+> **IMPLEMENTED — CLOSED** (final accepted behavior preserved: Peso with the same-`peso_id`
+> lifecycle, `Controlo_Create → Definições` with the repairer register, independent per-machine
+> repairer assignments, the PDF base-directory setting, email lists and email templates, glass
+> density settings with the water-density behavior, the shared Peso read model); the post-closure
+> **glass-density Owner correction** (glass density per processo NNPB/PS in Definições,
+> migration 005, seeds NNPB 2.4027 / PS 2.4231) and the **water-temperature → water-density
+> lookup** correction are implemented and independently verified (VERIFIED `7afcb00…`).
 > `ModuleRegistrations.CurrentBuildAvailable` remains `[]`, no route is registered, and
-> **P2-T06 / P2-T07 / P2-T08 remain NOT AUTHORIZED**.
+> **P2-T06 is also CLOSED; P2-T07 CLOSED; P2-T08 / P2-T09 / P2-T10 remain NOT IMPLEMENTED**.
 
 ## 6. Explicit non-scope
 

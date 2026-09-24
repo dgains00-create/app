@@ -24,8 +24,10 @@ variants are out of scope.
 
 ## 1. Purpose
 
-Deliver the Boquilhas module: aggregate create (production-linked and standalone), the four
-movements, movement editing with audit, derived balance, close/reopen and History.
+Deliver the Boquilhas module as the **production-linked movement register** settled by the Owner
+clarification (contract §33): one register per real `bq_id` / Job On context, exactly three
+movement types (`saida | entrada | entrada_sem_reparacao`), movement editing with audit, derived
+outstanding and History. **No standalone flow, no lifecycle, no close/reopen** (see §16–§17).
 
 ## 2. Authority
 
@@ -37,13 +39,19 @@ movements, movement editing with audit, derived balance, close/reopen and Histor
   **historically preserved**; and the Job-On-dependent machine sidebar is **removed** from current
   visual authority.
 - `dmo-beta-master/modules/BOQUILHAS.md` (full) — identity, flows, movement vocabulary, edit
-  audit, balance, business date, close/reopen, repairer, history, acceptance.
-- `dmo-beta-master/architecture/RECORD_LIFECYCLES.md` §9 — Boquilhas lifecycle.
-- `dmo-beta-master/architecture/CROSS_MODULE_FLOWS.md` — Job On → Boquilhas; standalone validity.
+  audit, balance, business date, close/reopen, repairer, history, acceptance. **SUPERSEDED /
+  HISTORICAL ONLY for the affected rules:** the standalone flow, the `Início`/`Irreparável`
+  vocabulary and the close/reopen lifecycle in that module document were superseded by the Owner
+  clarification (contract §33) — see §16.
+- `dmo-beta-master/architecture/RECORD_LIFECYCLES.md` §9 — Boquilhas lifecycle (affected rules
+  superseded by contract §33, see §16).
+- `dmo-beta-master/architecture/CROSS_MODULE_FLOWS.md` — Job On → Boquilhas (the "standalone
+  validity" trace is superseded by contract §33, see §16).
 - `dmo-beta-master/implementation/BETA_INTEGRATION_SEAMS.md` — Workstream E; "E → B" seam.
 - `dmo-master/global/ACCESS_MODEL.md` §1/§11 — Boquilhas is one assignable module.
 - `dmo-master/global/INFORMATION_MODEL.md` §"Boquilhas" — `movement_id -> boquilhas_id -> bq_id
-  -> tool_id + jobon_id`, and the standalone variant; `bq_id` is distinct from `boquilhas_id`.
+  -> tool_id + jobon_id` (production-linked branch; the standalone variant is superseded by
+  contract §33, see §16); `bq_id` is distinct from `boquilhas_id`.
 
 > **Terminology (binding — master plan §0):** the History in this workstream is **HISTÓRICO
 > (local)** — history functionality *inside* the module. It is not the top-level
@@ -52,33 +60,40 @@ movements, movement editing with audit, derived balance, close/reopen and Histor
 
 ## 3. Current implementation starting point
 
-Nothing operational exists (no `boquilha`/`movement` occurrence in `src/`). Depends on P2-T04 for
-canonical BQ Tool selection/create and `bq_id` resolution, and on the shell/components from
-P2-T01…P2-T03.
+Implemented under the accepted contract (`b884dd84…`) and corrected per the Owner clarification
+(contract §33): migration 007 `BoquilhasDomain` (corrected cleanly pre-closure to the final
+three-table schema), 15 routes (3 pages + 12 endpoints) gated `dmo.module.boquilhas`, full unit
+and integration suites green (see §16–§17). Built on P2-T04 for canonical BQ Tool
+selection/create and `bq_id` resolution, and on the shell/components from P2-T01…P2-T03.
 
-## 4. Scope
+## 4. Scope (FINAL — CLOSED model)
 
-1. Search/select/create BQ Tool context.
-2. **Production-linked flow:** `boquilhas_id -> bq_id -> jobon_id + tool_id`.
-3. **Standalone flow:** `boquilhas_id -> tool_id` with **no** fake Job On/`bq_id`.
-4. Active aggregate summary.
-5. Exactly the **four** write movement types: `Início`, `Saída`, `Entrada`, `Irreparável`.
-   `Editar` is an **action** on an existing movement — **never** a fifth movement type.
-6. Movement forms and validation; recent movements.
-7. Full **History** with filters (reference, lot, line, business date/period, movement type,
-   repairer, aggregate/file state, pagination); single click selects, double click opens.
-8. **Edit** preserves before/after audit, authenticated user and system timestamp **without** a
+Boquilhas is a **production-linked movement register** per the Owner clarification
+(contract §33):
+
+1. Search/select/create BQ Tool context (shared Tool orchestration; returns to origin).
+2. **Production-linked flow only:** `boquilhas_id -> bq_id -> jobon_id + tool_id`. One register
+   per real `bq_id` / Job On context; movements remain valid **after** the production end date.
+   **No standalone flow** (the former `boquilhas_id -> tool_id` flow is SUPERSEDED — §16). No
+   fake Job On/`bq_id`; the register identity is created WITHOUT any quantity event.
+3. Exactly the **three** write movement types: `saida` (Saída), `entrada` (Entrada),
+   `entrada_sem_reparacao` (Entrada sem reparação). `Editar` is an **action** on an existing
+   movement — **never** a movement type. No `inicio` / `irreparavel`.
+4. Movement forms and validation; recent movements.
+5. Full **History** with filters (reference, lot, line, business date/period, movement type,
+   repairer, register/file state, pagination); single click selects, double click opens.
+6. **Edit** preserves before/after audit, authenticated user and system timestamp **without** a
    second quantity event or double balance effect.
-9. **`business_date`** (editable) distinct from **`recorded_at`** (immutable).
-10. **Derived balance** buckets Disponível / Em reparação / Irreparável / Entrada excecional
-    from movement facts (no second mutable balance authority). Saída ≤ available;
-    Irreparável ≤ in-repair; excess Entrada recorded (not clamped/rejected); negative saldo
-    visible and non-blocking. `% utilização` is manual and never derived from movements.
-11. **Close/reopen** on the same `boquilhas_id`: immutable close snapshot; recorded reopen
-    actor/time/reason; a failed close leaves the active state unchanged.
-12. Canonical **`repairer_id`** stored on external Saída with historical retention.
-13. Production-line contextual panel **reading** (not owning) production context.
-14. **Automatic repairer resolution** (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md`
+7. **`business_date`** (editable) distinct from **`recorded_at`** (immutable).
+8. **Derived outstanding:** `SUM(saida) − SUM(entrada) − SUM(entrada_sem_reparacao)` from
+   movement facts alone (no second mutable balance authority). Excess Entrada recorded (not
+   clamped/rejected); negative outstanding visible and non-blocking. `% utilização` is manual
+   and never derived from movements.
+9. **No lifecycle:** no active/closed/reopen, no close snapshots, no reopening records, no
+   opening-facts surface (all SUPERSEDED — §16).
+10. Canonical **`repairer_id`** stored on Saída with historical retention.
+11. Production-line contextual panel **reading** (not owning) production context.
+12. **Automatic repairer resolution** (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md`
     §4, §5, §6): when a registration/movement is associated with a machine, the repairer is
     resolved from that machine's **current** assignment —
     `machine → current repairer assignment → repairer resolved`. The operator should not normally
@@ -87,16 +102,20 @@ P2-T01…P2-T03.
     model. The repairer used at the time of the movement is **historically preserved**: changing a
     machine's assignment later must **never** rewrite an earlier Boquilhas record. Boquilhas
     **consumes** the register and does not administer it.
-15. **Removed from current visual authority:** the Boquilhas **machine/sidebar** concept that
+13. **Removed from current visual authority:** the Boquilhas **machine/sidebar** concept that
     depends on Job On operational context is removed from the current frontend authority
     (`…DELTA.md` §11). Do **not** simulate Job On machine/reference state inside Boquilhas. If
     future Job On integration justifies such context, it may be reintroduced later from real
-    backend authority. The production-line contextual panel (item 13) is a different, read-only
+    backend authority. The production-line contextual panel (item 11) is a different, read-only
     reading of real supplied context and is unchanged.
 
 ## 5. Authority blocker B3 — required contract before execution
 
-The authored, reviewed contract must fix: the aggregate/movement schema and keys
+**Status: B3 CLOSED** — the required contract was authored, PLAN ACCEPT-ed and implemented; the
+blocker description below is **HISTORICAL / SUPERSEDED ONLY** (its close/reopen representation
+requirement was superseded by contract §33, see §16).
+
+The authored, reviewed contract had to fix: the aggregate/movement schema and keys
 (`boquilhas_id`, `movement_id`, `repairer_id`); the balance derivation rule; the edit/audit
 representation; the close/reopen representation; the History filter/query shapes; transactional
 boundaries; and the endpoint/route names with their module policy.
@@ -138,21 +157,27 @@ tests/DMO.UnitTests/  tests/DMO.IntegrationTests/
 `ModuleAuthorizationPolicies.PolicyName(ModuleCatalog.Boquilhas)` on routes/actions; navigation
 availability remains a projection only.
 
-## 9. Backend / persistence requirements
+## 9. Backend / persistence requirements (FINAL)
 
-Per B3. Aggregate + movements + edit/audit history + close snapshot + reopen record;
-`repairer_id` relation; no reverse-ID arrays; movement facts are the sole balance authority.
-The repairer actually used must remain readable on the historical record after the machine's
-current assignment changes; the machine assignments themselves are **read** from the
-Controlo_Create → Definições configuration and are not owned here.
+Per B3/§33. Exactly **three** tables — `boquilhas`, `boquilha_movements`,
+`boquilha_movement_audit` — in ONE corrected migration 007 (`20260924051151_BoquilhasDomain`;
+23 product tables / 24 raw). No lifecycle tables (`boquilha_close_snapshots`,
+`boquilha_reopenings`, `boquilha_machines`), no `status` column, no active-anchor partial unique
+indexes; one register per real BQ context (plain unique key); `repairer_id` relation; no
+reverse-ID arrays; movement facts are the sole outstanding authority. The repairer actually used
+must remain readable on the historical record after the machine's current assignment changes; the
+machine assignments themselves are **read** from the Controlo_Create → Definições configuration
+and are not owned here.
 
 ## 10. Required tests
 
-See master plan §11 P2-T07: four movement types only; `Editar` is not a type; balance
-constraints; excess Entrada recorded; negative saldo non-blocking; `% utilização` not derived;
-`business_date` != `recorded_at`; edit audit without a second movement; both flows without fake
-identities; close/reopen same id with full history; failed close no-op; repairer historical
-retention.
+See master plan §11 P2-T07: exactly three movement types (`saida`, `entrada`,
+`entrada_sem_reparacao`); `Editar` is not a type (no `inicio`/`irreparavel`); outstanding
+constraints (replay, never stored); excess Entrada recorded; negative outstanding non-blocking;
+`% utilização` not derived; `business_date` != `recorded_at`; edit audit without a second
+movement; production-linked flow without fake identities; one register per real `bq_id` / Job On
+context (no quantity event at register creation); movements remain valid after the production end
+date; repairer historical retention.
 
 Additionally (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §4, §5, §6, §11): a
 registration/movement associated with a machine resolves the repairer automatically and does not
@@ -163,15 +188,19 @@ rendered.
 
 ## 11. Acceptance criteria
 
-Every bullet in `modules/BOQUILHAS.md` "Acceptance criteria"; the movement selector exposes only
-the four types; no mandatory PDF; no settings tab; no replacement aggregate on close/reopen;
-automatic repairer resolution from the machine's current independent assignment; historical
-repairer preservation; no machine sidebar; `CurrentBuildAvailable` unchanged.
+The register is production-linked only (one register per real `bq_id` / Job On context; no
+standalone flow, no fake Job On/`bq_id`); the movement selector exposes exactly the three types;
+`Editar` is not a type; edit adds audit without a second movement; movements remain valid after
+the production end date; outstanding equals `SUM(saida) − SUM(entrada) −
+SUM(entrada_sem_reparacao)` from movement facts alone; no mandatory PDF; no settings tab; no
+lifecycle/close/reopen structures; automatic repairer resolution from the machine's current
+independent assignment; historical repairer preservation; no machine sidebar;
+`CurrentBuildAvailable` unchanged.
 
 ## 12. Completion evidence
 
-Committed implementation + tests + explicit confirmation that close/reopen creates no
-replacement aggregate.
+Committed implementation + tests + the final independent review `a96814f…` **VERIFIED**
+(`reports/P2_T07_FINAL_INDEPENDENT_REVIEW.md`) — **P2-T07 CLOSED** (see §17).
 
 ## 13. Downstream dependents
 
@@ -179,7 +208,14 @@ P2-T08, P2-T10.
 
 ## 14. Contract-authored record
 
-**Status: IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW**
+> **HISTORICAL / SUPERSEDED ONLY.** The contracted model recorded in §14–§15 (standalone flow,
+> four movement types incl. Início, balance buckets, close/reopen, six tables, 18 routes,
+> active-anchor B1 machinery) was **superseded by the Owner clarification, contract §33** (see
+> §16); the workstream is **CLOSED** (see §17). The record is kept for provenance only and is NOT
+> current authority.
+
+**Status at the time: IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION
+REVIEW**
 (contract-authoring and B1-correction tasks recorded in §14–§15 below; the implementation is
 executed per §15).
 
@@ -213,7 +249,10 @@ applied at the corrected contract commit (`b884dd84…`).
 
 ## 15. Implementation record
 
-**Status: IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW.**
+> **HISTORICAL / SUPERSEDED ONLY** — see the §14 call-out and §16/§17.
+
+**Status at the time: IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION
+REVIEW.**
 
 The focused Architect PLAN re-review (dmo-work `7c2479ebae50f8fe18a770fd373cffaae65a48e1`)
 returned **PLAN ACCEPT** — implementation AUTHORIZED against the corrected contract
@@ -226,14 +265,16 @@ Histórico, 18 routes all gated `dmo.module.boquilhas`, and the full P2-T07 matr
 rows incl. K6/K7/K8 REAL PostgreSQL races). Full unit + integration suites green on a fresh
 disposable PostgreSQL.
 
-The workstream is **NOT self-verified and NOT closed**: it awaits ONE independent review of the
-corrected P2-T07, then close if VERIFIED. `ModuleRegistrations.CurrentBuildAvailable` remains `[]`.
-**P2-T08 / P2-T10 remain NOT AUTHORIZED.**
+The workstream was **NOT closed at that time**: it awaited ONE independent review of the
+corrected P2-T07 — which then returned **VERIFIED** and closed it (see §17).
+`ModuleRegistrations.CurrentBuildAvailable` remains `[]`.
+**P2-T08 / P2-T10 remain NOT IMPLEMENTED / NOT AUTHORIZED.**
 
 ## 16. Owner clarification — the production movement register (correction record)
 
-**Status: IMPLEMENTED + OWNER CLARIFICATION CORRECTION APPLIED — AWAITING INDEPENDENT
-VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW.**
+> **APPLIED + VERIFIED — see §17 for the final status.** This record describes the Owner
+> clarification (contract §33) that superseded the §14–§15 model; **the current authority is the
+> final model below and §17.**
 
 A NEW OWNER CLARIFICATION (contract §33; implementation-response §21) **supersedes the affected
 rules** of the accepted contract — the old independent-verification gate was NOT run before this
@@ -267,5 +308,27 @@ replay incl. the Owner example → 0, Entrada sem reparação semantics, edit/au
 stale refusals, repairer history, schema facts, real Down/re-apply); 9 node-adapter behavioral
 scenarios PASS; auth negatives and negative-scope scans green; `CurrentBuildAvailable` stays `[]`.
 
-**NEXT GATE: one independent review of the corrected P2-T07, then close if VERIFIED.** The
-workstream is NOT closed. **P2-T08 / P2-T10 remain NOT AUTHORIZED.**
+**NEXT GATE (now closed):** one independent review of the corrected P2-T07, then close if
+VERIFIED — **COMPLETED: the final independent review `a96814f…` returned VERIFIED and closed
+P2-T07** (see §17). **P2-T08 / P2-T10 remain NOT IMPLEMENTED / NOT AUTHORIZED.**
+
+## 17. Final status — CLOSED
+
+**Status: IMPLEMENTED + OWNER CLARIFICATION CORRECTION APPLIED — VERIFIED — CLOSED.**
+
+- Final independent review: `reports/P2_T07_FINAL_INDEPENDENT_REVIEW.md` at commit `a96814f…`
+  — verdict **VERIFIED**; recommends **CLOSED**; under the simplified workflow **no additional
+  Architect implementation review is required** (the review found no concrete architectural
+  defect). The old 83 AC / 86-row matrix was deliberately not reconstructed — the review
+  verified the final §33 model.
+- Final model (current authority): **production-linked movement register** — one register per
+  real `bq_id` / Job On context (`boquilhas_id → bq_id → jobon_id + tool_id`); movements remain
+  valid after the production end date; exactly **three** movement types
+  `saida | entrada | entrada_sem_reparacao`; outstanding derived by replay
+  (`SUM(saida) − SUM(entrada) − SUM(entrada_sem_reparacao)`); **no lifecycle** (no
+  active/closed/reopen), **no standalone**, **no close/reopen**; **3 tables** (`boquilhas`,
+  `boquilha_movements`, `boquilha_movement_audit`); **15 routes** (3 pages + 12 endpoints), all
+  gated `dmo.module.boquilhas`.
+- `ModuleRegistrations.CurrentBuildAvailable` remains `[]`; no availability or route registered
+  (P2-T10 owns that).
+- **P2-T08 / P2-T10 remain NOT IMPLEMENTED / NOT AUTHORIZED.**

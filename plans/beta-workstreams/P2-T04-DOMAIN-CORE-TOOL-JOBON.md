@@ -100,7 +100,7 @@ Do **not** invent schema beyond what the authored contract fixes.
 
 ### 5.1 Contract status (recorded)
 
-**P2-T04: IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW.**
+**P2-T04: IMPLEMENTED — CLOSED.**
 **B1: RESOLVED — PLAN ACCEPT `7d7a7c564027945a5c9a73cb798e9c226ee7f013`.**
 
 The B1 contract was authored at
@@ -134,8 +134,10 @@ including the build and test results, is recorded in
 `ModuleRegistrations.CurrentBuildAvailable` is still `[]`, `DestinationRouteRegistrations` is still
 empty, no destination route is registered and no navigation entry exists: P2-T10 owns
 availability/navigation registration, so P2-T04's surfaces exist but stay unreachable until that
-workstream registers the Module as available. P2-T04 is **not** closed, and P2-T05 and later remain
-**NOT AUTHORIZED**.
+workstream registers the Module as available. **P2-T04 is CLOSED** (Architect focused re-review
+ACCEPT `b6f7a01c99fc8c517cca5cab335af5d47fb9e2f9` on the §15.1 correction, superseding the prior
+REJECT; see also §5.2). P2-T05/P2-T06/P2-T07 are also CLOSED; P2-T08/P2-T09/P2-T10 remain
+**NOT IMPLEMENTED**.
 
 ### 5.2 Owner clarification — Job On context snapshot invariant (recorded)
 
@@ -152,7 +154,10 @@ contexts and source Job Ons remain immutable; P2-T07 movements stay keyed by eac
 `tool_type`/`tool_reference`/`tool_lot` and the existing snapshot composition logic are reused
 unchanged). Implementation and verification record:
 `dev/responses/P2_T04_JOB_ON_SNAPSHOT_OWNER_CLARIFICATION_RESPONSE.md`. P2-T04 remains CLOSED;
-waiting for ONE focused independent review of this snapshot invariant.
+the focused independent review `787f5a9…` returned **VERIFIED**
+(`reports/P2_T04_JOB_ON_SNAPSHOT_INVARIANT_REVIEW.md`) — **OWNER CLARIFICATION CLOSED**; this
+clarification does NOT reopen P2-T04. Implementation `d2b3b3c…`; governance/response head
+`b7457ec…`.
 
 ## 6. Explicit non-scope
 

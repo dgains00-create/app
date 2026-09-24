@@ -2,9 +2,10 @@
 
 > **Formal implementation contract (authoritative for implementation):**
 > `plans/contracts/P2-T03_TOOLPICKER_ROWS_DECISIONBAR_CONTRACT.md` —
-> **CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW.** This handoff remains the scope
-> authority; the contract is the pinned carrier/state/test specification and must be reviewed and
-> `PLAN ACCEPT`-ed by the Architect before any implementation. Nothing in P2-T03 is implemented.
+> **(historical authoring status: CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW; since
+> superseded — the Architect PLAN review ACCEPTED the contract, `dmo-work` `c8af762f…`, and
+> P2-T03 is IMPLEMENTED — CLOSED per current Beta authority).** This handoff remains the scope
+> summary; the contract is the pinned carrier/state/test specification.
 
 Master plan: `plans/BETA_IMPLEMENTATION_MASTER_PLAN.md` §7 (P2-T03), §11, §12.
 Class: **Shared Beta primitive** (Workstream A, sub-steps A5/A6).

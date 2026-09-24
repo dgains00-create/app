@@ -130,7 +130,9 @@ their own future workstreams.
 
 Authority evidence for HISTÓRICO (local):
 - `dmo-beta-master/modules/BOQUILHAS.md` §"History" and its acceptance criteria ("full History
-  filters/table", "close/reopen retains the same `boquilhas_id` and full history").
+  filters/table", "close/reopen retains the same `boquilhas_id` and full history" — the quoted
+  close/reopen criterion is **SUPERSEDED / HISTORICAL ONLY**: the P2-T07 Owner clarification,
+  contract §33, removed the lifecycle — see §7 P2-T07).
 - `dmo-beta-master/modules/CONTROLO_CREATE.md` §"Included in Beta" (Create-side history views).
 - `dmo-beta-master/modules/CONTROLO_APPROVE.md` ("attributed decision/reopen history").
 - `dmo-beta-master/modules/JOB_ON_LIGHT.md` ("Reference History search/open tests").
@@ -425,9 +427,9 @@ and they must not be resolved by invention.
 
 | Ref | Nature | What is absent | Blocking workstream | Required artefact |
 |---|---|---|---|---|
-| B1 | Backend/interface contract | Concrete Tool/Job On/CM/MF/BQ query + mutation contract and physical schema have not been published as an accepted contract | P2-T04+ (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T04 per Beta `WORKFLOW.md`. **Authored:** `plans/contracts/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT.md` at contract SHA `58c6c1e8b4c9617daefc4ed02f7e65fb450bdada` (blob `799e6053a52d96acd21ed6be0475f5180e2525df`). **RESOLVED — PLAN ACCEPT:** Architect plan review `dev/reviews/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT_PLAN_REVIEW.md` at `diogo-o/dmo-work` SHA `7d7a7c564027945a5c9a73cb798e9c226ee7f013` returned **PLAN ACCEPT** (22 ACCEPT DEFAULT, 0 REQUIRES CORRECTION, 0 BLOCKING) and authorized P2-T04 implementation against that contract. B1 is closed; P2-T04 implementation is authorized and P2-T05+ remains unauthorized. |
-| B2 | Backend/interface contract | Concrete Peso/Pegamentos/Folha/Resumo calculate/persist/submit/read contract; **extended** to cover the Controlo_Create → Definições surfaces (repairer register, per-machine assignments, document base directory, email lists, email templates) settled in `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` | P2-T05/P2-T06 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T05. **Authored:** `plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md` — status **P2-T05 CONTRACT CORRECTED — AWAITING ARCHITECT RE-REVIEW** (Peso create/measurement core + the five Definições surfaces; Comparação/Pegamentos/Folha/Resumo and the read-model rendering recorded as P2-T05 handoff remainder per contract Q-SCOPE). **Architect plan review `256081fae43d4192b879b65fca0bb43efe8cdbca` (dmo-work): PLAN REJECT — C1–C4 only**; **Q-PDF resolved — ACCEPT DEFAULT, server-host filesystem configuration with server-side accessibility check**; 27 authority questions ACCEPT DEFAULT / 0 BLOCKING; corrections C1 (test matrix: 66 AC / 84 rows), C2 (`RESULT_NON_POSITIVE`), C3 (calculate route identity pin) and C4 (Appendix D.3 provenance) applied at the corrected contract commit. |
-| B3 | Backend/interface contract | Concrete Boquilhas aggregate/movement/edit-audit/close-reopen contract and `repairer_id` schema/query shape. The canonical `repairer_id` **directory source is now settled** (Controlo_Create → Definições), as are machine-assignment autonomy and historical repairer preservation (`…DELTA.md` §3.6, §4, §5, §6); the physical schema/query/endpoint contract is still absent | P2-T07 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T07. **Authored:** `plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md` — status **P2-T07 CONTRACT CORRECTED (B1) — AWAITING FOCUSED ARCHITECT PLAN RE-REVIEW** (both flows with the DB-enforced exclusive anchor, exactly four movement types, replay-derived balance, edit+audit, close/reopen on the same `boquilhas_id`, repairer consumption, six tables / one migration 007, 18 routes, 83 AC / 86 matrix rows, 12 NON-BLOCKING authority questions with pinned defaults). **Architect plan review `542a08a1bcf1340306f8e337a6c597580a921f3d` (dmo-work): PLAN REJECT — blocking finding B1 only** (one-active-aggregate-per-anchor not race-safe as contracted); the B1 correction (partial unique indexes `IX_boquilhas_active_bq_id`/`IX_boquilhas_active_tool_id` + exact 23505 → `Refused(ActiveAggregateExists)` mapping + concurrent create/reopen test rows K6–K8) is applied at the corrected contract commit; **focused Architect PLAN re-review `7c2479ebae50f8fe18a770fd373cffaae65a48e1` (dmo-work): PLAN ACCEPT** — implementation AUTHORIZED against `b884dd84…` only; **B3 RESOLVED (implementation executed** per the P2-T07 implementation response; **a NEW OWNER CLARIFICATION — contract §33 — then superseded the affected rules** (production movement register: no lifecycle/standalone/Início/Irreparável/B1 machinery; 3 types; derived outstanding; one register per REAL production; 15 routes; migration 007 corrected cleanly pre-closure to THREE tables / 23 product / 24 raw) and the correction is applied and verified (unit 658/658; integration 633 + 2 pre-existing skips; focused Boquilhas 67/67); **awaiting ONE independent review of the corrected P2-T07, then close if VERIFIED — see the §4 B3 detailed row and §7 P2-T07 status block**). |
+| B1 | Backend/interface contract | Concrete Tool/Job On/CM/MF/BQ query + mutation contract and physical schema have not been published as an accepted contract | P2-T04+ (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T04 per Beta `WORKFLOW.md`. **Authored:** `plans/contracts/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT.md` at contract SHA `58c6c1e8b4c9617daefc4ed02f7e65fb450bdada` (blob `799e6053a52d96acd21ed6be0475f5180e2525df`). **RESOLVED — PLAN ACCEPT:** Architect plan review `dev/reviews/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT_PLAN_REVIEW.md` at `diogo-o/dmo-work` SHA `7d7a7c564027945a5c9a73cb798e9c226ee7f013` returned **PLAN ACCEPT** (22 ACCEPT DEFAULT, 0 REQUIRES CORRECTION, 0 BLOCKING) and authorized P2-T04 implementation against that contract. B1 is closed; P2-T04 is implemented and **CLOSED** (Architect re-review ACCEPT `b6f7a01c…`; snapshot-clarification focused review `787f5a9…` VERIFIED). |
+| B2 | Backend/interface contract | Concrete Peso/Pegamentos/Folha/Resumo calculate/persist/submit/read contract; **extended** to cover the Controlo_Create → Definições surfaces (repairer register, per-machine assignments, document base directory, email lists, email templates) settled in `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` | P2-T05/P2-T06 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T05. **Authored:** `plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md` — status at correction time **P2-T05 CONTRACT CORRECTED — AWAITING ARCHITECT RE-REVIEW** (historical, superseded — the re-review ACCEPTED, see the B2 detailed row below) (Peso create/measurement core + the five Definições surfaces; Comparação/Pegamentos/Folha/Resumo and the read-model rendering recorded as P2-T05 handoff remainder per contract Q-SCOPE). **Architect plan review `256081fae43d4192b879b65fca0bb43efe8cdbca` (dmo-work): PLAN REJECT — C1–C4 only**; **Q-PDF resolved — ACCEPT DEFAULT, server-host filesystem configuration with server-side accessibility check**; 27 authority questions ACCEPT DEFAULT / 0 BLOCKING; corrections C1 (test matrix: 66 AC / 84 rows), C2 (`RESULT_NON_POSITIVE`), C3 (calculate route identity pin) and C4 (Appendix D.3 provenance) applied at the corrected contract commit. B2 is closed: contract ACCEPTED, P2-T05 and P2-T06 implemented and **CLOSED** (see §7). |
+| B3 | Backend/interface contract | Concrete Boquilhas aggregate/movement/edit-audit/close-reopen contract and `repairer_id` schema/query shape. The canonical `repairer_id` **directory source is now settled** (Controlo_Create → Definições), as are machine-assignment autonomy and historical repairer preservation (`…DELTA.md` §3.6, §4, §5, §6); the physical schema/query/endpoint contract is still absent | P2-T07 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T07. **Authored:** `plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md` — status **P2-T07 CONTRACT CORRECTED (B1) — AWAITING FOCUSED ARCHITECT PLAN RE-REVIEW** (HISTORICAL / SUPERSEDED ONLY — this entire contracted model, incl. both flows, the DB-enforced exclusive anchor, exactly four movement types, replay-derived balance, edit+audit, close/reopen on the same `boquilhas_id`, repairer consumption, six tables / one migration 007, 18 routes, 83 AC / 86 matrix rows and the 12 NON-BLOCKING authority questions with pinned defaults, was superseded by the Owner clarification, contract §33; the current CLOSED model is in §7 P2-T07). **Architect plan review `542a08a1bcf1340306f8e337a6c597580a921f3d` (dmo-work): PLAN REJECT — blocking finding B1 only** (one-active-aggregate-per-anchor not race-safe as contracted); the B1 correction (partial unique indexes `IX_boquilhas_active_bq_id`/`IX_boquilhas_active_tool_id` + exact 23505 → `Refused(ActiveAggregateExists)` mapping + concurrent create/reopen test rows K6–K8) is applied at the corrected contract commit; **focused Architect PLAN re-review `7c2479ebae50f8fe18a770fd373cffaae65a48e1` (dmo-work): PLAN ACCEPT** — implementation AUTHORIZED against `b884dd84…` only; **B3 RESOLVED (implementation executed** per the P2-T07 implementation response; **a NEW OWNER CLARIFICATION — contract §33 — then superseded the affected rules** (production movement register: no lifecycle/standalone/Início/Irreparável/B1 machinery; 3 types; derived outstanding; one register per REAL production; 15 routes; migration 007 corrected cleanly pre-closure to THREE tables / 23 product / 24 raw) and the correction is applied and verified (unit 658/658; integration 633 + 2 pre-existing skips; focused Boquilhas 67/67); **final independent review `a96814f…` VERIFIED — P2-T07 CLOSED (see the §4 B3 detailed row and §7 P2-T07 status block)**). |
 | B4 | Backend/interface contract | Document generation contract + directory/filesystem capability (`Infrastructure/Files`, `Infrastructure/Pdf` do not exist); **extended** to cover the operator-configured base directory (configure/change/verify accessibility) and sending through configured email lists/templates (`…DELTA.md` §7, §8, §9) | P2-T08 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T08 |
 
 These do **not** block P2-T01, P2-T02, P2-T03 (shared frontend primitives), whose authority is
@@ -439,9 +441,9 @@ document completes.
 
 | Blocker | Status |
 |---|---|
-| **B1** (P2-T04 Tool/Job On/context contract) | **RESOLVED — PLAN ACCEPT `7d7a7c564027945a5c9a73cb798e9c226ee7f013`.** Contract `plans/contracts/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT.md` at `58c6c1e8b4c9617daefc4ed02f7e65fb450bdada`; Architect plan review `dev/reviews/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT_PLAN_REVIEW.md` (in `diogo-o/dmo-work`) returned **PLAN ACCEPT** with 22 ACCEPT DEFAULT / 0 REQUIRES CORRECTION / 0 BLOCKING, stated **B1 → RESOLVED** and **P2-T04 implementation → AUTHORIZED**. P2-T04 is implemented against that contract and **CLOSED** (Architect focused re-review ACCEPT `b6f7a01c99fc8c517cca5cab335af5d47fb9e2f9` on the §15.1 correction, superseding the prior REJECT). **A NEW OWNER CLARIFICATION (contract §23) then SUPERSEDED the affected duplication wording** (every new Job On — normal creation and duplication — creates NEW cm/mf/bq context snapshots from the CURRENT canonical Tool identities; duplication reuses `tool_id` identities, never context identities; it re-snapshots the current canonical Tool row instead of cloning the source context's frozen triple) — applied and verified, P2-T04 remains **CLOSED**, awaiting ONE focused independent review of the snapshot invariant. |
-| **B2** (P2-T05/P2-T06 Controlo contract) | **RESOLVED — PLAN ACCEPT + IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW.** Contract `plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md` (status **P2-T05 CONTRACT ACCEPTED**; Architect plan review `256081fae43d4192b879b65fca0bb43efe8cdbca` = PLAN REJECT — C1–C4 only; **Q-PDF resolved**: ACCEPT DEFAULT — server-host filesystem configuration with server-side accessibility check; 27 ACCEPT DEFAULT / 0 BLOCKING; corrections C1–C4 applied; 66 AC / 84 matrix rows; re-review ACCEPT `f54ac15a96797a0dd0c51cf85b9b179e16be4da3`/`ceb9ee9…`). P2-T05 implemented against it (implementation response `dev/responses/P2_T05_IMPLEMENTATION_RESPONSE.md`); P2-T06 remains NOT AUTHORIZED. |
-| **B3** (P2-T07 Boquilhas contract) | **RESOLVED — PLAN ACCEPT + IMPLEMENTED + OWNER CLARIFICATION CORRECTION APPLIED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW** (`plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md` corrected at `b884dd84…`; authoring response `dev/responses/P2_T07_CONTRACT_AUTHORING_RESPONSE.md`; 83 AC / 86 matrix rows; 6 tables / 1 migration; 18 routes; 0 BLOCKING / 0 REQUIRES OWNER / 12 NON-BLOCKING pinned defaults). Architect plan review `542a08a1bcf1340306f8e337a6c597580a921f3d` = **PLAN REJECT — B1 only**; the B1 correction (two partial unique active-anchor indexes + exact 23505 → `Refused(ActiveAggregateExists)` mapping + concurrent create/reopen coverage) was applied; the focused Architect PLAN re-review `7c2479ebae50f8fe18a770fd373cffaae65a48e1` = **PLAN ACCEPT** (implementation AUTHORIZED against `b884dd84…` only); **B3 CLOSED as a blocker; P2-T07 IMPLEMENTED** (see §7 P2-T07 status block). **A NEW OWNER CLARIFICATION (contract §33) then SUPERSEDED the affected rules** (no lifecycle/standalone/Início/Irreparável/B1 machinery; production movement register with 3 types, derived outstanding, one register per REAL production, 15 routes; migration 007 corrected cleanly pre-closure to THREE tables / 23 product / 24 raw) — the correction is applied and verified (unit 658/658; integration 633 + 2 pre-existing skips; focused Boquilhas 67/67; migration cycle green) — **awaiting ONE independent review of the corrected P2-T07, then close if VERIFIED**. |
+| **B1** (P2-T04 Tool/Job On/context contract) | **RESOLVED — PLAN ACCEPT `7d7a7c564027945a5c9a73cb798e9c226ee7f013`.** Contract `plans/contracts/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT.md` at `58c6c1e8b4c9617daefc4ed02f7e65fb450bdada`; Architect plan review `dev/reviews/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT_PLAN_REVIEW.md` (in `diogo-o/dmo-work`) returned **PLAN ACCEPT** with 22 ACCEPT DEFAULT / 0 REQUIRES CORRECTION / 0 BLOCKING, stated **B1 → RESOLVED** and **P2-T04 implementation → AUTHORIZED**. P2-T04 is implemented against that contract and **CLOSED** (Architect focused re-review ACCEPT `b6f7a01c99fc8c517cca5cab335af5d47fb9e2f9` on the §15.1 correction, superseding the prior REJECT). **A NEW OWNER CLARIFICATION (contract §23) then SUPERSEDED the affected duplication wording** (every new Job On — normal creation and duplication — creates NEW cm/mf/bq context snapshots from the CURRENT canonical Tool identities; duplication reuses `tool_id` identities, never context identities; it re-snapshots the current canonical Tool row instead of cloning the source context's frozen triple) — applied and verified; the focused independent review `787f5a9…` returned **VERIFIED** (`reports/P2_T04_JOB_ON_SNAPSHOT_INVARIANT_REVIEW.md`): **OWNER CLARIFICATION CLOSED**, P2-T04 remains **CLOSED**. |
+| **B2** (P2-T05/P2-T06 Controlo contract) | **RESOLVED — PLAN ACCEPT + IMPLEMENTED — CLOSED.** Contract `plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md` (status **P2-T05 CONTRACT ACCEPTED**; Architect plan review `256081fae43d4192b879b65fca0bb43efe8cdbca` = PLAN REJECT — C1–C4 only; **Q-PDF resolved**: ACCEPT DEFAULT — server-host filesystem configuration with server-side accessibility check; 27 ACCEPT DEFAULT / 0 BLOCKING; corrections C1–C4 applied; 66 AC / 84 matrix rows; re-review ACCEPT `f54ac15a96797a0dd0c51cf85b9b179e16be4da3`/`ceb9ee9…`). P2-T05 implemented against it (implementation response `dev/responses/P2_T05_IMPLEMENTATION_RESPONSE.md`); P2-T06 implemented against its own accepted contract (`plans/contracts/P2-T06_CONTROLO_APPROVE_CONTRACT.md`, PLAN ACCEPT `947c5f7…`). **Both CLOSED.** |
+| **B3** (P2-T07 Boquilhas contract) | **RESOLVED — PLAN ACCEPT + IMPLEMENTED + OWNER CLARIFICATION CORRECTION APPLIED — CLOSED** (`plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md` corrected at `b884dd84…`; authoring response `dev/responses/P2_T07_CONTRACT_AUTHORING_RESPONSE.md`; the original contract recorded 83 AC / 86 matrix rows; 6 tables / 1 migration; 18 routes; 0 BLOCKING / 0 REQUIRES OWNER / 12 NON-BLOCKING pinned defaults — **all superseded by contract §33**). Architect plan review `542a08a1bcf1340306f8e337a6c597580a921f3d` = **PLAN REJECT — B1 only**; the B1 correction (two partial unique active-anchor indexes + exact 23505 → `Refused(ActiveAggregateExists)` mapping + concurrent create/reopen coverage) was applied; the focused Architect PLAN re-review `7c2479ebae50f8fe18a770fd373cffaae65a48e1` = **PLAN ACCEPT** (implementation AUTHORIZED against `b884dd84…` only); **B3 CLOSED as a blocker; P2-T07 IMPLEMENTED** (see §7 P2-T07 status block). **A NEW OWNER CLARIFICATION (contract §33) then SUPERSEDED the affected rules** (no lifecycle/standalone/Início/Irreparável/B1 machinery; production movement register with 3 types, derived outstanding, one register per REAL production, 15 routes; migration 007 corrected cleanly pre-closure to THREE tables / 23 product / 24 raw) — the correction is applied and verified (unit 658/658; integration 633 + 2 pre-existing skips; focused Boquilhas 67/67; migration cycle green); the **final independent review `a96814f…` returned VERIFIED** (`reports/P2_T07_FINAL_INDEPENDENT_REVIEW.md`) — **P2-T07 CLOSED**. |
 | **B4** (P2-T08 documents/PDF contract) | **UNCHANGED / OPEN** — no contract authored. P2-T08 remains **NOT AUTHORIZED**. |
 
 ---
@@ -475,9 +477,9 @@ DOMAIN CORE             (shared by >1 operational module)
         ▼                       ▼                      ▼
 OPERATIONAL MODULES
   P2-T05 Controlo Create   P2-T06 Controlo Approve   P2-T07 Boquilhas
-    (Peso, Comparação,        (review/decision over      (aggregate, 4 movements,
-     Pegamentos, Folha,        the same peso_id;          edit-audit, balance,
-     Resumo, shared Peso       consumes T05 read model)   close/reopen, History)
+    (Peso, Comparação,        (review/decision over      (production movement register,
+     Pegamentos, Folha,        the same peso_id;          3 movement types, edit-audit,
+     Resumo, shared Peso       consumes T05 read model)   derived outstanding, History)
      read model)
         │                       │                      │
         └───────────────────────┴──────────────────────┘
@@ -517,7 +519,7 @@ FINAL INTEGRATION
 | P2-T04 | Domain core: canonical Tool identity + Job On Light + Ferramentas Light | Domain core | P2-T01…P2-T03 | P2-T05, P2-T07 |
 | P2-T05 | Controlo Create (Peso, Comparação, Pegamentos, Folha, Resumo) + shared Peso read model | Operational | P2-T04 | P2-T06 |
 | P2-T06 | Controlo Approve (pending list, review, approve/reject/reopen) | Operational | P2-T05 | P2-T08, P2-T10 |
-| P2-T07 | Boquilhas (aggregate, movements, edit-audit, balance, close/reopen, History) | Operational | P2-T04 | P2-T08, P2-T10 |
+| P2-T07 | Boquilhas (production movement register, movements, edit-audit, derived outstanding, History) | Operational | P2-T04 | P2-T08, P2-T10 |
 | P2-T08 | Documents / PDF / directory convention / availability | Cross-cutting | P2-T05, P2-T06, P2-T07 | P2-T10 |
 | P2-T10 | Final integration: availability + routes + navigation + e2e | Integration | P2-T04…P2-T08 | — |
 
@@ -612,7 +614,7 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   6. `CurrentBuildAvailable` is still `[]` and no route changed.
 - **Completion evidence:** committed component + tests, build/test results recorded by the
   implementing agent, and confirmation that no protected file changed.
-- **STATUS: IMPLEMENTED** — implementation commit `72c38c26fa03a81465de72bed07c57f087530618`
+- **STATUS: IMPLEMENTED — CLOSED** — implementation commit `72c38c26fa03a81465de72bed07c57f087530618`
   in `DMO-MODULAR/main`; response
   `dev/responses/P2_T01_IMPLEMENTATION_RESPONSE.md`. New A-owned paths:
   `src/DMO.Web/Frontend/Shared/Contracts/*` (10 presentation contracts),
@@ -624,7 +626,7 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   Verification: build 0 warnings/0 errors; unit 374/374 passed; integration 115 passed /
   71 env-gated skipped / 0 failed; `git diff --check` clean; 0 migrations; 0 provisional
   markers in `src/`; `CurrentBuildAvailable` still `[]`; no protected file modified.
-  Awaiting Architect implementation review per `dmo-beta-master/WORKFLOW.md` step 12.
+  **P2-T01 is CLOSED** (per current Beta authority).
 - **Downstream dependents:** P2-T02…P2-T07 (all consume status/availability/states).
 
 ### P2-T02 — `DenseDataTable` + `AuditTrail` (A4)
@@ -654,8 +656,7 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   empty/lookup-failed distinction.
 - **Acceptance criteria:** the six bullet behaviors above each have a failing-if-removed test;
   no consumer URL is constructed by the component; no attribution synthesis is observable.
-- **STATUS: P2-T02 IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION
-  REVIEW.** Implementation commit `04601f9a827797481acd8ce4f76a6d2b1eb21af6`. The formal
+- **STATUS: P2-T02 IMPLEMENTED — CLOSED.** Implementation commit `04601f9a827797481acd8ce4f76a6d2b1eb21af6`. The formal
   implementation contract is
   `plans/contracts/P2-T02_DENSE_DATA_TABLE_AUDIT_TRAIL_CONTRACT.md` at accepted contract SHA
   `e79186a81d5cd934fe32a100bc8dd9dd08bf509a`, accepted by Architect PLAN ACCEPT at
@@ -672,9 +673,8 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   entry status absent). Implementation is additive only: 17 new shared contract types, 3 new
   shared partials, 2 new generic static assets, additive CSS and new unit/rendered tests; no
   P2-T01 artifact modified, no route or availability registration added, `CurrentBuildAvailable`
-  still `[]`. **Not self-accepted and not closed:** formal closure requires independent
-  verification and an Architect implementation review per `dmo-beta-master/WORKFLOW.md` step 12.
-  P2-T03 remains unauthorized and unimplemented.
+  still `[]`. **P2-T02 is CLOSED** (per current Beta authority); P2-T03 is implemented and
+  CLOSED as well (see below).
 - **Downstream dependents:** P2-T04 (Job On history), P2-T05/P2-T06 (Controlo lists),
   P2-T07 (Boquilhas History), P2-T08 (audit/decision history rendering).
 
@@ -734,8 +734,7 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   defines no backend/persistence/route/authorization/Supabase seam, protects the P2-T04+ boundary,
   and records a **complete** test-to-acceptance matrix (52 acceptance criteria ↔ 99 tests,
   bidirectional coverage) plus 6 CONTRACT QUESTIONS, all NON-BLOCKING with pinned defaults.
-- **STATUS: P2-T03 IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION
-  REVIEW.** Implementation commit `8a84c35f0db45ebba50170f112433d8107be4fdf`; implementation response
+- **STATUS: P2-T03 IMPLEMENTED — CLOSED.** Implementation commit `8a84c35f0db45ebba50170f112433d8107be4fdf`; implementation response
   `dev/responses/P2_T03_IMPLEMENTATION_RESPONSE.md`. Implemented exactly against the accepted
   contract and within A-owned paths only: 30 new shared contract types, 4 new shared Razor partials,
   2 new generic static assets, an additive `dmo-components.css` block and an additive
@@ -747,10 +746,8 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   evidence tests for the Architect's O1–O5 observations. Verified: build 0 errors (1 pre-existing
   warning in the accepted `P2T02RegressionTests.cs`, which is not modified); `DMO.UnitTests`
   468 passed / 0 failed / 0 skipped; `DMO.IntegrationTests` 201 passed / 71 environment-gated
-  skipped / 0 failed; 0 migrations. **Not self-accepted and not closed:** formal closure requires
-  independent verification and an Architect implementation review per `dmo-beta-master/WORKFLOW.md`
-  step 12. **P2-T04 remains unauthorized and has not started**; no P2-T03 artifact encodes P2-T04
-  semantics.
+  skipped / 0 failed; 0 migrations. **P2-T03 is CLOSED** (per current Beta authority); no
+  P2-T03 artifact encodes P2-T04 semantics, and P2-T04 is implemented and CLOSED (see below).
 
 ### P2-T09 — Secondary navigation + current-destination wiring
 
@@ -780,6 +777,9 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
 - **Acceptance criteria:** current-destination marking is derived from the projected destination
   set only; no authorization decision is taken in presentation; empty secondary renders nothing.
 - **Downstream dependents:** P2-T04…P2-T07 (local navigation), P2-T10.
+- **STATUS: PLANNED / NOT IMPLEMENTED.** Scope unchanged: secondary navigation +
+  current-destination wiring (`IsCurrent` producer in `ShellPresentationService`). Nothing is
+  implemented; no availability or route is registered.
 
 ### P2-T04 — Domain core: canonical Tool identity + Job On Light + Ferramentas Light
 
@@ -848,8 +848,10 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
 - **Completion evidence:** committed implementation + tests + the `PLAN ACCEPT` contract it was
   built against.
 - **Downstream dependents:** P2-T05, P2-T07, P2-T08, P2-T10.
-- **CONTRACT STATUS: AUTHORED — AWAITING ARCHITECT PLAN REVIEW.** The B1 contract is
-  `plans/contracts/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT.md`, status
+- **CONTRACT STATUS: AUTHORED — AWAITING ARCHITECT PLAN REVIEW (historical authoring status —
+  superseded: the Architect PLAN review ACCEPTED this contract, dmo-work `7d7a7c56…`; see
+  IMPLEMENTATION STATUS below).** The B1 contract is
+  `plans/contracts/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT.md`, status at authoring
   **P2-T04 CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW** and **B1 AWAITING PLAN ACCEPT**.
   It fixes the physical schema (6 tables: `tools`, `tool_machines`, `job_ons`, `cm_contexts`,
   `mf_contexts`, `bq_contexts`; every FK `RESTRICT`), the exact keys/constraints/indexes, the
@@ -865,8 +867,7 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   defaults and **no** BLOCKING physical-schema question. `ModuleRegistrations.CurrentBuildAvailable`
   is still `[]`, no route is registered and no application code was changed by the authoring task.
 
-- **IMPLEMENTATION STATUS: IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT
-  IMPLEMENTATION REVIEW.** P2-T04 was authorized by the Architect `PLAN ACCEPT`
+- **IMPLEMENTATION STATUS: IMPLEMENTED — CLOSED.** P2-T04 was authorized by the Architect `PLAN ACCEPT`
   (`7d7a7c564027945a5c9a73cb798e9c226ee7f013`, contract
   `58c6c1e8b4c9617daefc4ed02f7e65fb450bdada`) and is implemented against that contract: the
   canonical Tool registry, the Job On production occurrence, the CM/MF/BQ contexts with their frozen
@@ -878,7 +879,9 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   `DestinationRouteRegistrations` remains empty and no destination route is registered: P2-T10 owns
   availability/navigation registration. The evidence, the test-matrix result and the disclosed
   literal-shape readings are recorded in `dev/responses/P2_T04_IMPLEMENTATION_RESPONSE.md`. P2-T04 is
-  **not** closed; P2-T05 and later remain **NOT AUTHORIZED**.
+  **CLOSED** (Architect focused re-review ACCEPT `b6f7a01c99fc8c517cca5cab335af5d47fb9e2f9` on the
+  §15.1 correction; see also the OWNER CLARIFICATION record below). P2-T05/P2-T06/P2-T07 are also
+  CLOSED; P2-T08/P2-T09/P2-T10 remain **NOT IMPLEMENTED**.
 - **OWNER CLARIFICATION (Job On context snapshot invariant) — APPLIED.** A NEW OWNER CLARIFICATION
   (contract §23) SUPERSEDED the affected duplication wording: every new Job On — normal creation AND
   duplication — creates NEW `cm_id`/`mf_id`/`bq_id` context snapshots from the CURRENT canonical
@@ -891,7 +894,10 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   normal creation) and verified (build, full unit suite, full integration suite on disposable
   PostgreSQL, focused snapshot tests, P2-T04/P2-T07 regressions); record in
   `dev/responses/P2_T04_JOB_ON_SNAPSHOT_OWNER_CLARIFICATION_RESPONSE.md`. P2-T04 remains CLOSED;
-  awaiting ONE focused independent review of this snapshot invariant.
+  the focused independent review `787f5a9…` returned **VERIFIED**
+  (`reports/P2_T04_JOB_ON_SNAPSHOT_INVARIANT_REVIEW.md`) — **OWNER CLARIFICATION CLOSED**; this
+  clarification does NOT reopen P2-T04. Implementation `d2b3b3c…`; governance/response head
+  `b7457ec…`.
 
 ### P2-T05 — Controlo Create (Peso, Comparação, Pegamentos, Folha, Resumo) + shared Peso read model
 
@@ -1012,8 +1018,7 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   correction task at the corrected contract commit; the correction re-review returned
   **PLAN ACCEPT**.
 
-- **IMPLEMENTATION STATUS: IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT
-  IMPLEMENTATION REVIEW.** P2-T05 was authorized by the Architect correction re-review ACCEPT
+- **IMPLEMENTATION STATUS: IMPLEMENTED — CLOSED.** P2-T05 was authorized by the Architect correction re-review ACCEPT
   (`f54ac15a96797a0dd0c51cf85b9b179e16be4da3`/`ceb9ee9…`) and is implemented against the accepted
   contract: the Peso domain core (identity/anchoring, measurements, frozen facts), the stateless
   calculate route, the create/edit/submit/associate transactions on one `peso_id`, the five
@@ -1021,9 +1026,15 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   fixed-desktop pages (`Pages/Controlo/Create` + `Definicoes`), the published Peso read-model
   shapes, exactly ONE new migration (`ControloCreateDomain`: 8 tables, 22 CHECKs, 7 RESTRICT FKs),
   and the complete 66-AC/84-row test-to-acceptance matrix (evidence in
-  `dev/responses/P2_T05_IMPLEMENTATION_RESPONSE.md`). `ModuleRegistrations.CurrentBuildAvailable`
+  `dev/responses/P2_T05_IMPLEMENTATION_RESPONSE.md`). The post-closure **glass-density Owner
+  correction** (glass density per processo NNPB/PS stored operationally in
+  `Controlo_Create → Definições` — `glass_density_settings`, migration 005, seeds NNPB 2.4027 /
+  PS 2.4231) and the **water-temperature → water-density lookup** correction are implemented and
+  independently verified (VERIFIED `7afcb00…`); the water-density behavior and the same-`peso_id`
+  lifecycle are preserved. `ModuleRegistrations.CurrentBuildAvailable`
   remains `[]` and no destination route is registered: P2-T10 owns availability/navigation
-  registration. P2-T05 is **not** closed; P2-T06 and later remain **NOT AUTHORIZED**.
+  registration. **P2-T05 is CLOSED; P2-T06 is also CLOSED; P2-T08/P2-T09/P2-T10 remain
+  NOT IMPLEMENTED.**
 
 ### P2-T06 — Controlo Approve
 
@@ -1076,8 +1087,7 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   renderer was reused, not copied.
 - **Downstream dependents:** P2-T08, P2-T10.
 
-- **IMPLEMENTATION STATUS: IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT
-  IMPLEMENTATION REVIEW.** P2-T06 was authorized by the Architect PLAN review
+- **IMPLEMENTATION STATUS: IMPLEMENTED — CLOSED.** P2-T06 was authorized by the Architect PLAN review
   (`947c5f7cb18b9e78dc6d4bf3a6477314e1514492`, dmo-work — **PLAN ACCEPT**, blocking findings
   NONE) and is implemented against the accepted contract `dd0e16390e46d49c811d1597de674dcc68023813`
   (evidence in `dev/responses/P2_T06_IMPLEMENTATION_RESPONSE.md`): the decision core over the
@@ -1099,36 +1109,41 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   solution, including the 61-AC/67-row matrix, the migration/schema evidence on a disposable
   PostgreSQL and the D2/K5 conflict-reload behavioral harness.
   `ModuleRegistrations.CurrentBuildAvailable` remains **`[]`** and no destination route is
-  registered: P2-T10 owns availability/navigation registration. P2-T06 is **not** closed;
-  P2-T07 / P2-T08 / P2-T10 remain **NOT AUTHORIZED**.
+  registered: P2-T10 owns availability/navigation registration. **P2-T06 is CLOSED** (final
+  independent re-verification of the CP4 correction VERIFIED `8f9e4f8…`); P2-T07 is also CLOSED;
+  P2-T08 / P2-T09 / P2-T10 remain **NOT IMPLEMENTED**.
 
 ### P2-T07 — Boquilhas
 
-- **Authority:** `dmo-beta-master/modules/BOQUILHAS.md`;
-  `architecture/RECORD_LIFECYCLES.md` §9; `architecture/CROSS_MODULE_FLOWS.md` (Job On →
-  Boquilhas; standalone validity); `implementation/BETA_INTEGRATION_SEAMS.md` "Workstream E"
-  and "E → B" seam; `dmo-master/global/ACCESS_MODEL.md` §1/§11 (Boquilhas is one assignable
-  module).
-- **Current implementation starting point:** none. Depends on P2-T04 for canonical BQ Tool
-  selection/create and optional `bq_id` resolution.
-- **Dependencies:** P2-T04 (not P2-T05). Authority blocker B3.
-- **Precise scope:** search/select/create BQ Tool context; production-linked flow
-  (`boquilhas_id -> bq_id -> jobon_id + tool_id`) and standalone flow
-  (`boquilhas_id -> tool_id`, **no** fake Job On/`bq_id`); active aggregate summary; exactly the
-  four write movement types `Início`, `Saída`, `Entrada`, `Irreparável`; `Editar` as an action on
-  an existing movement (**never** a fifth movement type); movement forms and validation; recent
-  movements; full History with filters (reference, lot, line, business date/period, movement
-  type, repairer, aggregate/file state, pagination), single click selects, double click opens;
-  edit preserving before/after audit, authenticated user and system timestamp **without** a
-  second quantity event or double balance effect; `business_date` (editable) distinct from
-  `recorded_at` (immutable); derived balance buckets Disponível / Em reparação / Irreparável /
-  Entrada excecional from movement facts (no second mutable balance authority); Saída ≤ available
-  quantity; Irreparável ≤ in-repair quantity; excess Entrada recorded not clamped/rejected;
-  negative saldo visible and non-blocking; `% utilização` manual and not derived from movements;
-  close/reopen on the same `boquilhas_id` with immutable close snapshot and recorded
-  reopen actor/time/reason; failed close leaves the active state unchanged; canonical
-  `repairer_id` stored on external Saída with historical retention; production-line contextual
-  panel reading (not owning) production context.
+- **Authority:** `dmo-beta-master/modules/BOQUILHAS.md`; `architecture/RECORD_LIFECYCLES.md`
+  §9; `architecture/CROSS_MODULE_FLOWS.md` (Job On → Boquilhas);
+  `implementation/BETA_INTEGRATION_SEAMS.md` "Workstream E" and "E → B" seam;
+  `dmo-master/global/ACCESS_MODEL.md` §1/§11 (Boquilhas is one assignable module).
+  > **SUPERSEDED / HISTORICAL ONLY:** the earlier "standalone validity", "active aggregate",
+  > four-movement (`Início`/`Irreparável`) and close/reopen traces in those authority documents
+  > were superseded by the P2-T07 Owner clarification (contract §33). Current authority is the
+  > final model below.
+- **Current implementation starting point:** implemented under the accepted contract
+  (`b884dd84…`) and corrected per the Owner clarification (contract §33); migration 007 was
+  corrected cleanly pre-closure to the final three-table schema. Depends on P2-T04 for canonical
+  BQ Tool selection/create and `bq_id` resolution.
+- **Dependencies:** P2-T04 (not P2-T05). Authority blocker B3 — **closed** (see §4).
+- **Precise scope (FINAL — CLOSED model):** Boquilhas is a **production-linked movement
+  register** — one register per real `bq_id` / Job On context
+  (`boquilhas_id -> bq_id -> jobon_id + tool_id`), and movements remain valid **after** the
+  production end date. **No standalone flow.** Exactly **three** movement types:
+  `saida` (Saída), `entrada` (Entrada), `entrada_sem_reparacao` (Entrada sem reparação); `Editar`
+  is an action on an existing movement (**never** a movement type). Outstanding is derived by
+  replay, `SUM(saida) − SUM(entrada) − SUM(entrada_sem_reparacao)`, **never stored**. **No
+  lifecycle** (no active/closed/reopen, no `Início`, no `Irreparável`); the register identity is
+  created WITHOUT any quantity event. Edit preserves before/after audit, authenticated user and
+  system timestamp **without** a second quantity event or double balance effect; `business_date`
+  (editable) distinct from `recorded_at` (immutable); excess Entrada recorded not
+  clamped/rejected; negative outstanding visible and non-blocking; `% utilização` manual and not
+  derived from movements; canonical `repairer_id` stored on Saída with historical retention;
+  full History with filters (reference, lot, line, business date/period, movement type,
+  repairer, aggregate/file state, pagination), single click selects, double click opens;
+  production-line contextual panel reading (not owning) production context.
 - **Repairer resolution (settled — `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md`
   §3, §4, §5, §6):**
   - when a registration/movement is associated with a machine, the repairer is **resolved
@@ -1157,89 +1172,71 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   `src/DMO.Web/Pages/Boquilhas/`, `src/DMO.Web/Endpoints/`, tests in both projects.
 - **Access requirements:** `ModuleAuthorizationPolicies.PolicyName(ModuleCatalog.Boquilhas)`
   on routes/actions; navigation availability remains projection only.
-- **Persistence requirements:** aggregate + movements + edit/audit history + close snapshot +
-  reopen record; `repairer_id` relation; no reverse-ID arrays; movement facts are the sole
-  balance authority.
+- **Persistence requirements (FINAL):** exactly **three** tables — `boquilhas`,
+  `boquilha_movements`, `boquilha_movement_audit` — in ONE corrected migration 007
+  (`20260924051151_BoquilhasDomain`; 23 product tables / 24 raw). No lifecycle tables
+  (`boquilha_close_snapshots` / `boquilha_reopenings` / `boquilha_machines`), no `status`
+  column, no active-anchor partial unique indexes. One register per real BQ context (plain
+  unique key). `repairer_id` relation; no reverse-ID arrays; movement facts are the sole
+  outstanding authority.
 - **Required tests:** see §11 (P2-T07 row).
-- **Acceptance criteria:** every bullet in `modules/BOQUILHAS.md` "Acceptance criteria" — the
-  movement selector exposes only the four types; `Editar` is not a type; edit adds audit without
-  a second movement; both flows work without fake identities; excess Entrada recorded; negative
-  saldo non-blocking; business date ⊥ recorded timestamp; close/reopen retains the same
-  `boquilhas_id` and full history; no mandatory PDF or settings tab; the repairer is resolved
+- **Acceptance criteria (FINAL):** the register is production-linked only — one register per
+  real `bq_id` / Job On context, no standalone flow, no fake Job On/`bq_id`; the movement
+  selector exposes exactly the three types (`saida`, `entrada`, `entrada_sem_reparacao`);
+  `Editar` is not a type; edit adds audit without a second movement; movements remain valid
+  after the production end date; outstanding equals
+  `SUM(saida) − SUM(entrada) − SUM(entrada_sem_reparacao)` from movement facts alone (no second
+  mutable balance authority); excess Entrada recorded; negative outstanding non-blocking;
+  business date ⊥ recorded timestamp; no mandatory PDF or settings tab; the repairer is resolved
   automatically from the machine's current independent assignment; a later assignment change does
   not alter an earlier record's repairer; no machine sidebar is present
   (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §4, §5, §6, §11).
-- **Completion evidence:** committed implementation + tests + confirmation that no replacement
-  aggregate is created by close/reopen.
+- **Completion evidence:** committed implementation + tests + the final independent review
+  `a96814f…` **VERIFIED** (`reports/P2_T07_FINAL_INDEPENDENT_REVIEW.md`) under the simplified
+  workflow — **P2-T07 CLOSED**.
 - **Downstream dependents:** P2-T08, P2-T10.
 
-- **CONTRACT STATUS: IMPLEMENTED — OWNER CLARIFICATION CORRECTION APPLIED — AWAITING INDEPENDENT
-  VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW.** The B3 contract is `plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md` (corrected at
-  `b884dd84…`, **PLAN ACCEPT** at the focused Architect B1 re-review `7c2479eba…`, dmo-work —
-  implementation AUTHORIZED against `b884dd84…` only). **A NEW OWNER CLARIFICATION
-  (contract §33) then SUPERSEDED the affected rules**: Boquilhas is the PRODUCTION MOVEMENT
-  REGISTER — no open/closed lifecycle, no standalone flow, no Início/Irreparável types, no B1
-  active-anchor machinery; exactly three types (`saida|entrada|entrada_sem_reparacao`); the
-  derived outstanding `Σ Saída − Σ Entrada − Σ Entrada sem reparação`; every register anchored to
-  a REAL Job On/BQ context (movements valid after the production end date); the unreviewed
-  migration 007 was corrected CLEANLY pre-closure (final schema: 3 tables — `boquilhas`,
-  `boquilha_movements`, `boquilha_movement_audit`; the lifecycle tables/status/active-anchor
-  indexes removed; 23 product tables, 24 raw); final route count 15 (3 pages + 12 endpoints), all
-  gated `dmo.module.boquilhas`. It fixes — over the
-  accepted, CLOSED P2-T04/P2-T05 state and the settled delta — the Boquilhas identity core (the
-  DB-enforced exclusive anchor `boquilhas_id → bq_id` production-linked | `boquilhas_id →
-  tool_id` standalone; no fake Job On/`bq_id`; no `production_id`/reverse arrays/per-piece
-  identity), the shared Tool orchestration consumption (BQ-only candidates, no auto-select,
-  contextual create returning to origin, no second registry), the **exactly four** movement
-  types (`inicio|saida|entrada|irreparavel`; `Editar` is an action, never a type; Início
-  created with the aggregate), the replay-derived balance buckets
-  (Disponível/Em reparação/Irreparável/Entrada excecional — **no second mutable balance
-  authority**; Saída ≤ available and Irreparável ≤ in-repair as 409 refusals; excess Entrada
-  recorded, never clamped; negative saldo visible/non-blocking), edit-with-audit on the **same
-  `movement_id`** (before/after audit, backend actor/time, no double balance effect,
-  `movement_type`/`recorded_at` immutable), `business_date` (editable) ⊥ `recorded_at`
-  (immutable), repairer consumption (register + assignments owned by `Controlo_Create →
-  Definições`; machine → current assignment → resolved/suggested; final selected `repairer_id`
-  stored and **historically preserved** on the movement), close/reopen on the **same
-  `boquilhas_id`** (immutable close snapshot, atomic failed close, recorded reopen
-  actor/time/reason with exact eligibility), the manual `% utilização` still (never derived,
-  never a progress bar), the local Histórico (backend-applied filters, selection/open,
-  HISTÓRICO GLOBAL boundary), exactly **SIX new tables** (`boquilhas`, `boquilha_machines`,
-  `boquilha_movements`, `boquilha_movement_audit`, `boquilha_close_snapshots`,
-  `boquilha_reopenings`) in **ONE new additive migration (007)**, exactly **18 routes** (3
-  pages + 15 endpoints) all gated `dmo.module.boquilhas`, and a complete test-to-acceptance
-  matrix (**83 AC ↔ 86 rows; missing 0, dangling 0, orphan 0**). Authority questions:
-  **0 BLOCKING, 0 REQUIRES OWNER DECISION, 12 NON-BLOCKING with pinned defaults** —
-  Q-EDIT-FIELDS, Q-MACHINE, Q-INICIO, Q-EXCESS, Q-ORDER, Q-CREATE, Q-REOPEN-ELIG, Q-REFLOT,
-  Q-UTIL, Q-LINE, Q-CLOSE-DATE, Q-ANUL. The Architect plan review (dmo-work `542a08a1…`)
-  returned **PLAN REJECT — blocking finding B1 only** (one-active-aggregate-per-anchor not
-  race-safe as contracted); the B1 correction — partial unique indexes
-  `IX_boquilhas_active_bq_id`/`IX_boquilhas_active_tool_id` (`WHERE status = 'active' AND
-  <anchor> IS NOT NULL`), the exact scoped 23505 → `Refused(ActiveAggregateExists)` mapping,
-  race-safe create/reopen semantics and concurrent test rows K6–K8 — is applied at the
-  corrected contract commit. `ModuleRegistrations.CurrentBuildAvailable`
-  is still `[]`, no route is registered, no application code was changed by the authoring or
-  correction tasks. **Implementation executed** (P2-T07 implementation response
-  `dev/responses/P2_T07_IMPLEMENTATION_RESPONSE.md`): migration 007 `BoquilhasDomain` (six
-  tables; 26 product tables post-migration), the exact three unique indexes incl. the two
-  ACTIVE partial active-anchor backstops, the scoped 23505 mapping, the balance replay, the
-  edit+audit single-event semantics, close/reopen on the SAME `boquilhas_id`, the local
-  Histórico, 18 routes all gated `dmo.module.boquilhas`, and the full P2-T07 matrix
-  (83 AC ↔ 86 rows incl. K6/K7/K8 REAL PostgreSQL races) — full unit and integration suites
-  green on a fresh disposable PostgreSQL. **OWNER CLARIFICATION CORRECTION then applied**
-  (contract §33; response §21): the lifecycle/standalone/Início/Irreparável/B1 machinery was
-  removed and migration 007 was corrected cleanly pre-closure to the production movement
-  register — final schema THREE tables (`boquilhas`, `boquilha_movements`,
-  `boquilha_movement_audit`; 23 product tables, 24 raw; no status/lifecycle/anchor-index
-  structures), final movement types `saida|entrada|entrada_sem_reparacao`, derived outstanding,
-  one register per REAL production/BQ context (movements valid after the production end date),
-  final route count 15 (3 pages + 12 endpoints) all gated `dmo.module.boquilhas`; corrected
-  suites green on the fresh disposable PostgreSQL (unit 658/658; integration 633 + 2
-  pre-existing live-Supabase skips; focused Boquilhas 67/67; 9 node behavioral scenarios).
-  **P2-T07 is NOT self-verified and NOT closed**: it
-  awaits one independent review of the corrected P2-T07 / the Architect implementation review,
-  then close if VERIFIED. P2-T08 / P2-T10 remain
-  NOT AUTHORIZED and `CurrentBuildAvailable` stays `[]`.
+- **STATUS: CLOSED.** Final model — Boquilhas is a **production-linked movement register**:
+  one register per real `bq_id` / Job On context (`boquilhas_id → bq_id → jobon_id + tool_id`);
+  movements remain valid after the production end date; **no standalone flow**; exactly **three**
+  movement types (`saida | entrada | entrada_sem_reparacao`); outstanding derived by replay,
+  `SUM(saida) − SUM(entrada) − SUM(entrada_sem_reparacao)`; **no lifecycle** (no
+  active/closed/reopen); **3 tables** (`boquilhas`, `boquilha_movements`,
+  `boquilha_movement_audit`); **15 routes** (3 pages + 12 endpoints) all gated
+  `dmo.module.boquilhas`. Final independent review `a96814f…` **VERIFIED**
+  (`reports/P2_T07_FINAL_INDEPENDENT_REVIEW.md`); under the simplified workflow **no additional
+  Architect implementation review is required**. **P2-T07 is CLOSED.** `CurrentBuildAvailable`
+  stays `[]`; P2-T08 / P2-T10 remain NOT IMPLEMENTED.
+
+- **HISTORICAL / SUPERSEDED ONLY (provenance — NOT current authority):** the
+  pre-clarification contract and implementation record. The B3 contract is
+  `plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md` (at the time: corrected at `b884dd84…`, **PLAN
+  ACCEPT** at the focused Architect B1 re-review `7c2479eba…`, dmo-work — implementation
+  AUTHORIZED against `b884dd84…` only). That contracted model fixed — over the accepted, CLOSED
+  P2-T04/P2-T05 state — the DB-enforced exclusive anchor (`boquilhas_id → bq_id`
+  production-linked | `boquilhas_id → tool_id` standalone), the shared Tool orchestration
+  consumption, exactly **four** movement types (`inicio|saida|entrada|irreparavel`, Início
+  created with the aggregate), the replay-derived balance buckets (Disponível/Em reparação/
+  Irreparável/Entrada excecional), edit-with-audit on the **same `movement_id`**, close/reopen on
+  the **same `boquilhas_id`** (immutable close snapshot, atomic failed close, recorded reopen
+  actor/time/reason with exact eligibility), the manual `% utilização` still, the local
+  Histórico, exactly **SIX tables** (`boquilhas`, `boquilha_machines`, `boquilha_movements`,
+  `boquilha_movement_audit`, `boquilha_close_snapshots`, `boquilha_reopenings`) in migration 007,
+  exactly **18 routes** (3 pages + 15 endpoints), the 83 AC ↔ 86-row matrix (incl. K6/K7/K8 REAL
+  PostgreSQL races), the two ACTIVE partial unique active-anchor indexes
+  (`IX_boquilhas_active_bq_id`/`IX_boquilhas_active_tool_id`), the scoped 23505 →
+  `Refused(ActiveAggregateExists)` mapping, and the 12 NON-BLOCKING authority questions with
+  pinned defaults (Q-EDIT-FIELDS, Q-MACHINE, Q-INICIO, Q-EXCESS, Q-ORDER, Q-CREATE,
+  Q-REOPEN-ELIG, Q-REFLOT, Q-UTIL, Q-LINE, Q-CLOSE-DATE, Q-ANUL) — after the Architect plan
+  review (dmo-work `542a08a1…`) returned **PLAN REJECT — blocking finding B1 only**
+  (one-active-aggregate-per-anchor not race-safe as contracted; the old
+  one-active-aggregate race logic and the B1-correction partial unique indexes were part of that
+  superseded design). **A NEW OWNER CLARIFICATION (contract §33) SUPERSEDED all of the above**
+  (the old independent-verification gate was NOT run before the correction): no
+  lifecycle/standalone/Início/Irreparável/B1 machinery; 3 types; derived outstanding; migration
+  007 corrected cleanly pre-closure (see the CLOSED status above); correction record in
+  `dev/responses/P2_T07_IMPLEMENTATION_RESPONSE.md` §21. The corrected model was verified by the
+  final independent review `a96814f…` (**VERIFIED → CLOSED**).
 
 ### P2-T08 — Documents / PDF / directory convention / availability
 
@@ -1303,6 +1300,13 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
 - **Completion evidence:** committed implementation + tests + a rendered/parsed check that no
   filesystem path appears in output and that the three availability distinctions hold.
 - **Downstream dependents:** P2-T10.
+- **STATUS: NOT IMPLEMENTED / NOT AUTHORIZED.** No contract authored (authority blocker **B4
+  remains OPEN** — §4); no documents/PDF/files/email code exists. Remaining scope: Peso PDF,
+  Pegamentos PDF where applicable, Resumo PDF, the configured base directory
+  (`<reference>/<production-number>/`, deterministic filenames), availability states,
+  historical rendering from preserved facts, configured email lists/templates, preview/send
+  behavior as eventually contracted. Do not implement before its own authored, PLAN
+  ACCEPT-ed contract.
 
 ### P2-T10 — Final integration: availability + routes + navigation + end-to-end
 
@@ -1336,8 +1340,37 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
 - **Completion evidence:** the per-destination registration commit + the passing navigation and
   direct-route test set.
 - **Downstream dependents:** none.
+- **STATUS: NOT IMPLEMENTED.** `ModuleRegistrations.CurrentBuildAvailable` remains `[]` and
+  `DestinationRouteRegistrations` remains empty: no availability registration, no route
+  registration, no navigation exposure, no cross-module integration, no end-to-end run. P2-T10
+  still owns: real destination availability, real route registration, navigation exposure,
+  cross-module integration, final end-to-end verification.
 
 ---
+
+## REMAINING BETA WORK (current state)
+
+Everything in the implemented Beta path is **CLOSED** — P2-T00…P2-T07, including the P2-T04 Job
+On snapshot Owner clarification and the P2-T07 production movement register. What remains:
+
+1. **Focused independent review of the Job On snapshot Owner clarification** — **COMPLETE**:
+   the implementation (`d2b3b3c…`) and governance/response head (`b7457ec…`) were reviewed and
+   **VERIFIED** at `787f5a9…` (`reports/P2_T04_JOB_ON_SNAPSHOT_INVARIANT_REVIEW.md`);
+   **OWNER CLARIFICATION CLOSED**; P2-T04 remains CLOSED. It involved no new functionality and
+   nothing further is pending for it.
+2. **P2-T09** — secondary navigation / current-destination wiring (`IsCurrent` producer).
+   **PLANNED / NOT IMPLEMENTED.**
+3. **P2-T08** — documents/PDF/files/email consumption: Peso PDF, Pegamentos PDF where
+   applicable, Resumo PDF, the configured base directory (`<reference>/<production-number>/`,
+   deterministic filenames), availability states, historical rendering from preserved facts,
+   configured email lists/templates, preview/send as eventually contracted. **NOT IMPLEMENTED**;
+   B4 still open; requires its own authored, PLAN ACCEPT-ed contract.
+4. **P2-T10** — availability registration (`CurrentBuildAvailable`, still `[]`), real route
+   registration, navigation exposure, cross-module integration, final end-to-end verification.
+   **NOT IMPLEMENTED**; per-destination, strictly after each surface is real.
+5. **Final full-suite / end-to-end verification** — after P2-T08/P2-T09/P2-T10 land.
+
+**CurrentBuildAvailable:** `[]`. No closed workstream registered any availability or route.
 
 ## 8. Shared Data / Domain Relationships
 
@@ -1358,8 +1391,8 @@ UI do not acquire duplicate domain models. Authority:
 | Pegamentos | `pegamentos_id` | Controlo | may legitimately be absent; `NotEvaluable` when nominal is missing | nominal/limits actually used are preserved | Controlo, documents | preserved closed control must not drift with live Tool changes | **No invented nominal** |
 | Folha de Controlo | `controlo_sheet_id` | Controlo | persisted component decisions/observations | persisted facts | Controlo, Approve | preserved decisions | **distinct from `resumo_id` — must not be merged** |
 | Resumo | `resumo_id` | Controlo | persisted record for one `jobon_id` context | record is authority even when the PDF is absent | Controlo, documents | record ≠ its PDF | **No projection-of-Folha** |
-| Boquilhas aggregate | `boquilhas_id` | Boquilhas | active → close (immutable snapshot) → archived → optional reopen | movements are append-only facts; balance derived | Boquilhas, documents, HISTÓRICO GLOBAL (later) | close snapshot + reopen actor/time/reason; movements never rewritten | production-linked via `bq_id`; standalone via direct `tool_id`; **no fake Job On**, **no per-piece identity** |
-| Movement | `movement_id` | Boquilhas | append-only; `Editar` is an action producing audit, not a new movement | business date (editable) ⊥ recorded timestamp (immutable) | Boquilhas, HISTÓRICO GLOBAL (later) | before/after audit + actor + system timestamp | **no second balance authority** |
+| Boquilhas register | `boquilhas_id` | Boquilhas (production movement register) | **no lifecycle** — one register per real `bq_id` / Job On context; movements remain valid after the production end date | movements are append-only facts; outstanding derived (`SUM(saida) − SUM(entrada) − SUM(entrada_sem_reparacao)`) | Boquilhas, documents, HISTÓRICO GLOBAL (later) | production association and movement facts preserved; movements never rewritten | production-linked via `bq_id` only — **no standalone flow**, **no fake Job On**, **no per-piece identity**, **no close/reopen** |
+| Movement | `movement_id` | Boquilhas | append-only; exactly `saida` / `entrada` / `entrada_sem_reparacao`; `Editar` is an action producing audit, not a new movement | business date (editable) ⊥ recorded timestamp (immutable) | Boquilhas, HISTÓRICO GLOBAL (later) | before/after audit + actor + system timestamp | **no second balance authority**; no `inicio`/`irreparavel`/close-reopen machinery |
 | Repairer | `repairer_id` | **Controlo_Create → Definições** (canonical repairer register) | simple register (name is the required data); selected/consumed per machine assignment and per external Saída | current assignment resolves automatically for new Boquilhas registrations; historical records retain the value actually used | Controlo Create, Boquilhas | **not rewritten when the machine's current assignment changes** | **not administered by Boquilhas**; **not owned by Controlo_Approve**; repairer register owned by Controlo_Create → Definições (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §3) |
 | Machine repairer assignment | per machine (`B1`,`B2`,`B3`,`C1`,`C2`,`C3`) | Controlo_Create → Definições (operational configuration) | one **independent** current assignment per machine | changing one machine never changes another | Controlo Create, Boquilhas (resolution) | never rewrites historical Boquilhas records | **no grouping rule** — no "Linha B"/"Linha C", no shared B/C assignment (`…DELTA.md` §4) |
 | Operational settings (Definições) | n/a (configuration, not a domain identity) | **Controlo_Create** | repairer register, machine repairer assignments, PDF/document base directory, email lists, email templates | configuration is current-state; the facts it feeds are preserved on the records that used them | Controlo Create (owner), Boquilhas (consumes repairer resolution), P2-T08 (consumes directory/email config) | historical records preserve what they used | **not owned by Controlo_Approve**; **no new global Admin module**; not a new destination (`…DELTA.md` §1, §2, §7, §8, §10) |
@@ -1403,10 +1436,10 @@ Never ahead of the surface.
 
 | Destination | Module identity(ies) | Route | Becomes available in | Route registered in |
 |---|---|---|---|---|
-| Job On | `job-on-view`, `job-on-create` (share `job-on`) | `/jobon` (or the accepted contract path) | P2-T04 complete | P2-T10 (per destination) |
-| Controlo | `controlo-create`, `controlo-approve` (share `controlo`) | `/controlo` | P2-T05 for Create; P2-T06 adds Approve actions on the same destination | P2-T10 |
-| Controlo_Create → Definições | **not a Module; not a destination** — a surface inside the Controlo Create destination, gated by `controlo-create` | reached inside `/controlo` | P2-T05 (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §1) | n/a — never registered separately |
-| Boquilhas | `boquilhas` | `/boquilhas` | P2-T07 complete | P2-T10 |
+| Job On | `job-on-view`, `job-on-create` (share `job-on`) | `/jobon` (or the accepted contract path) | surface **implemented and CLOSED** (P2-T04) — availability registered only in P2-T10; `CurrentBuildAvailable` still `[]` | P2-T10 (per destination) |
+| Controlo | `controlo-create`, `controlo-approve` (share `controlo`) | `/controlo` | surface **implemented and CLOSED** (P2-T05 Create; P2-T06 adds Approve actions on the same destination) — availability registered only in P2-T10; `CurrentBuildAvailable` still `[]` | P2-T10 |
+| Controlo_Create → Definições | **not a Module; not a destination** — a surface inside the Controlo Create destination, gated by `controlo-create` | reached inside `/controlo` | implemented with P2-T05; never registered separately | n/a — never registered separately |
+| Boquilhas | `boquilhas` | `/boquilhas` | surface **implemented and CLOSED** (P2-T07, production movement register) — availability registered only in P2-T10; `CurrentBuildAvailable` still `[]` | P2-T10 |
 | Ferramentas | `ferramentas`, `ferramentas-approve` | **no top-level route, ever** | never top-level; contextual entry inside Job On/Controlo/Boquilhas | n/a |
 | HISTÓRICO GLOBAL | `historia` (technical identity; do not rename in code) | **no route in this Beta** | never in this Beta (DEFERRED BY DESIGN — §3.1) | n/a |
 | Armazém / Reparação Interna / Reparação Programada / Tampões | respective identities | not planned here | outside Beta scope (`BETA_SCOPE.md`) | n/a |
@@ -1505,10 +1538,10 @@ Legend: **U** = unit, **I** = integration/host, **UI** = rendered/component or b
   no email template; a `controlo-approve`-only caller cannot reach Controlo_Create → Definições.
 
 ### P2-T07 — Boquilhas
-- **U:** exactly the four movement types are writable (`Início`, `Saída`, `Entrada`, `Irreparável`); `Editar` is not a movement type; Saída does not exceed available and Irreparável does not exceed in-repair; excess Entrada is recorded, not clamped; negative saldo remains visible and non-blocking; `% utilização` is never derived from movements; `business_date` is editable while `recorded_at` is immutable.
-- **I:** editing a movement preserves before/after audit without creating a second quantity event and without double balance effect; the production-linked flow resolves/reuses `bq_id`; the standalone flow works with **no** fake Job On/`bq_id`; close/reopen retains the same `boquilhas_id` and full history; a failed close leaves the active state unchanged; the close snapshot is immutable; reopen records actor/time/reason; an external Saída stores the canonical `repairer_id` and it is not rewritten when the directory/default changes.
-- **I:** balance is derivable from movement facts alone (no second mutable balance authority).
-- **UI:** History filters/select/open; the movement selector shows only the four types; no mandatory PDF action and no internal settings tab; **no machine/reference sidebar** is rendered
+- **U:** exactly the three movement types are writable (`saida`, `entrada`, `entrada_sem_reparacao`); `Editar` is not a movement type (and no `inicio`/`irreparavel` type exists); excess Entrada is recorded, not clamped; negative outstanding remains visible and non-blocking; `% utilização` is never derived from movements; `business_date` is editable while `recorded_at` is immutable.
+- **I:** editing a movement preserves before/after audit without creating a second quantity event and without double balance effect; the production-linked flow resolves/reuses `bq_id` with **no** fake Job On/`bq_id`; one register per real `bq_id` / Job On context (register identity created WITHOUT any quantity event); movements remain valid after the production end date; an external Saída stores the canonical `repairer_id` and it is not rewritten when the directory/default changes.
+- **I:** outstanding is derivable from movement facts alone (`SUM(saida) − SUM(entrada) − SUM(entrada_sem_reparacao)`; no second mutable balance authority, no lifecycle/status/close-reopen machinery).
+- **UI:** History filters/select/open; the movement selector shows only the three types; no mandatory PDF action and no internal settings tab; **no machine/reference sidebar** is rendered
   (`…DELTA.md` §11).
 - **U/I (repairer resolution, `…DELTA.md` §4, §5, §6):** when a registration/movement is
   associated with a machine, the repairer is resolved automatically from that machine's current
@@ -1579,27 +1612,27 @@ Areas future agents must preserve. Default rule: **DO NOT MODIFY PROTECTED FOUND
 Per-destination, strictly after the destination is real. Each step is its own commit with its own verification. Never advance a step whose surface is incomplete.
 
 ```text
-Step 1  P2-T00  Record the P1-T07 architecture acceptance (governance; no code).
-Step 2  P2-T01  Shared generic states + RecordStatus + AvailabilityState.
-Step 3  P2-T02  DenseDataTable + AuditTrail.
-Step 4  P2-T03  ToolPicker presentation + ToolSummaryRow + MeasurementRows + DecisionBar.
-Step 5  P2-T09  Secondary navigation + current-destination wiring (additive shell extension).
+Step 1  P2-T00  Record the P1-T07 architecture acceptance (governance; no code).        [DONE — CLOSED]
+Step 2  P2-T01  Shared generic states + RecordStatus + AvailabilityState.               [DONE — CLOSED]
+Step 3  P2-T02  DenseDataTable + AuditTrail.                                            [DONE — CLOSED]
+Step 4  P2-T03  ToolPicker presentation + ToolSummaryRow + MeasurementRows + DecisionBar. [DONE — CLOSED]
+Step 5  P2-T09  Secondary navigation + current-destination wiring (additive shell extension). [NOT IMPLEMENTED]
         -- shared primitives complete; CurrentBuildAvailable still [] --
-Step 6  P2-T04  Domain core (Tool identity + Job On Light + Ferramentas Light).
+Step 6  P2-T04  Domain core (Tool identity + Job On Light + Ferramentas Light).         [DONE — CLOSED]
                 Ferramentas remains contextual-only; no top-level route.
-Step 7  P2-T10a Register job-on availability + its real route; verify 4-condition gating
+Step 7  P2-T10a Register job-on availability + its real route; verify 4-condition gating [PENDING — P2-T10]
                 and direct-route denial. Navigation shows Job On only for granted users.
-Step 8  P2-T05  Controlo Create + shared Peso read model.
-Step 9  P2-T10b Register controlo availability + route (Create actions live; Approve still
+Step 8  P2-T05  Controlo Create + shared Peso read model.                               [DONE — CLOSED]
+Step 9  P2-T10b Register controlo availability + route (Create actions live; Approve still [PENDING — P2-T10]
                 denied because its Module is not yet available).
-Step 10 P2-T06  Controlo Approve (consumes the shared Peso read model; no approval copy).
-Step 11 P2-T10c controlo-approve Module availability registration (same destination).
-Step 12 P2-T07  Boquilhas.
-Step 13 P2-T10d Register boquilhas availability + route.
-Step 14 P2-T08  Documents/PDF/directory/availability (gated by owning workflow permissions).
-Step 15 P2-T10e Cross-module links, document actions, end-to-end verification across
+Step 10 P2-T06  Controlo Approve (consumes the shared Peso read model; no approval copy). [DONE — CLOSED]
+Step 11 P2-T10c controlo-approve Module availability registration (same destination).   [PENDING — P2-T10]
+Step 12 P2-T07  Boquilhas (production movement register — final §33 model).             [DONE — CLOSED]
+Step 13 P2-T10d Register boquilhas availability + route.                                [PENDING — P2-T10]
+Step 14 P2-T08  Documents/PDF/directory/availability (gated by owning workflow permissions). [NOT IMPLEMENTED]
+Step 15 P2-T10e Cross-module links, document actions, end-to-end verification across    [PENDING — P2-T10]
                 Job On <-> Controlo <-> Boquilhas <-> documents.
-Step 16 Final full-suite verification and per-workstream acceptance evidence review.
+Step 16 Final full-suite verification and per-workstream acceptance evidence review.    [PENDING]
 ```
 
 **Never in this sequence:** exposing Ferramentas as a top-level destination; exposing HISTÓRICO GLOBAL; pre-registering a Module whose surface is incomplete; creating placeholder operational pages.
@@ -1632,8 +1665,8 @@ Investigated during this planning run and determined **not** to require implemen
 - **A second database context / generic repository abstraction / reverse-ID arrays / a `production_id` or `revision_id`** — forbidden by `docs/ARCHITECTURE.md` and `contracts/IDENTITIES_AND_RELATIONSHIPS.md`.
 
 ### 14.3 Deferred by design (later dependency stage, tracked)
-- All of P2-T04...P2-T10 are deferred to a .NET-capable implementation environment. Nothing in this planning run authorizes their execution: each requires its own authored contract and Architect `PLAN ACCEPT` per `dmo-beta-master/WORKFLOW.md`.
-- B1-B4 (section 4) are the concrete contracts to author first, in dependency order.
+- All of P2-T04...P2-T10 are deferred to a .NET-capable implementation environment. Nothing in this planning run authorizes their execution: each requires its own authored contract and Architect `PLAN ACCEPT` per `dmo-beta-master/WORKFLOW.md`. *(Historical planning-run statement — since superseded for P2-T04…P2-T07: each received its authored contract, `PLAN ACCEPT`, implementation and closure, see §7.)*
+- B1-B4 (section 4) are the concrete contracts to author first, in dependency order. *(Current: B1–B3 closed; B4 (P2-T08) remains OPEN.)*
 
 ---
 
@@ -1645,20 +1678,20 @@ Investigated during this planning run and determined **not** to require implemen
 | 7.2 secondary nav / current marking | PARTIAL | READY FOR IMPLEMENTATION | P2-T09 |
 | 7.3 access identities without feature actions | PARTIAL | READY FOR IMPLEMENTATION | P2-T04...P2-T07, P2-T10 |
 | 7 (Q3) P1-T07 accepted-status gap | PARTIAL | CLOSED (P2-T00: ACCEPT review `50e8841…`) | — |
-| 9.1 Job On create/view/edit | MISSING | READY FOR IMPLEMENTATION | P2-T04 |
-| 9.2 Job On duplicate | MISSING | READY FOR IMPLEMENTATION | P2-T04 |
-| 9.3 reference to productions | MISSING | READY FOR IMPLEMENTATION | P2-T04 |
-| 9.4 Ferramentas Light Tool ficha | MISSING | READY FOR IMPLEMENTATION | P2-T04 |
-| 9.5 Tool canonical identity | MISSING | READY FOR IMPLEMENTATION | P2-T04 |
-| 9.6 Peso draft/measurement/submit | MISSING | READY FOR IMPLEMENTATION | P2-T05 |
-| 9.7 Peso pending association | MISSING | READY FOR IMPLEMENTATION | P2-T05 |
-| 9.8 Comparison | MISSING | READY FOR IMPLEMENTATION | P2-T05 |
-| 9.9 Pegamentos | MISSING | READY FOR IMPLEMENTATION | P2-T05 |
-| 9.10 Folha + Resumo | MISSING | READY FOR IMPLEMENTATION | P2-T05 |
-| 9.11 shared Peso read model | MISSING | READY FOR IMPLEMENTATION | P2-T05 publishes, P2-T06 consumes |
-| 9.12 Controlo Approve | MISSING | READY FOR IMPLEMENTATION | P2-T06 — **IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW** (contract `plans/contracts/P2-T06_CONTROLO_APPROVE_CONTRACT.md` @ `dd0e163…`; PLAN ACCEPT `947c5f7…`; response `dev/responses/P2_T06_IMPLEMENTATION_RESPONSE.md`; 61 AC / 67 matrix rows; 605 unit / 568 integration green; migration 006 + one table + one additive index; `CurrentBuildAvailable` `[]`) |
-| 9.13 Boquilhas | MISSING | READY FOR IMPLEMENTATION | P2-T07 — **IMPLEMENTED + OWNER CLARIFICATION CORRECTION APPLIED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW** (contract `plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md` corrected at `b884dd84…`; PLAN ACCEPT (focused B1) `7c2479ebe…`; response `dev/responses/P2_T07_IMPLEMENTATION_RESPONSE.md` incl. §21 correction record; final model per contract §33 — production movement register, 3 tables / 23 product / 24 raw, 15 routes, 3 movement types, derived outstanding; unit 658/658, integration 633 + 2 pre-existing skips, focused Boquilhas 67/67; verification pending — one independent review then close if VERIFIED; `CurrentBuildAvailable` `[]`) |
-| 9.14 Boquilhas repairer | MISSING | READY FOR IMPLEMENTATION | P2-T07 — **IMPLEMENTED + OWNER CLARIFICATION CORRECTION APPLIED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW** (consumption contract implemented and preserved by the correction: machine → current assignment → resolved suggestion; final selected `repairer_id` stored on Saída with historical retention; register/assignments owned by `Controlo_Create → Definições`; same contract as 9.13 §33) |
+| 9.1 Job On create/view/edit | MISSING | READY FOR IMPLEMENTATION | P2-T04 — **IMPLEMENTED + CLOSED** (see §7) |
+| 9.2 Job On duplicate | MISSING | READY FOR IMPLEMENTATION | P2-T04 — **IMPLEMENTED + CLOSED** (see §7; final duplication semantics per the snapshot Owner clarification, contract §23) |
+| 9.3 reference to productions | MISSING | READY FOR IMPLEMENTATION | P2-T04 — **IMPLEMENTED + CLOSED** (see §7) |
+| 9.4 Ferramentas Light Tool ficha | MISSING | READY FOR IMPLEMENTATION | P2-T04 — **IMPLEMENTED + CLOSED** (see §7) |
+| 9.5 Tool canonical identity | MISSING | READY FOR IMPLEMENTATION | P2-T04 — **IMPLEMENTED + CLOSED** (see §7) |
+| 9.6 Peso draft/measurement/submit | MISSING | READY FOR IMPLEMENTATION | P2-T05 — **IMPLEMENTED + CLOSED** (see §7) |
+| 9.7 Peso pending association | MISSING | READY FOR IMPLEMENTATION | P2-T05 — **IMPLEMENTED + CLOSED** (see §7) |
+| 9.8 Comparison | MISSING | READY FOR IMPLEMENTATION | P2-T05 — **IMPLEMENTED + CLOSED** (see §7) |
+| 9.9 Pegamentos | MISSING | READY FOR IMPLEMENTATION | P2-T05 — **IMPLEMENTED + CLOSED** (see §7) |
+| 9.10 Folha + Resumo | MISSING | READY FOR IMPLEMENTATION | P2-T05 — **IMPLEMENTED + CLOSED** (see §7) |
+| 9.11 shared Peso read model | MISSING | READY FOR IMPLEMENTATION | P2-T05 publishes, P2-T06 consumes — **both IMPLEMENTED + CLOSED** (see §7) |
+| 9.12 Controlo Approve | MISSING | READY FOR IMPLEMENTATION | P2-T06 — **IMPLEMENTED + CLOSED** (contract `plans/contracts/P2-T06_CONTROLO_APPROVE_CONTRACT.md` @ `dd0e163…`; PLAN ACCEPT `947c5f7…`; response `dev/responses/P2_T06_IMPLEMENTATION_RESPONSE.md`; 61 AC / 67 matrix rows; 605 unit / 568 integration green; migration 006 + one table + one additive index; final independent re-verification of the CP4 correction VERIFIED `8f9e4f8…`; `CurrentBuildAvailable` `[]`) |
+| 9.13 Boquilhas | MISSING | READY FOR IMPLEMENTATION | P2-T07 — **IMPLEMENTED + OWNER CLARIFICATION CORRECTION APPLIED — CLOSED** (contract `plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md` corrected at `b884dd84…`; PLAN ACCEPT (focused B1) `7c2479ebe…`; response `dev/responses/P2_T07_IMPLEMENTATION_RESPONSE.md` incl. §21 correction record; final model per contract §33 — production movement register, 3 tables / 23 product / 24 raw, 15 routes, 3 movement types, derived outstanding; unit 658/658, integration 633 + 2 pre-existing skips, focused Boquilhas 67/67; final independent review `a96814f…` **VERIFIED** (`reports/P2_T07_FINAL_INDEPENDENT_REVIEW.md`); `CurrentBuildAvailable` `[]`) |
+| 9.14 Boquilhas repairer | MISSING | READY FOR IMPLEMENTATION | P2-T07 — **IMPLEMENTED + OWNER CLARIFICATION CORRECTION APPLIED — CLOSED** (consumption contract implemented and preserved by the correction: machine → current assignment → resolved suggestion; final selected `repairer_id` stored on Saída with historical retention; register/assignments owned by `Controlo_Create → Definições`; same contract as 9.13 §33; closed with the final review `a96814f…`) |
 | **delta §1** Controlo_Create owns Definições | SETTLED (new authority) | RECORDED — `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` | P2-T05 |
 | **delta §2** Controlo_Approve reduced to Aprovar + Histórico de Pesos | SETTLED (scope reduction) | RECORDED | P2-T06 |
 | **delta §3** repairer register (name only; owner = Controlo_Create → Definições) | SETTLED (new authority; closes the B3 directory-source half) | RECORDED | P2-T05 (register), P2-T07 (consumption) |
@@ -1683,6 +1716,6 @@ Investigated during this planning run and determined **not** to require implemen
 | 11 canonical order | AMBIGUITY | ALREADY SATISFIED | — |
 | 11 Peso vocabulary | AMBIGUITY | RESOLVED | P2-T05/P2-T06 |
 | **B1** Tool/Job On/context backend contract | BLOCKER | **RESOLVED — PLAN ACCEPT `7d7a7c564027945a5c9a73cb798e9c226ee7f013`** (contract `58c6c1e8b4c9617daefc4ed02f7e65fb450bdada`); P2-T04 implemented against it and **CLOSED** (Architect re-review ACCEPT `b6f7a01c99fc8c517cca5cab335af5d47fb9e2f9`) | P2-T04 |
-| **B2** Peso/Definições backend contract | BLOCKER | **RESOLVED — PLAN ACCEPT + IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW** (`plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md`; **P2-T05 CONTRACT ACCEPTED**; Architect plan review `256081fae…` PLAN REJECT — C1–C4 only; Q-PDF resolved — ACCEPT DEFAULT server-host filesystem configuration with server-side accessibility check; 27 ACCEPT DEFAULT / 0 BLOCKING; 66 AC / 84 matrix rows; correction re-review ACCEPT `f54ac15a…`/`ceb9ee9…`; implementation response `dev/responses/P2_T05_IMPLEMENTATION_RESPONSE.md`; P2-T06 remains NOT AUTHORIZED) | P2-T05 (implemented), P2-T06 (authorization still required) |
+| **B2** Peso/Definições backend contract | BLOCKER | **RESOLVED — PLAN ACCEPT + IMPLEMENTED — CLOSED** (`plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md`; **P2-T05 CONTRACT ACCEPTED**; Architect plan review `256081fae…` PLAN REJECT — C1–C4 only; Q-PDF resolved — ACCEPT DEFAULT server-host filesystem configuration with server-side accessibility check; 27 ACCEPT DEFAULT / 0 BLOCKING; 66 AC / 84 matrix rows; correction re-review ACCEPT `f54ac15a…`/`ceb9ee9…`; implementation response `dev/responses/P2_T05_IMPLEMENTATION_RESPONSE.md`; P2-T06 implemented against its own accepted contract and also **CLOSED**) | P2-T05 (implemented, closed), P2-T06 (implemented, closed) |
 
-**Counts.** PARTIAL items dispositioned: **4/4**. MISSING items mapped: **17/17**. Ambiguities resolved: **7/7** (HISTÓRICO GLOBAL scope, missing design plan, P1-T07 status, canonical order, Peso vocabulary, plus the section-10 wiring set as three DO-NOT-IMPLEMENT resolutions). Ambiguities remaining BLOCKED BY AUTHORITY: **0**. Intra-workstream contract-authoring gaps (B1–B4): **B1 RESOLVED — PLAN ACCEPT (CLOSED); B2 RESOLVED — PLAN ACCEPT (implemented, awaiting verification/review); B3/B4 OPEN** — none blocks planning.
+**Counts.** PARTIAL items dispositioned: **4/4**. MISSING items mapped: **17/17**. Ambiguities resolved: **7/7** (HISTÓRICO GLOBAL scope, missing design plan, P1-T07 status, canonical order, Peso vocabulary, plus the section-10 wiring set as three DO-NOT-IMPLEMENT resolutions). Ambiguities remaining BLOCKED BY AUTHORITY: **0**. Intra-workstream contract-authoring gaps (B1–B4): **B1 RESOLVED — CLOSED; B2 RESOLVED — CLOSED; B3 RESOLVED — CLOSED (final independent review `a96814f…` VERIFIED); B4 OPEN — P2-T08 NOT IMPLEMENTED** — none blocks the remaining work (§ REMAINING BETA WORK).

@@ -124,11 +124,10 @@ The formal implementation contract for this workstream is
 `plans/contracts/P2-T02_DENSE_DATA_TABLE_AUDIT_TRAIL_CONTRACT.md`, with authoring response
 `dev/responses/P2_T02_CONTRACT_AUTHORING_RESPONSE.md`.
 
-Status: **P2-T02 IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION
-REVIEW.** The contract was accepted by Architect PLAN ACCEPT (`dmo-work` SHA
+Status: **P2-T02 IMPLEMENTED — CLOSED** (per current Beta authority). The contract was accepted
+by Architect PLAN ACCEPT (`dmo-work` SHA
 `f1ddb968e026dc6cf2569d8de64400d8c3044514`) at accepted contract SHA
 `e79186a81d5cd934fe32a100bc8dd9dd08bf509a`, and the implementation is committed with response
 `dev/responses/P2_T02_IMPLEMENTATION_RESPONSE.md`. This handoff remains the scope summary; the
-contract is the binding implementation specification. Formal closure requires independent
-verification and an Architect implementation review (WORKFLOW.md step 12). P2-T03 remains
-**NOT AUTHORIZED**.
+contract is the binding implementation specification. **P2-T03 is implemented and CLOSED as
+well** (per current Beta authority — see the master plan §7).

@@ -143,7 +143,7 @@ P2-T08, P2-T10.
 
 ## 13. Contract-authored record
 
-**Status: IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW**
+**Status: IMPLEMENTED — CLOSED**
 (implementation task; planning gate closed by the Architect PLAN review `947c5f7…` — PLAN ACCEPT,
 blocking findings NONE).
 
@@ -161,7 +161,7 @@ new additive migration (006), exactly 9 routes all gated `dmo.module.controlo-ap
 NON-BLOCKING authority questions with pinned defaults (Q-SEND, Q-REOPEN, Q-NOTE, Q-FOLHA,
 Q-PERCM, Q-COMP, Q-RENDER, Q-WARN, Q-PAGE, Q-DECISIONS) — 0 BLOCKING, 0 REQUIRES OWNER DECISION.
 
-The implementation is **not** self-accepted: it awaits independent verification and the
-Architect implementation review per `dmo-beta-master/WORKFLOW.md` step 12.
-`ModuleRegistrations.CurrentBuildAvailable` remains `[]`. **P2-T07 / P2-T08 / P2-T10 remain NOT
-AUTHORIZED.**
+The implementation was independently re-verified (final focused re-verification of the CP4
+correction **VERIFIED** `8f9e4f8…`). **P2-T06 is CLOSED.**
+`ModuleRegistrations.CurrentBuildAvailable` remains `[]`. **P2-T07 is also CLOSED; P2-T08 /
+P2-T09 / P2-T10 remain NOT IMPLEMENTED.**
