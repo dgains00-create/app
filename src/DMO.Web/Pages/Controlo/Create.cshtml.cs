@@ -34,6 +34,7 @@ public sealed class CreateModel : PageModel
 
     private readonly IControloCreateService _controlo;
     private readonly IJobOnService _jobOns;
+    private readonly IProductionResumoRead _productionResumo;
     private readonly ICurrentAccountContext _currentAccount;
     private readonly ShellPresentationService _shell;
     private readonly ILogger<CreateModel> _logger;
@@ -42,17 +43,20 @@ public sealed class CreateModel : PageModel
     public CreateModel(
         IControloCreateService controlo,
         IJobOnService jobOns,
+        IProductionResumoRead productionResumo,
         ICurrentAccountContext currentAccount,
         ShellPresentationService shell,
         ILogger<CreateModel> logger)
     {
         ArgumentNullException.ThrowIfNull(controlo);
         ArgumentNullException.ThrowIfNull(jobOns);
+        ArgumentNullException.ThrowIfNull(productionResumo);
         ArgumentNullException.ThrowIfNull(currentAccount);
         ArgumentNullException.ThrowIfNull(shell);
         ArgumentNullException.ThrowIfNull(logger);
         _controlo = controlo;
         _jobOns = jobOns;
+        _productionResumo = productionResumo;
         _currentAccount = currentAccount;
         _shell = shell;
         _logger = logger;
@@ -224,47 +228,69 @@ public sealed class CreateModel : PageModel
             regionLabel: "Produções");
     }
 
+    /// <summary>
+    /// R1/R3 — the production entry through the Resumo da produção (P2-T05 contract §31.1): the
+    /// occurrence's OWN light projection — production facts + the CM context the Peso surface is
+    /// populated from (reference, machine, lot, processo, CM identity via the real cm_id/tool_id).
+    /// No full-ficha load, no second production model; a missing occurrence is a lookup failure,
+    /// never an empty surface.
+    /// </summary>
     private async Task LoadProductionAsync(Guid jobOnId, CancellationToken cancellationToken)
     {
-        var result = await _jobOns.GetAsync(jobOnId, cancellationToken);
+        var resumo = await _productionResumo.GetResumoAsync(jobOnId, cancellationToken);
 
-        if (result is not JobOnResult.Ficha(var ficha))
+        if (resumo is null)
         {
             LookupFailed = true;
             return;
         }
 
-        var cm = ficha.Contexts.FirstOrDefault(context => context.ContextType == ToolContextType.Cm);
-
         Strip = new ProductionStripModel(
-            ficha.Reference,
-            ficha.ProductionNumber,
-            ficha.Machine,
-            ficha.ProductionDate,
-            cm?.Tool.Processo is { } processo ? ToolTokens.ToToken(processo) : null);
+            resumo.Reference,
+            resumo.ProductionNumber,
+            resumo.Machine,
+            resumo.ProductionDate,
+            resumo.Cm?.Processo is { } processo ? ToolTokens.ToToken(processo) : null);
 
-        CmContext = new CmContextRegionModel(
-            JobOnId: ficha.JobOnId,
-            FichaVersion: ficha.Version,
-            CmContextId: cm?.ContextId,
-            ToolId: cm?.ToolId,
-            FrozenType: cm?.ToolType is { } type ? ToolTokens.ToToken(type) : null,
-            cm?.ToolReference,
-            cm?.ToolLot,
-            cm is not null ? BuildToolSummary(cm) : null);
+        if (resumo.Cm is { } cm)
+        {
+            CmContext = new CmContextRegionModel(
+                JobOnId: resumo.JobOnId,
+                FichaVersion: resumo.Version,
+                CmContextId: cm.CmId,
+                ToolId: cm.ToolId,
+                FrozenType: cm.FrozenToolType,
+                cm.FrozenToolReference,
+                cm.FrozenToolLot,
+                BuildToolSummary(cm));
+        }
+        else
+        {
+            // No CM context on this occurrence: the region shows the missing-context recovery
+            // (the truthful empty, never an invented context).
+            CmContext = new CmContextRegionModel(
+                JobOnId: resumo.JobOnId,
+                FichaVersion: resumo.Version,
+                CmContextId: null,
+                ToolId: null,
+                FrozenType: null,
+                FrozenReference: null,
+                FrozenLot: null,
+                Tool: null);
+        }
 
-        AssociationCandidates = await LoadCandidatesAsync(cm?.ToolId, cancellationToken);
+        AssociationCandidates = await LoadCandidatesAsync(resumo.Cm?.ToolId, cancellationToken);
     }
 
-    private ToolSummaryRowPresentation BuildToolSummary(ToolContextFicha cm) =>
+    private ToolSummaryRowPresentation BuildToolSummary(CmResumoProjection cm) =>
         ToolSummaryRowPresentation.Create(
             CommonState.Ready,
-            cm.Tool.ToolId.ToString(),
-            type: ToolSummaryFactPresentation.Create("Tipo", ToolTokens.ToToken(cm.Tool.Type)),
-            reference: ToolSummaryFactPresentation.Create("Referência", cm.Tool.Reference),
-            lot: ToolSummaryFactPresentation.Create("Lote", cm.Tool.Lot),
-            process: ToolSummaryFactPresentation.Create("Processo", ToolTokens.ToToken(cm.Tool.Processo) ?? "—"),
-            quantity: ToolSummaryFactPresentation.Create("Quantidade", cm.Tool.Quantity?.ToString() ?? "—"));
+            cm.ToolId.ToString(),
+            type: ToolSummaryFactPresentation.Create("Tipo", cm.FrozenToolType),
+            reference: ToolSummaryFactPresentation.Create("Referência", cm.LiveToolReference),
+            lot: ToolSummaryFactPresentation.Create("Lote", cm.LiveToolLot),
+            process: ToolSummaryFactPresentation.Create("Processo", ToolTokens.ToToken(cm.Processo) ?? "—"),
+            quantity: ToolSummaryFactPresentation.Create("Quantidade", cm.Quantity?.ToString() ?? "—"));
 
     private async Task<IReadOnlyList<CandidateEntry>> LoadCandidatesAsync(
         Guid? toolId,

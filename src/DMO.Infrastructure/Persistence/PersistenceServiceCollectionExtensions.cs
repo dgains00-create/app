@@ -58,6 +58,7 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<IEmailTemplateRepository, EmailTemplateRepository>();
         services.AddScoped<IGlassDensitySettingsRepository, GlassDensitySettingsRepository>();
         services.AddScoped<IPesoContextRead, DmoPesoContextRead>();
+        services.AddScoped<IProductionResumoRead, DmoProductionResumoRead>();
         services.AddScoped<IJobOnDependencyProbe, PesoJobOnDependencyProbe>();
 
         // ---- P2-T06 Controlo Approve: the review decision core --------------------------------

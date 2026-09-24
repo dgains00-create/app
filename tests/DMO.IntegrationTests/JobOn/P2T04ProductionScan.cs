@@ -589,6 +589,9 @@ internal static class P2T04ProductionScan
         // ---- P2-T07 (disclosed): the new env-gated Boquilhas persistence tests --------------
         "Migration007BoquilhasDomainTests.cs",
         "BoquilhasRepositoryIntegrationTests.cs",
+        // ---- Owner-clarification Resumo/association delta (disclosed): the new env-gated
+        // persistence tests of the Controlo entry + pré-JobOn association slice -------------
+        "PesoResumoAssociationIntegrationTests.cs",
     ];
 
     /// <summary>Returns whether a repository-relative test path belongs to the new P2-T04 surface.</summary>

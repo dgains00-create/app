@@ -37,7 +37,8 @@ internal sealed class P2T05TestComposition :
     IEmailListRepository,
     IEmailTemplateRepository,
     IGlassDensitySettingsRepository,
-    IPesoContextRead
+    IPesoContextRead,
+    IProductionResumoRead
 {
     /// <summary>The accepted P2-T04 store backing the real Job On/Tool services.</summary>
     public P2T04TestStore JobOnToolStore { get; } = new();
@@ -212,6 +213,59 @@ internal sealed class P2T05TestComposition :
         }
 
         return null;
+    }
+
+    // ----------------------------------------------------------------- IProductionResumoRead
+
+    /// <summary>
+    /// The Resumo da produção mirror, composed from the P2-T04 store's own public reads (the same
+    /// single source of truth as <see cref="GetCmContextAsync"/>): occurrence → CM context → live
+    /// Tool facts. Never synthesizes a context and never loads rows the entry does not need.
+    /// </summary>
+    public async Task<ProductionResumoReadModel?> GetResumoAsync(
+        Guid jobOnId,
+        CancellationToken cancellationToken)
+    {
+        var occurrence = await ((IJobOnRepository)JobOnToolStore)
+            .GetByIdAsync(jobOnId, cancellationToken);
+
+        if (occurrence is null)
+        {
+            return null;
+        }
+
+        var cm = occurrence.Contexts.FirstOrDefault(context => context.ContextType == ToolContextType.Cm);
+
+        CmResumoProjection? projection = null;
+
+        if (cm is not null)
+        {
+            var tool = await ((IToolRepository)JobOnToolStore)
+                .GetByIdAsync(cm.ToolId.Value, cancellationToken)
+                ?? throw new InvalidOperationException(
+                    $"Context '{cm.ContextId}' references canonical Tool '{cm.ToolId}' which " +
+                    "does not exist; the persisted context cannot be explained truthfully.");
+
+            projection = new CmResumoProjection(
+                cm.ContextId,
+                cm.ToolId.Value,
+                ToolTokens.ToToken(cm.Frozen.Type),
+                cm.Frozen.Reference,
+                cm.Frozen.Lot,
+                tool.Reference,
+                tool.Lot,
+                tool.Processo,
+                tool.Quantity);
+        }
+
+        return new ProductionResumoReadModel(
+            occurrence.JobOnId.Value,
+            occurrence.Reference,
+            occurrence.ProductionNumber,
+            occurrence.Machine.Value,
+            occurrence.ProductionDate,
+            occurrence.Version,
+            projection);
     }
 
     // ----------------------------------------------------------------- IPesoRepository

@@ -89,6 +89,23 @@ public static class ControloCreateEndpoints
                 : MapJobOnResult(result);
         });
 
+        // Resumo da produção — the Controlo entry read of ONE occurrence (P2-T05 contract §31.1,
+        // OWNER CLARIFICATION: jobon_id → Resumo da produção → cm_id → Peso). Light packet: the
+        // production facts + the CM context the Peso surface is populated from (reference, machine,
+        // lot, processo, CM identity) — one context-specific statement, no global scan, no Peso/
+        // output/history payload. Read-only; never writes and never bumps.
+        group.MapGet("/resumo/{jobonId:guid}", async (
+            Guid jobonId,
+            IProductionResumoRead resumo,
+            CancellationToken cancellationToken) =>
+        {
+            var value = await resumo.GetResumoAsync(jobonId, cancellationToken);
+
+            return value is null
+                ? Results.NotFound(new { reason = "not-found", jobonId })
+                : Results.Ok(ToResumoResponse(value));
+        });
+
         // Route 4 — pending-association candidates resolving to the anchor Tool (the additive Job On
         // read, Q-CAND).
         group.MapGet("/tools/{toolId:guid}/association-candidates", async (
@@ -529,6 +546,26 @@ public static class ControloCreateEndpoints
                 context.Tool.Quantity,
                 context.Tool.CompatibleMachines.Select(machine => machine.Value).ToArray()))).ToArray());
 
+    private static ProductionResumoResponse ToResumoResponse(ProductionResumoReadModel resumo) => new(
+        resumo.JobOnId,
+        resumo.Reference,
+        resumo.ProductionNumber,
+        resumo.Machine,
+        resumo.ProductionDate,
+        resumo.Version,
+        resumo.Cm is { } cm
+            ? new CmResumoResponse(
+                cm.CmId,
+                cm.ToolId,
+                cm.FrozenToolType,
+                cm.FrozenToolReference,
+                cm.FrozenToolLot,
+                cm.LiveToolReference,
+                cm.LiveToolLot,
+                ToolTokens.ToToken(cm.Processo),
+                cm.Quantity)
+            : null);
+
     private static PesoSheetResponse ToSheetResponse(PesoSheetReadModel sheet) => new(
         sheet.PesoId,
         sheet.Version,
@@ -727,6 +764,33 @@ public static class ControloCreateEndpoints
 
     /// <summary>Route 11 response: the real CM context created/updated by the Job On contract.</summary>
     public sealed record CmAssociationCreatedResponse(Guid JobonId, Guid CmId, int Version);
+
+    /// <summary>
+    /// Resumo da produção response: the Controlo entry projection of one occurrence (contract
+    /// §31.1) — production facts + the CM context the Peso is populated from; the live Tool summary
+    /// is the light packet (no compatible machines, no history, no outputs).
+    /// </summary>
+    public sealed record ProductionResumoResponse(
+        Guid JobonId,
+        string Reference,
+        string ProductionNumber,
+        string Machine,
+        DateOnly? ProductionDate,
+        int Version,
+        CmResumoResponse? Cm);
+
+    /// <summary>The CM context of the Resumo: real cm_id/tool_id, the frozen triple and the live
+    /// Tool entry facts (reference, lot, processo, quantity).</summary>
+    public sealed record CmResumoResponse(
+        Guid CmId,
+        Guid ToolId,
+        string FrozenToolType,
+        string FrozenToolReference,
+        string FrozenToolLot,
+        string LiveToolReference,
+        string LiveToolLot,
+        string? Processo,
+        int? Quantity);
 
     /// <summary>Typed, actionable refusal response.</summary>
     public sealed record PesoRefusalResponse(string Reason, string Message);
