@@ -427,7 +427,7 @@ and they must not be resolved by invention.
 |---|---|---|---|---|
 | B1 | Backend/interface contract | Concrete Tool/Job On/CM/MF/BQ query + mutation contract and physical schema have not been published as an accepted contract | P2-T04+ (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T04 per Beta `WORKFLOW.md`. **Authored:** `plans/contracts/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT.md` at contract SHA `58c6c1e8b4c9617daefc4ed02f7e65fb450bdada` (blob `799e6053a52d96acd21ed6be0475f5180e2525df`). **RESOLVED — PLAN ACCEPT:** Architect plan review `dev/reviews/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT_PLAN_REVIEW.md` at `diogo-o/dmo-work` SHA `7d7a7c564027945a5c9a73cb798e9c226ee7f013` returned **PLAN ACCEPT** (22 ACCEPT DEFAULT, 0 REQUIRES CORRECTION, 0 BLOCKING) and authorized P2-T04 implementation against that contract. B1 is closed; P2-T04 implementation is authorized and P2-T05+ remains unauthorized. |
 | B2 | Backend/interface contract | Concrete Peso/Pegamentos/Folha/Resumo calculate/persist/submit/read contract; **extended** to cover the Controlo_Create → Definições surfaces (repairer register, per-machine assignments, document base directory, email lists, email templates) settled in `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` | P2-T05/P2-T06 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T05. **Authored:** `plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md` — status **P2-T05 CONTRACT CORRECTED — AWAITING ARCHITECT RE-REVIEW** (Peso create/measurement core + the five Definições surfaces; Comparação/Pegamentos/Folha/Resumo and the read-model rendering recorded as P2-T05 handoff remainder per contract Q-SCOPE). **Architect plan review `256081fae43d4192b879b65fca0bb43efe8cdbca` (dmo-work): PLAN REJECT — C1–C4 only**; **Q-PDF resolved — ACCEPT DEFAULT, server-host filesystem configuration with server-side accessibility check**; 27 authority questions ACCEPT DEFAULT / 0 BLOCKING; corrections C1 (test matrix: 66 AC / 84 rows), C2 (`RESULT_NON_POSITIVE`), C3 (calculate route identity pin) and C4 (Appendix D.3 provenance) applied at the corrected contract commit. |
-| B3 | Backend/interface contract | Concrete Boquilhas aggregate/movement/edit-audit/close-reopen contract and `repairer_id` schema/query shape. The canonical `repairer_id` **directory source is now settled** (Controlo_Create → Definições), as are machine-assignment autonomy and historical repairer preservation (`…DELTA.md` §3.6, §4, §5, §6); the physical schema/query/endpoint contract is still absent | P2-T07 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T07. **Authored:** `plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md` — status **P2-T07 CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW** (both flows with the DB-enforced exclusive anchor, exactly four movement types, replay-derived balance, edit+audit, close/reopen on the same `boquilhas_id`, repairer consumption, six tables / one migration 007, 18 routes, 83 AC / 83 matrix rows, 12 NON-BLOCKING authority questions with pinned defaults); **B3 remains OPEN until the Architect PLAN ACCEPT**. |
+| B3 | Backend/interface contract | Concrete Boquilhas aggregate/movement/edit-audit/close-reopen contract and `repairer_id` schema/query shape. The canonical `repairer_id` **directory source is now settled** (Controlo_Create → Definições), as are machine-assignment autonomy and historical repairer preservation (`…DELTA.md` §3.6, §4, §5, §6); the physical schema/query/endpoint contract is still absent | P2-T07 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T07. **Authored:** `plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md` — status **P2-T07 CONTRACT CORRECTED (B1) — AWAITING FOCUSED ARCHITECT PLAN RE-REVIEW** (both flows with the DB-enforced exclusive anchor, exactly four movement types, replay-derived balance, edit+audit, close/reopen on the same `boquilhas_id`, repairer consumption, six tables / one migration 007, 18 routes, 83 AC / 86 matrix rows, 12 NON-BLOCKING authority questions with pinned defaults). **Architect plan review `542a08a1bcf1340306f8e337a6c597580a921f3d` (dmo-work): PLAN REJECT — blocking finding B1 only** (one-active-aggregate-per-anchor not race-safe as contracted); the B1 correction (partial unique indexes `IX_boquilhas_active_bq_id`/`IX_boquilhas_active_tool_id` + exact 23505 → `Refused(ActiveAggregateExists)` mapping + concurrent create/reopen test rows K6–K8) is applied at the corrected contract commit; **B3 remains OPEN until the Architect PLAN ACCEPT**. |
 | B4 | Backend/interface contract | Document generation contract + directory/filesystem capability (`Infrastructure/Files`, `Infrastructure/Pdf` do not exist); **extended** to cover the operator-configured base directory (configure/change/verify accessibility) and sending through configured email lists/templates (`…DELTA.md` §7, §8, §9) | P2-T08 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T08 |
 
 These do **not** block P2-T01, P2-T02, P2-T03 (shared frontend primitives), whose authority is
@@ -441,7 +441,7 @@ document completes.
 |---|---|
 | **B1** (P2-T04 Tool/Job On/context contract) | **RESOLVED — PLAN ACCEPT `7d7a7c564027945a5c9a73cb798e9c226ee7f013`.** Contract `plans/contracts/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT.md` at `58c6c1e8b4c9617daefc4ed02f7e65fb450bdada`; Architect plan review `dev/reviews/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT_PLAN_REVIEW.md` (in `diogo-o/dmo-work`) returned **PLAN ACCEPT** with 22 ACCEPT DEFAULT / 0 REQUIRES CORRECTION / 0 BLOCKING, stated **B1 → RESOLVED** and **P2-T04 implementation → AUTHORIZED**. P2-T04 is implemented against that contract and **CLOSED** (Architect focused re-review ACCEPT `b6f7a01c99fc8c517cca5cab335af5d47fb9e2f9` on the §15.1 correction, superseding the prior REJECT). |
 | **B2** (P2-T05/P2-T06 Controlo contract) | **RESOLVED — PLAN ACCEPT + IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW.** Contract `plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md` (status **P2-T05 CONTRACT ACCEPTED**; Architect plan review `256081fae43d4192b879b65fca0bb43efe8cdbca` = PLAN REJECT — C1–C4 only; **Q-PDF resolved**: ACCEPT DEFAULT — server-host filesystem configuration with server-side accessibility check; 27 ACCEPT DEFAULT / 0 BLOCKING; corrections C1–C4 applied; 66 AC / 84 matrix rows; re-review ACCEPT `f54ac15a96797a0dd0c51cf85b9b179e16be4da3`/`ceb9ee9…`). P2-T05 implemented against it (implementation response `dev/responses/P2_T05_IMPLEMENTATION_RESPONSE.md`); P2-T06 remains NOT AUTHORIZED. |
-| **B3** (P2-T07 Boquilhas contract) | **CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW** (`plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md`; authoring response `dev/responses/P2_T07_CONTRACT_AUTHORING_RESPONSE.md`; 83 AC / 83 matrix rows; 6 tables / 1 migration; 18 routes; 0 BLOCKING / 0 REQUIRES OWNER / 12 NON-BLOCKING pinned defaults). **B3 REMAINS OPEN** — only the Architect PLAN ACCEPT resolves it and authorizes P2-T07 implementation. |
+| **B3** (P2-T07 Boquilhas contract) | **CONTRACT CORRECTED (B1) — AWAITING FOCUSED ARCHITECT PLAN RE-REVIEW** (`plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md`; authoring response `dev/responses/P2_T07_CONTRACT_AUTHORING_RESPONSE.md`; 83 AC / 86 matrix rows; 6 tables / 1 migration; 18 routes; 0 BLOCKING / 0 REQUIRES OWNER / 12 NON-BLOCKING pinned defaults). Architect plan review `542a08a1bcf1340306f8e337a6c597580a921f3d` = **PLAN REJECT — B1 only**; the B1 correction (two partial unique active-anchor indexes + exact 23505 → `Refused(ActiveAggregateExists)` mapping + concurrent create/reopen coverage) is applied. **B3 REMAINS OPEN** — only the Architect focused PLAN re-review (B1) / PLAN ACCEPT resolves it and authorizes P2-T07 implementation. |
 | **B4** (P2-T08 documents/PDF contract) | **UNCHANGED / OPEN** — no contract authored. P2-T08 remains **NOT AUTHORIZED**. |
 
 ---
@@ -1160,39 +1160,46 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   aggregate is created by close/reopen.
 - **Downstream dependents:** P2-T08, P2-T10.
 
-- **CONTRACT STATUS: AUTHORED — AWAITING ARCHITECT PLAN REVIEW.** The B3 contract is
-  `plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md` (status
-  **P2-T07 CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW**; authoring response
-  `dev/responses/P2_T07_CONTRACT_AUTHORING_RESPONSE.md`). It fixes — over the accepted, CLOSED
-  P2-T04/P2-T05 state and the settled delta — the Boquilhas identity core (the DB-enforced
-  exclusive anchor `boquilhas_id → bq_id` production-linked | `boquilhas_id → tool_id`
-  standalone; no fake Job On/`bq_id`; no `production_id`/reverse arrays/per-piece identity),
-  the shared Tool orchestration consumption (BQ-only candidates, no auto-select, contextual
-  create returning to origin, no second registry), the **exactly four** movement types
-  (`inicio|saida|entrada|irreparavel`; `Editar` is an action, never a type; Início created with
-  the aggregate), the replay-derived balance buckets (Disponível/Em reparação/Irreparável/
-  Entrada excecional — **no second mutable balance authority**; Saída ≤ available and
-  Irreparável ≤ in-repair as 409 refusals; excess Entrada recorded, never clamped; negative
-  saldo visible/non-blocking), edit-with-audit on the **same `movement_id`** (before/after
-  audit, backend actor/time, no double balance effect, `movement_type`/`recorded_at`
-  immutable), `business_date` (editable) ⊥ `recorded_at` (immutable), repairer consumption
-  (register + assignments owned by `Controlo_Create → Definições`; machine → current
-  assignment → resolved/suggested; final selected `repairer_id` stored and **historically
-  preserved** on the movement), close/reopen on the **same `boquilhas_id`** (immutable close
-  snapshot, atomic failed close, recorded reopen actor/time/reason with exact eligibility), the
-  manual `% utilização` still (never derived, never a progress bar), the local Histórico
-  (backend-applied filters, selection/open, HISTÓRICO GLOBAL boundary), exactly **SIX new
-  tables** (`boquilhas`, `boquilha_machines`, `boquilha_movements`, `boquilha_movement_audit`,
-  `boquilha_close_snapshots`, `boquilha_reopenings`) in **ONE new additive migration (007)**,
-  exactly **18 routes** (3 pages + 15 endpoints) all gated `dmo.module.boquilhas`, and a
-  complete test-to-acceptance matrix (**83 AC ↔ 83 rows; missing 0, dangling 0, orphan 0**).
-  Authority questions: **0 BLOCKING, 0 REQUIRES OWNER DECISION, 12 NON-BLOCKING with pinned
-  defaults** — Q-EDIT-FIELDS, Q-MACHINE, Q-INICIO, Q-EXCESS, Q-ORDER, Q-CREATE, Q-REOPEN-ELIG,
-  Q-REFLOT, Q-UTIL, Q-LINE, Q-CLOSE-DATE, Q-ANUL. `ModuleRegistrations.CurrentBuildAvailable`
-  is still `[]`, no route is registered, no application code was changed by the authoring
-  task. The contract is **not self-accepted**: it awaits the Architect PLAN review per
-  `dmo-beta-master/WORKFLOW.md` step 6. **B3 remains OPEN**; P2-T07 is NOT started; P2-T08 /
-  P2-T10 remain NOT AUTHORIZED.
+- **CONTRACT STATUS: CORRECTED (B1) — AWAITING FOCUSED ARCHITECT PLAN RE-REVIEW.** The B3
+  contract is `plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md` (status
+  **P2-T07 CONTRACT CORRECTED (B1) — AWAITING FOCUSED ARCHITECT PLAN RE-REVIEW**; authoring
+  response `dev/responses/P2_T07_CONTRACT_AUTHORING_RESPONSE.md`). It fixes — over the
+  accepted, CLOSED P2-T04/P2-T05 state and the settled delta — the Boquilhas identity core (the
+  DB-enforced exclusive anchor `boquilhas_id → bq_id` production-linked | `boquilhas_id →
+  tool_id` standalone; no fake Job On/`bq_id`; no `production_id`/reverse arrays/per-piece
+  identity), the shared Tool orchestration consumption (BQ-only candidates, no auto-select,
+  contextual create returning to origin, no second registry), the **exactly four** movement
+  types (`inicio|saida|entrada|irreparavel`; `Editar` is an action, never a type; Início
+  created with the aggregate), the replay-derived balance buckets
+  (Disponível/Em reparação/Irreparável/Entrada excecional — **no second mutable balance
+  authority**; Saída ≤ available and Irreparável ≤ in-repair as 409 refusals; excess Entrada
+  recorded, never clamped; negative saldo visible/non-blocking), edit-with-audit on the **same
+  `movement_id`** (before/after audit, backend actor/time, no double balance effect,
+  `movement_type`/`recorded_at` immutable), `business_date` (editable) ⊥ `recorded_at`
+  (immutable), repairer consumption (register + assignments owned by `Controlo_Create →
+  Definições`; machine → current assignment → resolved/suggested; final selected `repairer_id`
+  stored and **historically preserved** on the movement), close/reopen on the **same
+  `boquilhas_id`** (immutable close snapshot, atomic failed close, recorded reopen
+  actor/time/reason with exact eligibility), the manual `% utilização` still (never derived,
+  never a progress bar), the local Histórico (backend-applied filters, selection/open,
+  HISTÓRICO GLOBAL boundary), exactly **SIX new tables** (`boquilhas`, `boquilha_machines`,
+  `boquilha_movements`, `boquilha_movement_audit`, `boquilha_close_snapshots`,
+  `boquilha_reopenings`) in **ONE new additive migration (007)**, exactly **18 routes** (3
+  pages + 15 endpoints) all gated `dmo.module.boquilhas`, and a complete test-to-acceptance
+  matrix (**83 AC ↔ 86 rows; missing 0, dangling 0, orphan 0**). Authority questions:
+  **0 BLOCKING, 0 REQUIRES OWNER DECISION, 12 NON-BLOCKING with pinned defaults** —
+  Q-EDIT-FIELDS, Q-MACHINE, Q-INICIO, Q-EXCESS, Q-ORDER, Q-CREATE, Q-REOPEN-ELIG, Q-REFLOT,
+  Q-UTIL, Q-LINE, Q-CLOSE-DATE, Q-ANUL. The Architect plan review (dmo-work `542a08a1…`)
+  returned **PLAN REJECT — blocking finding B1 only** (one-active-aggregate-per-anchor not
+  race-safe as contracted); the B1 correction — partial unique indexes
+  `IX_boquilhas_active_bq_id`/`IX_boquilhas_active_tool_id` (`WHERE status = 'active' AND
+  <anchor> IS NOT NULL`), the exact scoped 23505 → `Refused(ActiveAggregateExists)` mapping,
+  race-safe create/reopen semantics and concurrent test rows K6–K8 — is applied at the
+  corrected contract commit. `ModuleRegistrations.CurrentBuildAvailable`
+  is still `[]`, no route is registered, no application code was changed by the authoring or
+  correction tasks. The contract is **not self-accepted**: it awaits the Architect focused
+  PLAN re-review (B1) per `dmo-beta-master/WORKFLOW.md` step 6. **B3 remains OPEN**; P2-T07 is
+  NOT started; P2-T08 / P2-T10 remain NOT AUTHORIZED.
 
 ### P2-T08 — Documents / PDF / directory convention / availability
 
@@ -1610,8 +1617,8 @@ Investigated during this planning run and determined **not** to require implemen
 | 9.10 Folha + Resumo | MISSING | READY FOR IMPLEMENTATION | P2-T05 |
 | 9.11 shared Peso read model | MISSING | READY FOR IMPLEMENTATION | P2-T05 publishes, P2-T06 consumes |
 | 9.12 Controlo Approve | MISSING | READY FOR IMPLEMENTATION | P2-T06 — **IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW** (contract `plans/contracts/P2-T06_CONTROLO_APPROVE_CONTRACT.md` @ `dd0e163…`; PLAN ACCEPT `947c5f7…`; response `dev/responses/P2_T06_IMPLEMENTATION_RESPONSE.md`; 61 AC / 67 matrix rows; 605 unit / 568 integration green; migration 006 + one table + one additive index; `CurrentBuildAvailable` `[]`) |
-| 9.13 Boquilhas | MISSING | READY FOR IMPLEMENTATION | P2-T07 — **CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW** (`plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md`; 83 AC / 83 matrix rows; 6 tables / 1 migration 007; 18 routes; 0 BLOCKING / 0 OWNER / 12 NON-BLOCKING; no implementation; `CurrentBuildAvailable` `[]`) |
-| 9.14 Boquilhas repairer | MISSING | READY FOR IMPLEMENTATION | P2-T07 — **CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW** (consumption contract: machine → current assignment → resolved; final selected `repairer_id` stored on external Saída with historical retention; register/assignments owned by `Controlo_Create → Definições`; same contract as 9.13) |
+| 9.13 Boquilhas | MISSING | READY FOR IMPLEMENTATION | P2-T07 — **CONTRACT CORRECTED (B1) — AWAITING FOCUSED ARCHITECT PLAN RE-REVIEW** (`plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md`; PLAN REJECT `542a08a1…` (B1 only) + B1 correction applied; 83 AC / 86 matrix rows; 6 tables / 1 migration 007; 18 routes; 0 BLOCKING / 0 OWNER / 12 NON-BLOCKING; no implementation; `CurrentBuildAvailable` `[]`) |
+| 9.14 Boquilhas repairer | MISSING | READY FOR IMPLEMENTATION | P2-T07 — **CONTRACT CORRECTED (B1) — AWAITING FOCUSED ARCHITECT PLAN RE-REVIEW** (consumption contract: machine → current assignment → resolved; final selected `repairer_id` stored on external Saída with historical retention; register/assignments owned by `Controlo_Create → Definições`; same contract as 9.13) |
 | **delta §1** Controlo_Create owns Definições | SETTLED (new authority) | RECORDED — `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` | P2-T05 |
 | **delta §2** Controlo_Approve reduced to Aprovar + Histórico de Pesos | SETTLED (scope reduction) | RECORDED | P2-T06 |
 | **delta §3** repairer register (name only; owner = Controlo_Create → Definições) | SETTLED (new authority; closes the B3 directory-source half) | RECORDED | P2-T05 (register), P2-T07 (consumption) |

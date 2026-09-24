@@ -3,7 +3,10 @@
 **Workstream:** P2-T07 — Boquilhas (BQ external-repair quantity workflow; aggregate + movement
 ledger + edit-audit + close/reopen + local Histórico).
 **Task class:** contract authoring only. **No implementation.**
-**Status:** CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW.
+**Status:** CONTRACT CORRECTED (B1) — AWAITING FOCUSED ARCHITECT PLAN RE-REVIEW. The Architect
+PLAN review (dmo-work `542a08a1…`) returned **PLAN REJECT — blocking finding B1 only**; the B1
+correction (partial unique indexes + exact 23505 mapping + concurrent test rows) has been
+applied to the contract (see §12). **Not accepted; implementation NOT AUTHORIZED.**
 **Precedence note:** P2-T05 (Controlo_Create) and its post-closure glass-density correction slice
 are **CLOSED**; P2-T06 (Controlo Approve) is **CLOSED** (its closure record announces the
 **P2-T07 planning/contract gate** as the next eligible gate, recorded only — NOT AUTHORIZED);
@@ -249,7 +252,22 @@ Q-REFLOT, Q-UTIL, Q-LINE, Q-CLOSE-DATE and Q-ANUL — per `dmo-beta-master/WORKF
 Until then:
 
 - P2-T07 implementation is **not** authorized and **has** not started;
-- P2-T07 status is `CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW`;
+- P2-T07 status is `CONTRACT CORRECTED (B1) — AWAITING FOCUSED ARCHITECT PLAN RE-REVIEW`;
 - P2-T08 / P2-T10 remain **NOT AUTHORIZED**;
 - this response does **not** self-accept the contract and does not mark P2-T07 started;
 - `ModuleRegistrations.CurrentBuildAvailable` remains `[]`.
+
+## 12. Focused B1 correction (this task)
+
+| Item | Value |
+|---|---|
+| Architect PLAN review | `dev/reviews/P2-T07_BOQUILHAS_CONTRACT_PLAN_REVIEW.md` @ dmo-work `542a08a1bcf1340306f8e337a6c597580a921f3d` |
+| Original decision | **PLAN REJECT** — blocking findings **B1 only**; all 12 authority questions independently adjudicated **ACCEPT DEFAULT** (0 REQUIRES OWNER DECISION, 0 BLOCKING) |
+| Defect (verbatim finding) | the `active-aggregate-exists` refusal (one-active-aggregate-per-anchor invariant) was not race-safe as contracted: create has no version guard and the in-transaction application scan cannot serialize concurrent creates for the same anchor under READ COMMITTED with no unique anchor tuple (§7.2), no partial unique index (§7.5), no isolation override and no advisory locks (§10) — two active aggregates on one anchor could both commit |
+| Correction applied | **B1 only** — (1) partial unique indexes `IX_boquilhas_active_bq_id` (`bq_id` WHERE `status = 'active' AND bq_id IS NOT NULL`) and `IX_boquilhas_active_tool_id` (`tool_id` WHERE `status = 'active' AND tool_id IS NOT NULL`) in §7.2 (semantic) and §7.5 (physical); the exclusive-anchor CHECK keeps the two predicates mutually exclusive, serializing per truthful anchor type; (2) the exact scoped mapping: 23505 on either index → `Refused(ActiveAggregateExists)`, no other 23505 source mapped (§7.2, §8.2); (3) application pre-check = normal-path refusal only; the database index = the concurrency authority; create (§22.2) and reopen (§23.3) race semantics with full-transaction rollback (no partial aggregate, no orphan Início; failed reopen preserves `closed` state/snapshot/history; no partial reopening record); (4) transaction rules §10 (incl. explicit no advisory-lock/no-SERIALIZABLE/no-table-lock/no-lock-table/no-mutex) and §11 matrix/rules; (5) migration-007 delta §28.2 (indexes only — tables 6, migrations 1 unchanged); (6) test rows K6 (production-linked create race), K7 (standalone create race), K8 (create-vs-reopen race) in §29 — **83 AC / 86 rows**; no new criterion; mappings to existing AC-C6/AC-C7/AC-K3/AC-K4; **missing 0, dangling 0, orphan 0** |
+| Not changed | every Architect PASS domain (identity/linked-vs-standalone, tool orchestration, movement vocabulary, replay balance, quantity rules, edit semantics, dates, repairer resolution/history, aggregate/create model, close, reopen identity, utilisation, local Histórico, exactly 18 routes, `dmo.module.boquilhas` gate, P2-T05/T08/T10 boundaries, fixed desktop, `CurrentBuildAvailable = []`); authority questions stay **12 ACCEPT DEFAULT / 0 OWNER / 0 BLOCKING** (B1 is a concurrency implementation-contract defect, not a new Owner question) |
+| Status after correction | **CORRECTED — AWAITING FOCUSED ARCHITECT PLAN RE-REVIEW** (NOT accepted; implementation NOT AUTHORIZED) |
+| Next gate | **focused Architect PLAN re-review of B1 only** — expected ACCEPT after the correction |
+| Files changed (this correction) | `plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md` (B1 correction + App. D.5 record), `plans/BETA_IMPLEMENTATION_MASTER_PLAN.md` (§4 B3 row + §7 CONTRACT STATUS — status records only), `plans/beta-workstreams/P2-T07-BOQUILHAS.md` (§14 status record), `dev/responses/P2_T07_CONTRACT_AUTHORING_RESPONSE.md` (this section) |
+| Implementation performed | **NONE** — docs/governance only; no `src/**`, no `tests/**`, no migration, no Supabase change |
+| `ModuleRegistrations.CurrentBuildAvailable` | `[]` (unchanged) |

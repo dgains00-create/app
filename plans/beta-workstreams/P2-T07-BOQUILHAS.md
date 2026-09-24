@@ -179,8 +179,8 @@ P2-T08, P2-T10.
 
 ## 14. Contract-authored record
 
-**Status: AUTHORED — AWAITING ARCHITECT PLAN REVIEW** (contract-authoring task, planning gate
-only; **no implementation**).
+**Status: CORRECTED (B1) — AWAITING FOCUSED ARCHITECT PLAN RE-REVIEW** (contract-authoring and
+B1-correction tasks, planning gate only; **no implementation**).
 
 The implementation contract is `plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md` (authoring
 response `dev/responses/P2_T07_CONTRACT_AUTHORING_RESPONSE.md`). It fixes — over the accepted,
@@ -198,12 +198,19 @@ non-blocking), edit-with-audit on the same `movement_id` (no double balance effe
 `boquilhas_id` (immutable snapshot; atomic failed close; recorded reopen), the manual
 `% utilização` still, the local Histórico (backend filters; HISTÓRICO GLOBAL boundary), SIX new
 tables in ONE additive migration (007), exactly 18 routes all gated `dmo.module.boquilhas`, and
-a complete test-to-acceptance matrix (**83 AC ↔ 83 rows; missing 0, dangling 0, orphan 0**) with
+a complete test-to-acceptance matrix (**83 AC ↔ 86 rows; missing 0, dangling 0, orphan 0** —
+the B1-correction rows K6–K8 cover concurrent create/create and create/reopen races) with
 12 NON-BLOCKING authority questions carrying pinned defaults (Q-EDIT-FIELDS, Q-MACHINE,
 Q-INICIO, Q-EXCESS, Q-ORDER, Q-CREATE, Q-REOPEN-ELIG, Q-REFLOT, Q-UTIL, Q-LINE, Q-CLOSE-DATE,
 Q-ANUL) — **0 BLOCKING, 0 REQUIRES OWNER DECISION**.
 
-The contract is **not** self-accepted: it awaits the Architect PLAN review per
+The Architect PLAN review (dmo-work `542a08a1…`) returned **PLAN REJECT — blocking finding B1
+only**: the one-active-aggregate-per-anchor refusal was not race-safe as contracted. The B1
+correction (partial unique indexes `IX_boquilhas_active_bq_id`/`IX_boquilhas_active_tool_id` +
+exact 23505 → `Refused(ActiveAggregateExists)` mapping + race-safe create/reopen semantics) is
+applied at the corrected contract commit.
+
+The contract is **not** self-accepted: it awaits the Architect focused PLAN re-review (B1) per
 `dmo-beta-master/WORKFLOW.md` step 6 (B3 remains OPEN until PLAN ACCEPT). Implementation is
 **NOT STARTED — NOT AUTHORIZED**. `ModuleRegistrations.CurrentBuildAvailable` remains `[]`.
 **P2-T08 / P2-T10 remain NOT AUTHORIZED.**

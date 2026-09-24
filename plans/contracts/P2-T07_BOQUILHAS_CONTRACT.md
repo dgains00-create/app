@@ -6,8 +6,15 @@ ledger + edit-audit + close/reopen + local Histórico).
 **Handoff:** `plans/beta-workstreams/P2-T07-BOQUILHAS.md` (authoritative handoff for this
 workstream). **Settled delta:** `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` (§3–§6,
 §11).
-**Status:** **AUTHORED — AWAITING ARCHITECT PLAN REVIEW.** Not accepted; implementation is
-authorized only by the Architect `PLAN ACCEPT` per `dmo-beta-master/WORKFLOW.md`.
+**Status:** **CORRECTED (B1) — AWAITING FOCUSED ARCHITECT PLAN RE-REVIEW.** The Architect PLAN
+review (`dev/reviews/P2-T07_BOQUILHAS_CONTRACT_PLAN_REVIEW.md` @ dmo-work `542a08a1…`) returned
+**PLAN REJECT — blocking finding B1 only** (one-active-aggregate-per-anchor concurrency
+enforcement). This revision applies exactly that correction: two partial unique indexes
+(`IX_boquilhas_active_bq_id`, `IX_boquilhas_active_tool_id`), the exact 23505 →
+`Refused(ActiveAggregateExists)` mapping, the create/reopen race-safe backstop semantics and the
+corresponding test rows (§7, §8, §10, §11, §22, §23, §28, §29, App. D.5). **Not accepted**;
+implementation is authorized only by the Architect `PLAN ACCEPT` per
+`dmo-beta-master/WORKFLOW.md`.
 
 > **Scope note (operative):** this contract authors the **operational Boquilhas aggregate and its
 > movement history** over the accepted, **CLOSED** P2-T04 domain core (canonical `tool_id`,
@@ -777,13 +784,42 @@ PK_boquilha_reopenings           (reopen_id)
 
 ### 7.2 Unique constraints (unique indexes, accepted foundation style)
 
-| Name | Table | Tuple | Meaning |
+| Name | Table | Tuple / predicate | Meaning |
 |---|---|---|---|
 | `boquilha_machines_boquilhas_machine_key` | `boquilha_machines` | (`boquilhas_id`, `machine`) | one row per machine per aggregate |
+| `IX_boquilhas_active_bq_id` | `boquilhas` | (`bq_id`) **PARTIAL**: `WHERE status = 'active' AND bq_id IS NOT NULL` | **at most one ACTIVE aggregate per production-linked anchor** (`bq_id`) — the race-safe database backstop of the one-active rule (Q-CREATE/Q-REOPEN-ELIG; §11.2, §22.2, §23.3) |
+| `IX_boquilhas_active_tool_id` | `boquilhas` | (`tool_id`) **PARTIAL**: `WHERE status = 'active' AND tool_id IS NOT NULL` | **at most one ACTIVE aggregate per standalone anchor** (`tool_id`) — the same backstop |
 
-No other business unique tuple exists: no "one aggregate per tool" (multiple traces over time
-are legitimate — §23), no "one movement per type", no one-close-per-aggregate (close/reopen
-cycles produce one snapshot per close).
+These are the **only** business unique tuples. The rationale for the two partial tuples versus
+the rejected unconditional one:
+
+- No **unconditional** "one aggregate per anchor" tuple exists: multiple traces over time are
+  legitimate (a closed trace never blocks a later one — §23), so `bq_id`/`tool_id` alone are
+  deliberately **not** unique.
+- The **active-only** partial tuples above are the exact Q-CREATE/Q-REOPEN-ELIG invariant
+  ("one active aggregate at a time per BQ Tool context", global §7; §1.3) made structural:
+  closed rows are unconstrained, active rows collide on the same anchor.
+- The anchor-exclusivity CHECK (`boquilhas_anchor_exclusive_check`, §7.4) guarantees a row can
+  satisfy **at most one** of the two partial predicates (production-linked = `bq_id` non-NULL /
+  `tool_id` NULL; standalone = the reverse), so the two indexes serialize active-aggregate
+  creation **independently per truthful anchor type** — never cross-talk between the flows.
+
+**Concurrency authority (B1 correction; Architect PLAN review `542a08a1…`).** The application
+pre-check (`HasActiveAggregateForAnchorAsync` inside the create/reopen transactions, §22.2/
+§23.3) remains the **normal-path refusal for UX, but is NOT the concurrency authority**. The
+database partial unique indexes are the race-safe invariant backstop: if a competing create (or
+reopen) commits an active aggregate on the same anchor between the pre-check and this
+transaction's COMMIT, the database raises `23505 unique_violation` on the relevant index, the
+**entire transaction rolls back**, and the repository maps it to the **same**
+`Refused(ActiveAggregateExists)` — no partial aggregate, no orphan Início, no 500.
+
+**23505 mapping (exact — B1 correction).** PostgreSQL `23505 unique_violation`, when caused by
+`IX_boquilhas_active_bq_id` **or** `IX_boquilhas_active_tool_id`, maps in the
+repository/infrastructure layer to `Refused(ActiveAggregateExists)` (409), distinguished by the
+reported constraint/index identity (`PostgresException.SqlState` + constraint name, the
+accepted `TryMapConstraintViolation` pattern — §8.2 binding rules). **No other 23505 source is
+mapped to this domain result**: the mapping is scoped to exactly these two index identities,
+and no generic catch-all 23505 mapping is contracted.
 
 ### 7.3 Foreign keys (all `ON DELETE RESTRICT`)
 
@@ -844,9 +880,13 @@ cycles produce one snapshot per close).
 | `IX_boquilha_movement_audit_movement_id` | `boquilha_movement_audit` | `movement_id`, `edited_at` | NO | FK-supporting + the per-movement trail read (§19) |
 | `IX_boquilha_close_snapshots_boquilhas_id` | `boquilha_close_snapshots` | `boquilhas_id`, `closed_at` | NO | FK-supporting + "last close" determination (§23) |
 | `IX_boquilha_reopenings_boquilhas_id` | `boquilha_reopenings` | `boquilhas_id`, `reopened_at` | NO | FK-supporting + reopen history read (§23) |
+| `IX_boquilhas_active_bq_id` | `boquilhas` | `bq_id` | YES (partial) | **invariant backstop, not a query index** — at most one ACTIVE aggregate per `bq_id` (§7.2; race-free create/reopen enforcement, §11.2/§22.2/§23.3) |
+| `IX_boquilhas_active_tool_id` | `boquilhas` | `tool_id` | YES (partial) | **invariant backstop, not a query index** — at most one ACTIVE aggregate per `tool_id` (§7.2; race-free create/reopen enforcement, §11.2/§22.2/§23.3) |
 
-No other index is contracted. In particular no speculative index is added for Histórico filter
-combinations (reference/lot traversal, movement type, repairer, business-date range): those are
+The two partial unique indexes are declared in §7.2 (semantic register) and listed here only for
+the physical index register; they exist to enforce the one-active invariant, not to serve a read
+predicate. No other index is contracted. In particular no speculative index is added for Histórico
+filter combinations (reference/lot traversal, movement type, repairer, business-date range): those are
 predicate-bound registry queries over small aggregates and no authority justifies speculative
 indexes (P2-T04 Q12 / P2-T05 §17.5 / P2-T06 §7.3 stance). `boquilha_machines`
 (`UNIQUE (boquilhas_id, machine)`) serves its own FK support.
@@ -923,8 +963,11 @@ Binding rules (same as P2-T04 §12.2 / P2-T05 §20.2 / P2-T06 §8.2): `Cancellat
 last; `Task<T?>` single reads / `Task<IReadOnlyList<T>>` lists / `Task<T>` writes; the write
 opens its own transaction; private static `Project(...)` mapping; constraint violations mapped
 via `PostgresException.SqlState` + constraint name (23514 → the same validator token, never a
-500); repositories own no domain rule beyond the accepted unit shapes; `BoquilhasService` owns
-the balance-relative validation by composing repository reads (single replay helper, §18).
+500; **23505 on `IX_boquilhas_active_bq_id`/`IX_boquilhas_active_tool_id` →
+`Refused(ActiveAggregateExists)` — the exact scoped mapping of §7.2, with no other 23505 source
+mapped to this domain result**); repositories own no domain rule beyond the accepted unit shapes;
+`BoquilhasService` owns the balance-relative validation by composing repository reads (single
+replay helper, §18).
 
 **Where the consumed reads come from:** machine assignment reads use the **closed P2-T05**
 `IMachineRepairerAssignmentRepository` (`GetByMachineAsync`/`ListAsync` — read-only, no member
@@ -1008,11 +1051,11 @@ no isolation override, no advisory locks, no outbox.
 
 | Operation | Transaction boundary | Atomic unit |
 |---|---|---|
-| Aggregate create (§22.4) | ONE transaction | `boquilhas` row + **all** `boquilha_machines` rows + the **Início** `boquilha_movements` row — all-or-nothing |
+| Aggregate create (§22.4) | ONE transaction | `boquilhas` row + **all** `boquilha_machines` rows + the **Início** `boquilha_movements` row — all-or-nothing; application pre-check + the **partial unique index backstop** (`IX_boquilhas_active_bq_id`/`IX_boquilhas_active_tool_id`, §7.2): a competing create/reopen that commits between pre-check and COMMIT raises 23505 → whole transaction rolls back → `Refused(ActiveAggregateExists)` (§11, §22.2) |
 | Movement append (§17) | ONE transaction | replay validation + the single `boquilha_movements` row (incl. Entrada expected/excess facts) — all-or-nothing |
 | Movement edit (§19) | ONE transaction | guarded UPDATE of the **same** `movement_id` row (new current values + `version += 1` + `updated_at`) + the `boquilha_movement_audit` row — all-or-nothing; **no second movement row is ever inserted** |
 | Close (§23) | ONE transaction | `boquilhas.status := 'closed'` + `version += 1` + the immutable `boquilha_close_snapshots` row (replay-computed buckets) — all-or-nothing |
-| Reopen (§23) | ONE transaction | eligibility checks + `boquilhas.status := 'active'` + `version += 1` + the `boquilha_reopenings` row — all-or-nothing |
+| Reopen (§23) | ONE transaction | eligibility checks + `boquilhas.status := 'active'` + `version += 1` + the `boquilha_reopenings` row — all-or-nothing; the **partial unique index backstop** protects the one-active invariant at the database: if a concurrent create/reopen commits an active aggregate on the same anchor before this transaction's status UPDATE, the UPDATE raises 23505 → complete rollback → `Refused(ActiveAggregateExists)` — the aggregate remains `closed`, its close snapshot and all history intact, no partial reopening record (§11, §23.3) |
 | Opening-facts update (§23) | ONE transaction | `boquilhas` row (opening_date/utilisation/observations) + machine-set replace (delete + insert child rows) — all-or-nothing |
 | Reads (grid/ficha/history/audit/assignments/repairers/productions/jobon) | none — read-only | — |
 
@@ -1020,7 +1063,8 @@ Rules:
 
 1. A forced mid-transaction failure leaves **zero** rows of the operation (no aggregate without
    its Início; no status flip without a snapshot; no movement update without its audit row) —
-   test rows prove both orders (K3, C2).
+   test rows prove both orders (K3, C2). A 23505 on an active-anchor index in create/reopen is
+   such a failure: zero rows of the operation survive (K6–K8).
 2. After a successful COMMIT, a retry is a **new** attempt with the fresh observed version;
    after a rolled-back failure, a retry is a clean attempt. No client idempotency key is
    invented (P2-T04 Q17 stance).
@@ -1029,6 +1073,10 @@ Rules:
    AC-E2, AC-MG3).
 4. `recorded_at` is written exactly once at movement insertion and is never touched by any
    later statement (§20).
+5. **The race-safe invariant backstop uses no advisory lock, no `SERIALIZABLE` isolation, no
+   explicit table lock, no lock table and no application mutex** (B1 correction, Architect
+   review `542a08a1…`): the partial unique indexes of §7.2 plus the exact 23505 mapping are the
+   entire mechanism; everything else in this section is unchanged.
 
 ---
 
@@ -1054,11 +1102,11 @@ Rules:
 
 | Operation | Observed version(s) | On staleness | Rows written on staleness |
 |---|---|---|---|
-| Aggregate create | n/a (nothing pre-exists; anchor race → `active-aggregate-exists` refusal, §23) | `Refused(ActiveAggregateExists)` (409) | 0 |
+| Aggregate create | n/a (nothing pre-exists) — the anchor race is closed by the **application pre-check AND the partial unique index backstop** (§7.2): either the pre-check refuses or the database raises 23505 on `IX_boquilhas_active_bq_id`/`IX_boquilhas_active_tool_id`, both → `Refused(ActiveAggregateExists)` (409) | `Refused(ActiveAggregateExists)` (409) | 0 |
 | Movement append | `expectedAggregateVersion` (protects against concurrent close/reopen) | `Refused(StaleVersion)` (409) | 0 |
 | Movement edit | `expectedAggregateVersion` + `expectedMovementVersion` | `Refused(StaleVersion)` (409) | 0 |
 | Close | `expectedAggregateVersion` | `Refused(StaleVersion)` (409) | 0 |
-| Reopen | `expectedAggregateVersion` | `Refused(StaleVersion)` (409) | 0 |
+| Reopen | `expectedAggregateVersion` + the **active-anchor index backstop** (a concurrent create/reopen that commits another active aggregate on the same anchor makes the status UPDATE raise 23505 → `Refused(ActiveAggregateExists)`, complete rollback — §23.3) | `Refused(StaleVersion)` (409) or `Refused(ActiveAggregateExists)` (409) | 0 |
 | Opening-facts update | `expectedAggregateVersion` | `Refused(StaleVersion)` (409) | 0 |
 
 ### 11.3 Rules
@@ -1071,6 +1119,16 @@ dados foram alterados por outra ação; nada foi guardado." — typed server mes
 never bump. Versions increment exactly once per committed mutation (create starts at 1; each
 guarded mutation adds 1).
 
+**One-active-anchor invariant (B1 correction; Architect review `542a08a1…`).** The partial
+unique indexes of §7.2 are the race-safe database backstop of the one-active-aggregate-per-anchor
+rule: a `23505 unique_violation` on either index — produced by a create or a reopen racing a
+concurrent create/reopen that committed first — rolls back the **entire** transaction and maps to
+`Refused(ActiveAggregateExists)` via the exact §7.2 mapping (never a 500, never a partial
+aggregate, never an orphan Início; a failed reopen preserves the `closed` state, the close
+snapshot and all history). The application pre-check remains the normal-path refusal and is not
+the concurrency authority. No advisory lock, no `SERIALIZABLE` isolation, no explicit table lock
+and no lock table is introduced (§10 rule 5).
+
 ### 11.4 Interaction of the two version scopes
 
 - Movement append/edit asserts the **aggregate version** because close/reopen mutate the
@@ -1082,6 +1140,11 @@ guarded mutation adds 1).
   same movement — the second fails `stale-version`.
 - Reopen/close guard against each other and against opening-fact updates through the aggregate
   version; the eligibility anchor scans (§23) run inside the transaction.
+- **Create-vs-create and create-vs-reopen on the same anchor** have no pre-existing version to
+  observe (create) or a version that cannot see the other's uncommitted row — they are closed by
+  the §7.2 partial unique indexes: whoever commits the active row first wins (create: INSERT
+  succeeds, or the reopen's status UPDATE succeeds); the loser's write raises 23505 → the exact
+  mapping → `Refused(ActiveAggregateExists)` (K6–K8).
 
 ---
 
@@ -1663,10 +1726,21 @@ CreateBoquilhasCommand(
 
 Transaction (§10): validate anchors (Tool exists + type `BQ`; `bq_id` exists as a real
 `bq_contexts` row); refuse when an **active** aggregate already exists for the same anchor
-(`Refused(ActiveAggregateExists)` — S7, Q-CREATE); INSERT `boquilhas` (created_by = current
-account) + machine rows + the **Início** movement (`quantity = InitialQuantity`, `business_date
-= OpeningDate`, recorded_by = current account); COMMIT. The Início movement is therefore born
-with aggregate `version = 1` and movement `version = 1`.
+(`Refused(ActiveAggregateExists)` — S7, Q-CREATE; the **application pre-check** = normal-path
+refusal for UX only, NOT the concurrency authority — §7.2); INSERT `boquilhas` (created_by =
+current account) + machine rows + the **Início** movement (`quantity = InitialQuantity`,
+`business_date = OpeningDate`, recorded_by = current account); COMMIT. The Início movement is
+therefore born with aggregate `version = 1` and movement `version = 1`.
+
+**Race-free anchor enforcement (B1 correction; Architect review `542a08a1…`):** if a competing
+transaction commits an active aggregate on the same anchor between the pre-check and this
+transaction's COMMIT, the INSERT hits the §7.2 partial unique index
+(`IX_boquilhas_active_bq_id` for the production-linked anchor, `IX_boquilhas_active_tool_id` for
+the standalone anchor) → `23505 unique_violation` → the **entire transaction rolls back** (no
+`boquilhas` row, no machine rows, no Início — no partial aggregate, no orphan Início) → the
+exact §7.2 mapping returns `Refused(ActiveAggregateExists)` (409). The application detects the
+losing race through the same refusal token as the normal path; nothing internal leaks to the
+caller.
 
 ### 22.3 BQ-context creation — never a Boquilhas-owned write
 
@@ -1758,6 +1832,10 @@ BEGIN
         tie-break close_snapshot_id)               else ROLLBACK -> Refused(NotLastClosed)
   8. assert no OTHER active aggregate shares the anchor (HasActiveAggregateForAnchor)
                                                     else ROLLBACK -> Refused(ActiveAggregateExists)
+                                                    (application pre-check = normal-path refusal
+                                                     for UX only, NOT the concurrency authority —
+                                                     §7.2; the partial unique index of step 10 is
+                                                     the race-safe backstop)
   9. INSERT boquilha_reopenings (boquilhas_id, close_snapshot_id = the last close,
      reopened_by = current account, reopened_at = backend clock, reason)
   10. UPDATE boquilhas: status := 'active', version += 1, updated_at := now()
@@ -1772,6 +1850,13 @@ BEGIN
   aggregate; a later close writes a **new** snapshot (AC-C8).
 - Reopen is a lifecycle fact, not a movement type (`RECORD_LIFECYCLES.md` §9).
 - Failed reopen (any precondition) writes nothing.
+- **Race-safe backstop (B1 correction; Architect review `542a08a1…`):** the same
+  one-active-per-anchor invariant protects reopen at the database. If a concurrent create (or
+  another reopen of a different aggregate on the same anchor) commits an **active** row between
+  step 8's scan and step 10's UPDATE, the UPDATE raises `23505 unique_violation` on the §7.2
+  partial unique index → the **entire transaction rolls back** → exact §7.2 mapping →
+  `Refused(ActiveAggregateExists)`. The aggregate remains `closed`; its close snapshot, history
+  and reopen records are untouched; **no partial reopening record is written** (K8).
 
 ### 23.4 Opening-facts update (exact)
 
@@ -1959,15 +2044,19 @@ src/DMO.Infrastructure/Migrations/<UTC timestamp>_BoquilhasDomain.cs   (+ .Desig
 
 Created: **6 tables** — `boquilhas`, `boquilha_machines`, `boquilha_movements`,
 `boquilha_movement_audit`, `boquilha_close_snapshots`, `boquilha_reopenings` — with exactly the
-columns, nullability, defaults, CHECKs, unique constraints, foreign keys (all `RESTRICT`) and
-indexes of §6/§7.
+columns, nullability, defaults, CHECKs, unique constraints (incl. the two **partial unique
+indexes** `IX_boquilhas_active_bq_id` / `IX_boquilhas_active_tool_id`, `WHERE status = 'active'
+AND <anchor> IS NOT NULL` — §7.2, B1 correction), foreign keys (all `RESTRICT`) and indexes of
+§6/§7.
 
 Post-migration public table count: **27** (21 current + 6 new).
 
 Not created: any other table, any seed/reference row, any trigger, any function, any view, any
 extension, any sequence, any PostgreSQL enum type, any RLS policy, any
 `__EFMigrationsHistory` manipulation, and **no column on any existing table** (no `boquilhas`
-columns on `tools`/`job_ons`/`bq_contexts`/`repairers`; no balance column anywhere).
+columns on `tools`/`job_ons`/`bq_contexts`/`repairers`; no balance column anywhere). The B1
+correction changes **indexes only**: the table set (6), the migration count (1 — migration 007
+remains the single Boquilhas migration) and every column/CHECK/FK are unchanged.
 
 ### 28.3 Supersession record (exact extent)
 
@@ -2126,6 +2215,9 @@ audit is mechanical.
 | K3 | DB | forced mid-transaction failure in append, edit, close and reopen → zero partial state (no movement, no audit, no snapshot, no reopen record, no version bump, status unchanged) | AC-K3 |
 | K4 | DB | save-time race (second connection bumps the aggregate version mid-save) → 409 `stale-version` via the `SaveAsync` mapping; no silent overwrite of the newer state | AC-K4 |
 | K5 | R | on `stale-version` the surface enters the accepted conflict presentation with the explicit "Recarregar estado atual" recovery; no auto-retry, no auto-merge; observed versions refresh only on success (D2 pattern) | AC-K5 |
+| K6 | DB | **B1 correction — production-linked create race:** two concurrent creates for the SAME `bq_id` against a real PostgreSQL database → exactly ONE succeeds (201); exactly ONE returns 409 `active-aggregate-exists` (either via the application pre-check or via the DB partial unique index `IX_boquilhas_active_bq_id` mapped from 23505 — the test asserts the outcome, not which mechanism fired, and asserts the loser's refusal is the typed token, never a 500); end state: exactly ONE active aggregate, exactly ONE committed Início event, machine rows only for the winner, ZERO partial/orphan state | AC-C6, AC-K3, AC-K4 |
+| K7 | DB | **B1 correction — standalone create race:** same concurrent race for the SAME `tool_id` via `IX_boquilhas_active_tool_id`; identical expected outcome (one 201, one 409 `active-aggregate-exists`, one active aggregate, one Início, no orphan state) | AC-C6, AC-K3, AC-K4 |
+| K8 | DB | **B1 correction — create-vs-reopen race:** a reopen of the last-closed aggregate for an anchor races a create for the SAME anchor → at most one active aggregate results: if the reopen commits first the create refuses (pre-check or 23505); if the create commits first, the reopen's status UPDATE raises 23505 on the relevant active-anchor index → 409 `active-aggregate-exists` and the reopen transaction rolls back COMPLETELY — the aggregate remains `closed`, its close snapshot, reopen records and all history intact, and NO partial reopening record exists | AC-C6, AC-C7, AC-K3 |
 
 #### MIGRATION / SCHEMA
 
@@ -2161,11 +2253,13 @@ audit is mechanical.
   AC-B1…AC-B9 (9), AC-E1…AC-E6 (6), AC-D1…AC-D3 (3), AC-R1…AC-R6 (6), AC-U1…AC-U3 (3),
   AC-C1…AC-C8 (8), AC-H1…AC-H6 (6), AC-A1…AC-A6 (6), AC-K1…AC-K5 (5), AC-MG1…AC-MG3 (3),
   AC-L1…AC-L3 (3), AC-N1…AC-N7 (7) = 8+6+4+9+6+3+6+3+8+6+6+5+3+3+7 = **83**; each criterion
-  exists exactly once in §32 (no aliases).
-- **Test rows: 83** — IDENTITY 8, TOOL 6, MOVEMENT VOCABULARY 4, BALANCE 9, EDIT 6, DATES 3,
-  REPAIRER 6, UTILISATION 3, CLOSE/REOPEN 8, HISTORY 6, ACCESS 6, CONCURRENCY 5, MIGRATION 3,
-  FIXED DESKTOP 3, BOUNDARIES 7 = **83**; all row ids unique and each row maps to the
-  same-named criterion.
+  exists exactly once in §32 (no aliases; **no new criterion was added by the B1 correction** —
+  the added test rows map to the existing AC-C6/AC-C7/AC-K3/AC-K4 criteria).
+- **Test rows: 86** — IDENTITY 8, TOOL 6, MOVEMENT VOCABULARY 4, BALANCE 9, EDIT 6, DATES 3,
+  REPAIRER 6, UTILISATION 3, CLOSE/REOPEN 8, HISTORY 6, ACCESS 6, **CONCURRENCY 8 (K1–K8)**,
+  MIGRATION 3, FIXED DESKTOP 3, BOUNDARIES 7 = 8+6+4+9+6+3+6+3+8+6+6+8+3+3+7 = **86**; all
+  row ids unique; each row maps to ≥ 1 criterion that exists in §32 (the added K6–K8 rows map
+  to the existing active-aggregate/concurrency criteria).
 - **missing = 0** (every criterion maps to ≥ 1 row — exactly its own row), **dangling = 0**
   (every row maps only to keys that exist in §32), **orphan = 0** (no row without a criterion;
   the boundary/negative rows are scans of real absence, not tests of other workstreams'
@@ -2191,7 +2285,7 @@ with the closed P2-T04/P2-T05/P2-T06 state and the settled delta (see §30.2; su
 | Q-INICIO | When is the Início movement created, and may more Inícios be appended? | "Total do lote — the initial quantity … (the Início movement)" (global §5); no append rule | **created with the aggregate in the create transaction; later `inicio` appends refused (`only-one-inicio`)** (§17, §22.2) | create transaction + append guard | ACCEPT DEFAULT |
 | Q-EXCESS | How is the excess-Entrada fact persisted? | global §9 lists `expected_return_quantity`/`excess_received_quantity` as movement facts; beta says "movement fact/projection"; no physical rule | **persisted on the Entrada row, computed in the append transaction by replay; the Entrada excecional bucket = the sum** (§17.2, §18) | Entrada CHECK + row | ACCEPT DEFAULT |
 | Q-ORDER | What replay order derives the balance? | movement facts are the authority; `business_date` editable; `recorded_at` immutable; no order rule | **`recorded_at ASC, movement_id ASC` (physical receipt order)**; editing `business_date` never reorders or changes balance (§18) | derivation contract | ACCEPT DEFAULT |
-| Q-CREATE | May a second ACTIVE aggregate be opened for the same BQ Tool context? | reopen is "only when no other active trace exists for the same BQ Tool context" (global §7); creation rule silent | **creation refused while an active aggregate exists for the same anchor (`active-aggregate-exists`)**; after close a new trace or a reopen is possible (§23) | create refusal | ACCEPT DEFAULT |
+| Q-CREATE | May a second ACTIVE aggregate be opened for the same BQ Tool context? | reopen is "only when no other active trace exists for the same BQ Tool context" (global §7); creation rule silent | **creation refused while an active aggregate exists for the same anchor (`active-aggregate-exists`)**; after close a new trace or a reopen is possible (§23) — race-safe enforcement via the §7.2 partial unique index backstop (B1 correction; §§11, 22.2) | create refusal + partial unique indexes | ACCEPT DEFAULT |
 | Q-REOPEN-ELIG | Exact reopen eligibility algorithm | "only for the last closed trace and only when no other active trace exists for the same BQ Tool context" (global §7); "where the settled aggregate rules permit" (beta §9) | **closed ∧ this aggregate holds the most recent close among aggregates sharing its anchor ∧ no other active aggregate shares its anchor** (§23.3) | reopen preconditions | ACCEPT DEFAULT |
 | Q-REFLOT | Are reference/lot duplicated on the aggregate? | global §5 lists them as opening fields; §5 also forbids a manual copy; master plan §8 forbids duplicate master data | **no copy — reached through the anchor** (live `tools` standalone / frozen `bq_contexts` triple linked); filters are traversal (§15.3, §24) | schema + filters | ACCEPT DEFAULT |
 | Q-UTIL | Shape of the manual utilisation still | "initial utilisation as a manual still where applicable"; "opening/closing … manual stills"; never derived/synced | **one manual `utilisation_percent` (0–100 or NULL) on the aggregate, editable, captured as-is in the close snapshot; never a progress bar** (§23) | aggregate column + snapshot | ACCEPT DEFAULT |
@@ -2211,6 +2305,12 @@ contract returns `CORRECTION REQUIRED` for that item. Closed rules (standalone v
 repairer ownership, machine independence, historical repairer preservation, movement
 vocabulary, no fake Job On, Editar not a type, close/reopen same identity, movement facts as
 balance authority) are **not** re-asked — they are consumed as settled.
+
+**B1 is not an authority question.** The Architect's blocking finding (`542a08a1…`) was a
+concurrency implementation-contract defect (race-safe enforcement of the already-pinned
+Q-CREATE/Q-REOPEN-ELIG rule), corrected here by the §7.2 partial unique indexes + the exact
+23505 mapping (§7, §8, §10, §11, §22, §23, §28, §29, App. D.5). The 12 dispositions above are
+**unchanged: 12 ACCEPT DEFAULT / 0 REQUIRES OWNER DECISION / 0 BLOCKING.**
 
 ---
 
@@ -2378,7 +2478,8 @@ P2-T07 is acceptable only when every criterion below is satisfied and proven by 
 
 **Count: 83 criteria** (AC-I1…I8, AC-T1…T6, AC-V1…V4, AC-B1…B9, AC-E1…E6, AC-D1…D3,
 AC-R1…R6, AC-U1…U3, AC-C1…C8, AC-H1…H6, AC-A1…A6, AC-K1…K5, AC-MG1…MG3, AC-L1…L3,
-AC-N1…N7) ↔ the §29 rows (**83 rows**; audit in §29: **missing 0, dangling 0, orphan 0**).
+AC-N1…N7) ↔ the §29 rows (**86 rows** — 83 same-named + the B1-correction concurrency rows
+K6–K8 mapping to AC-C6/AC-C7/AC-K3/AC-K4; audit in §29: **missing 0, dangling 0, orphan 0**).
 
 ---
 
@@ -2440,8 +2541,9 @@ repairer/assignment write surface, a PDF/file/email/send surface, a document ide
 balance table/column, a machine/reference sidebar simulating Job On, a fifth movement type, an
 annulment/delete path, availability/navigation registration, `historia` (HISTÓRICO GLOBAL),
 `production_id`/`job_on_revision_id`/fake `bq_id`/fake `jobon_id`, reverse-ID arrays, or a
-second Tool registry. The B3 contract status remains AUTHORED — AWAITING ARCHITECT PLAN REVIEW
-until the Architect decides; P2-T08/P2-T10 receive only the seams of §27.
+second Tool registry. The B3 contract status is CORRECTED (B1) — AWAITING FOCUSED ARCHITECT
+PLAN RE-REVIEW (PLAN REJECT `542a08a1…`, B1 applied) until the Architect decides; P2-T08/P2-T10
+receive only the seams of §27.
 
 ---
 
@@ -2498,11 +2600,11 @@ grid including the movement ledger.
 
 | Item | Status |
 |---|---|
-| P2-T07 | **CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW** (NOT accepted, NOT implemented) |
+| P2-T07 | **CONTRACT CORRECTED (B1) — AWAITING FOCUSED ARCHITECT PLAN RE-REVIEW** (PLAN REJECT `542a08a1…`; B1-only correction applied; NOT accepted, NOT implemented) |
 | P2-T05 (Controlo_Create) | **CLOSED** (closure `3491097…`, dmo-work) |
 | P2-T05 glass-density correction slice | **CLOSED** (closure `02bd53e…`, dmo-work) |
 | P2-T06 (Controlo Approve) | **CLOSED** (closure `fcfa81f…`, dmo-work; "NEXT ELIGIBLE GATE: P2-T07 planning/contract gate — recorded only, NOT AUTHORIZED") |
-| P2-T07 | **NOT STARTED — NOT AUTHORIZED** (unchanged; this task authors the contract only) |
+| P2-T07 | **NOT STARTED — NOT AUTHORIZED** (unchanged; this task corrects the contract only) |
 | P2-T08 / P2-T10 | **NOT AUTHORIZED** (unchanged) |
 | Application code modified | **NO** |
 | Migration created | **NO** |
@@ -2553,6 +2655,19 @@ build/tests                         : not modified (authoring only; no build cla
 | Implementation performed | **NONE** (docs-only planning commit: contract + response + master-plan/workstream status records) |
 | Status | **AUTHORED — AWAITING ARCHITECT PLAN REVIEW** (PLAN ACCEPT / corrections / reject) |
 
+### D.5 Focused B1 correction record (this task)
+
+| Item | Value |
+|---|---|
+| Architect PLAN review | `dev/reviews/P2-T07_BOQUILHAS_CONTRACT_PLAN_REVIEW.md` @ dmo-work `542a08a1bcf1340306f8e337a6c597580a921f3d` |
+| Original decision | **PLAN REJECT** — blocking findings **B1 only** (12 authority questions ACCEPT DEFAULT / 0 OWNER / 0 BLOCKING) |
+| Defect | the `active-aggregate-exists` refusal was not race-safe as contracted: create has no version guard and the in-transaction application scan cannot serialize concurrent creates for the same anchor under READ COMMITTED with no unique anchor tuple, no partial unique index, no isolation override and no advisory locks |
+| Correction applied | **B1 only** — `IX_boquilhas_active_bq_id` and `IX_boquilhas_active_tool_id` partial unique indexes (`WHERE status = 'active' AND <anchor> IS NOT NULL`, §7.2/§7.5), the exact scoped 23505 → `Refused(ActiveAggregateExists)` mapping (§7.2/§8.2), race-safe create (§22.2) and reopen (§23.3) backstop semantics + transaction rules (§10/§11), migration-007 schema delta (§28.2), and the concurrent create/reopen test rows K6–K8 (§29; **83 AC / 86 rows; no new criterion; missing 0, dangling 0, orphan 0**) |
+| Not changed | all Architect PASS domains (identity, orchestration, vocabulary, replay balance, edit, dates, repairer, close/reopen, utilisation, Histórico, routes, access, boundaries, fixed desktop); tables (6), migration count (1), movement/repairer/lifecycle semantics, the 12 ACCEPT DEFAULT questions |
+| Status after correction | **CORRECTED — AWAITING FOCUSED ARCHITECT PLAN RE-REVIEW** (NOT accepted; implementation NOT AUTHORIZED) |
+| Correction commit | recorded in the DMO-MODULAR remote `main` report of the correction task |
+| Implementation performed | **NONE** (docs/governance only) |
+
 ---
 
 ## Appendix E — PLAN REVIEW gate
@@ -2572,7 +2687,7 @@ Implementation may begin only when the Architect has:
 Until then:
 
 ```text
-P2-T07 CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW
+P2-T07 CONTRACT CORRECTED (B1) — AWAITING FOCUSED ARCHITECT PLAN RE-REVIEW
 NOT IMPLEMENTED — NOT AUTHORIZED
 CurrentBuildAvailable = []
 ```
