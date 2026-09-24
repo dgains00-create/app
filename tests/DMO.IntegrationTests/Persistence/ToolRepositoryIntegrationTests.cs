@@ -477,12 +477,13 @@ public sealed class ToolRepositoryIntegrationTests
     }
 
     /// <summary>
-    /// CTX14 (AC-61): a create freezes the triple read from the Tool row at selection time, and
-    /// duplication copies the source context's frozen triple — a later Tool metadata change is never
-    /// reflected in either.
+    /// CTX14 (AC-61, superseded wording): a create freezes the triple read from the Tool row at
+    /// selection time, and duplication ALSO snapshots the CURRENT canonical Tool row (Owner
+    /// clarification, contract §23) — a later Tool metadata change is never reflected in either a
+    /// pre-existing context or a context created before that change.
     /// </summary>
     [SkippableFact]
-    public async Task CTX14_TheCreateAndTheDuplicationFreezeTheTripleReadAtSelectionTime()
+    public async Task CTX14_TheCreateAndTheDuplicationFreezeTheTripleReadAtCreationTime()
     {
         PersistenceTestDatabase.SkipIfNotConfigured();
 
@@ -517,15 +518,22 @@ public sealed class ToolRepositoryIntegrationTests
                 new NpgsqlParameter("l", updatedLot),
                 new NpgsqlParameter("p", toolId));
 
-            // Duplication copies the SOURCE context's frozen triple verbatim (no live re-read).
+            // Duplication snapshots the CURRENT canonical Tool row (the post-change values): the
+            // snapshot source is the Tool at duplication time, never the source context's frozen
+            // triple. The old "copies the source frozen triple verbatim" reading is superseded.
             var duplicated = Assert.IsType<DMO.Application.JobOn.JobOnResult.Duplicated>(await jobOns.DuplicateAsync(
                 new DMO.Application.JobOn.DuplicateJobOnCommand(
                     source.JobOnId, ExpectedSourceVersion: 1, $"pn-{token}-02", "B1", null),
                 CancellationToken.None));
 
             Assert.Equal(
-                $"{reference}|01",
+                $"{updatedReference}|{updatedLot}",
                 await FrozenTripleAsync(context, duplicated.JobOnId, "cm_contexts"));
+
+            // The source's own historical context is never rewritten by the Tool change.
+            Assert.Equal(
+                $"{reference}|01",
+                await FrozenTripleAsync(context, source.JobOnId, "cm_contexts"));
 
             // A NEW create freezes the Tool row as it is now: the live values at selection time.
             var later = Assert.IsType<DMO.Application.JobOn.JobOnResult.Created>(await jobOns.CreateAsync(

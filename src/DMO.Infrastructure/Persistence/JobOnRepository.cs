@@ -25,8 +25,10 @@ namespace DMO.Infrastructure.Persistence;
 /// <para>
 /// Contextual Tool resolution (existence + type match) and the freezing of the context's
 /// type/reference/lot triple happen <b>inside</b> the write transaction, so a concurrent change
-/// cannot bypass them. Duplication is the one path that deliberately does <b>not</b> re-read the
-/// live Tool: it copies the SOURCE context's frozen triple verbatim.
+/// cannot bypass them. Duplication follows the same snapshot path as creation (Owner
+/// clarification, contract §23): the service builds every duplicated context from the CURRENT
+/// canonical Tool row at duplication time, and the repository persists exactly the supplied
+/// snapshots — it never clones the source context's frozen triple.
 /// </para>
 /// </remarks>
 public sealed class JobOnRepository : IJobOnRepository
@@ -311,8 +313,10 @@ public sealed class JobOnRepository : IJobOnRepository
                 UpdatedAt = now,
             });
 
-            // New context identities; the SOURCE context's canonical tool_id and frozen triple are
-            // copied verbatim and the live Tool is deliberately NOT re-read.
+            // New context identities; each supplied context carries the SOURCE context's canonical
+            // tool_id and the snapshot the service produced from the CURRENT canonical Tool row at
+            // duplication time (Owner clarification, contract §23 — the source context's frozen
+            // triple is never cloned).
             foreach (var context in duplicatedContexts)
             {
                 InsertContextCopy(duplicate.JobOnId.Value, context, now);

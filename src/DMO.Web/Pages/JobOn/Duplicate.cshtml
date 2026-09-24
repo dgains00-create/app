@@ -9,12 +9,13 @@
 <script src="~/js/dmo-jobon.js" defer></script>
 
 @*
-    P2-T04 Job On duplication surface (contract §13.2 route 9, §10.1, §10.2).
+    P2-T04 Job On duplication surface (contract §13.2 route 9, §10.1, §10.2; Owner clarification §23).
 
     The preview is read-only: it shows the explicitly chosen source and its contexts (frozen triple and
     live projection) and writes nothing. The source version observed here is the concurrency contract
     of the duplication; the new occurrence receives a new jobon_id and new context identities, retains
-    the same canonical tool_ids and copies the SOURCE contexts' frozen triples verbatim.
+    the same canonical tool_ids and snapshots the CURRENT canonical Tool state at duplication time
+    (the source context's frozen triple is never cloned).
 *@
 <section class="dmo-jobon" data-dmo-jobon-surface="duplicate">
     <dl class="dmo-jobon__facts" data-dmo-jobon-source-facts="true">
@@ -89,7 +90,7 @@
         </div>
 
         <p class="dmo-jobon__hint" data-dmo-jobon-hint="true">
-            A nova produção mantém as ferramentas associadas e os valores congelados da origem.
+            A nova produção mantém as ferramentas associadas e regista os valores atuais das ferramentas.
         </p>
 
         <p class="dmo-jobon__error" data-dmo-jobon-submit-error="true" hidden></p>

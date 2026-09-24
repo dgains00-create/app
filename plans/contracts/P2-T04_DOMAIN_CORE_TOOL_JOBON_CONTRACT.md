@@ -41,6 +41,7 @@ Supabase changed:          NO
 | 9 | Tool orchestration contract | 20 | Test-to-acceptance matrix |
 | 10 | Duplication transaction | 21 | Authority questions |
 | 11 | Create / edit / delete transactions | 22 | Implementation acceptance criteria |
+| 23 | OWNER CLARIFICATION — Job On context snapshot invariant (supersedes the affected duplication rules) |  |  |
 
 Appendices: **A** protected boundaries · **B** file ownership / expected paths · **C** fixed desktop
 obligations · **D** governance record · **E** PLAN REVIEW gate.
@@ -767,6 +768,10 @@ Each context row carries `tool_id` (live canonical relation) **and** the frozen 
 - The frozen triple is **not** a second Tool authority: it is never queried to answer "what is this
   Tool now", never used as a join key, and never rendered as if it were current Tool state. The
   live ficha always reads through `tool_id`.
+- <b>Every new context is a new snapshot:</b> normal creation, an explicit re-selection (§7.4) and
+  duplication each capture the CURRENT canonical Tool row at that moment through the selected
+  `tool_id`. Duplication never clones an older context's frozen triple (§23 — the Owner
+  clarification supersedes the former verbatim-copy wording of §10.3/§21 Q16).
 
 ### 7.3 Idempotent create/reuse for the same `jobon_id + tool_id`
 
@@ -1017,11 +1022,18 @@ BEGIN
   5. INSERT job_ons (copied_from_jobon_id = source jobon_id, version = 1)
   6. for every source context: INSERT the corresponding context row on the NEW jobon_id with
        - tool_id        = the SOURCE CONTEXT's tool_id      (retained, unchanged)
-       - tool_type/tool_reference/tool_lot = the SOURCE CONTEXT's frozen triple
-         (copied verbatim; the live Tool is NOT re-read — JOB_ON.md §8 "copy captured/manual
-          values as reviewable starting values")
+       - tool_type/tool_reference/tool_lot = a FRESH snapshot of the CURRENT canonical Tool row
+         read through that tool_id at duplication time (Owner clarification §23; the former
+         wording "copied verbatim from the source context; the live Tool is NOT re-read" is
+         SUPERSEDED)
   7. COMMIT
 ```
+
+> **SUPERSEDED (Owner clarification §23):** the original step 6 of this section read "the SOURCE
+> CONTEXT's frozen triple (copied verbatim; the live Tool is NOT re-read — JOB_ON.md §8 'copy
+> captured/manual values as reviewable starting values')". That wording is superseded by §23: the
+> source context contributes only its canonical `tool_id`; the new context's frozen triple is
+> always a NEW snapshot of the CURRENT canonical Tool row at duplication time.
 
 ### 10.4 Guaranteed outcomes
 
@@ -1031,11 +1043,12 @@ BEGIN
 | new context ids | every copied context gets a new id; **no source context id is reused** |
 | source unchanged | the source row is only read: its `version`, `updated_at` and every other column are unchanged, and its context rows are untouched. Proven by comparing the full source state before/after. |
 | copied Tool choices retained | each copied context carries the same canonical `tool_id` as its source context, unchanged, until the operator explicitly changes it (§7.4) |
+| current Tool state captured | each copied context's frozen triple is a NEW snapshot of the CURRENT canonical Tool row read through its `tool_id` at duplication time — never the source context's historical frozen triple (§23 supersedes the former verbatim-copy wording) |
 | historical source allowed | any source may be used; older sources are never rejected |
 | explicit source relation | `copied_from_jobon_id` records the source (structural lineage, never a revision) |
 | transactional | the whole thing is one transaction; a failure at any step leaves neither the new Job On nor any new context row |
 | concurrency | a stale `ExpectedSourceVersion` refuses the duplication and creates nothing |
-| no ID copying | ids that must be new are allocated new; ids that must be retained (`tool_id`) are retained |
+| no ID copying | ids that must be new are allocated new; the `tool_id` is the one identity retained from the source context |
 
 ### 10.5 What duplication never does
 
@@ -1046,7 +1059,10 @@ BEGIN
 - never copies a frozen-only, verification, approval, Controlo, Boquilhas or document fact — P2-T04
   has none of those, and any future one is that module's own duplication concern;
 - never auto-selects a source and never auto-fills a production number that was not supplied;
-- never re-reads the live Tool to "refresh" the copied triple (§21 Q16 records this pinned default).
+- never clones the SOURCE context's frozen triple into the new context — the new context
+  re-snapshots the CURRENT canonical Tool row at duplication time (§23). The former bullet
+  "never re-reads the live Tool to 'refresh' the copied triple (§21 Q16 records this pinned
+  default)" is **SUPERSEDED** by the Owner clarification §23.
 
 ---
 
@@ -2089,7 +2105,7 @@ proves. Evidence must separate committed test source inspected in Git from execu
 | CTX11 | S | no Tool/Job On type exposes a reverse collection member and no reverse-array column exists | AC-38 |
 | CTX12 | DB | the reverse read by `tool_id` returns the occurrences using that Tool while no Tool row stores them | AC-30, AC-38 |
 | CTX13 | I | reading a Job On with no contexts returns an empty context list and creates no rows | AC-26, AC-27 |
-| CTX14 | DB | duplication (and any create) freezes the triple read from the Tool row at selection time; a later Tool metadata change is not reflected | AC-61 |
+| CTX14 | DB | every new context — on create AND on duplication — freezes the triple read from the Tool row at creation time; a later Tool metadata change is never reflected in an existing context (§23 supersedes the former duplication wording) | AC-61 |
 | CTX15 | DB | removing a context referenced by a test-double dependent row fails closed (`RESTRICT`) and nothing is deleted | AC-37 |
 | CTX16 | U | context resolution by (`jobonId`, type) returns at most one context; the API exposes no list-of-contexts-for-a-type operation | AC-29 |
 | CTX17 | S | each context entity/configuration declares exactly the contracted columns, no `version` column and no extra navigation | AC-104 |
@@ -2105,7 +2121,7 @@ proves. Evidence must separate committed test source inspected in Git from execu
 | DUP4 | DB | every duplicated context has a new id, none equals a source context id, and the count matches the source's context count | AC-58 |
 | DUP5 | DB | after duplication the source row and all source context rows are byte-identical (same `version`, same frozen triples, same timestamps) | AC-59 |
 | DUP6 | DB | each duplicated context references the same canonical `tool_id` as its source context | AC-60 |
-| DUP7 | DB | after changing the live Tool's `reference`/`lot`, duplication still copies the **source context's** frozen triple | AC-61 |
+| DUP7 | DB | after changing the live Tool's `reference`/`lot`, duplication snapshots the **current canonical Tool state** — the duplicate carries the NEW values while the source context keeps its historical frozen triple (§23 supersedes the former "copies the source frozen triple" reading) | AC-61 |
 | DUP8 | DB | the duplicated row's `copied_from_jobon_id` equals the source id; a created (non-duplicated) Job On has `NULL` | AC-62 |
 | DUP9 | DB | duplicating onto an existing (`reference`,`production_number`) is refused and creates no row | AC-16, AC-63 |
 | DUP10 | DB | a stale `ExpectedSourceVersion` refuses the duplication: no new `job_ons` row, no new context rows | AC-64 |
@@ -2115,6 +2131,8 @@ proves. Evidence must separate committed test source inspected in Git from execu
 | DUP14 | DB | duplication does not modify `tools` or `tool_machines` (row hashes unchanged) | AC-53 |
 | DUP15 | I | after duplication the new Job On's CM Tool can be changed while the source's CM context keeps its `tool_id` and frozen triple | AC-60, AC-59 |
 | DUP16 | S | the duplication request carrier contains no source context id and no `tool_id` reuse field driven by the client | AC-58 |
+| DUP17 | DB | duplicating the same source twice produces two independent occurrences whose context identities are ALL distinct (source vs B vs C, per table) while every context references the same canonical `tool_id` — no context identity is ever reused (§23) | AC-58 |
+| DUP18 | DB | the source `bq_id` and the duplicated `bq_id` are distinct while both reference the same canonical BQ `tool_id` — P2-T07 movements keyed by `bq_id` stay with their own production (§23) | AC-58 |
 
 ### 20.5 Delete and dependency rule
 
@@ -2259,7 +2277,7 @@ authorized without further authority. **No physical-schema-critical question rem
 | Q13 | Can a wrong Tool-owned field (e.g. a wrong lot) be corrected in P2-T04? | `JOB_ON.md` §9 requires correcting the wrong field **on the canonical Tool**, which is a Tool edit; Tool editing is the Ferramentas change-request/direct-edit lifecycle, explicitly outside Beta Light scope | (a) no Tool edit in P2-T04 (the operator creates the correct Tool and re-selects it); (b) add a Tool edit path | **(a).** Adding a Tool edit path would authorize a mutation outside Beta scope and pre-empt the change-request authority. The practical Beta workaround is a new correct Tool plus an explicit re-selection (which is a supported edit) | no Tool update route/primitive exists; §5.3.6 | NON-BLOCKING |
 | Q14 | Are reference/lot compared case-sensitively? | Authority fixes no lexical normalisation for references or lots | (a) trimmed, exact (ordinal); (b) case-insensitive; (c) fully normalised | **(a).** Any normalisation rule would itself be an invented data rule and would need its own authority; exactness keeps "different lot = different Tool" unambiguous and auditable | trimming on input; unique indexes compare exact values | NON-BLOCKING |
 | Q15 | What ordering does Tool search use? | Authority is silent; ranking/relevance is explicitly *not* the shared component's business | (a) no guaranteed order; (b) `tool_type, reference, lot, tool_id`; (c) relevance score | **(b).** Deterministic and meaning-free; (c) would invent an industrial ranking that `FERRAMENTAS_LIGHT.md` forbids in the picker | one `ORDER BY`; a unit test pins it | NON-BLOCKING |
-| Q16 | At duplication, is the copied context's frozen triple re-read from the live Tool or copied from the source context? | `JOB_ON.md` §8 says "copy captured/manual values as reviewable starting values"; `BETA_VERSION.md` §4.1 says the duplicate receives new contexts with the same `tool_id` "until changed" | (a) copy the source's frozen triple verbatim; (b) re-read the live Tool | **(a).** It preserves exactly what the source recorded (the historical-stability principle) and avoids a silent "refresh" of history at duplication time; a genuinely changed Tool is the operator's explicit re-selection | one insert path; a test where the live Tool changed before duplication still copies the source triple | NON-BLOCKING |
+| Q16 | At duplication, is the copied context's frozen triple re-read from the live Tool or copied from the source context? | `JOB_ON.md` §8 says "copy captured/manual values as reviewable starting values"; `BETA_VERSION.md` §4.1 says the duplicate receives new contexts with the same `tool_id` "until changed" | (a) copy the source's frozen triple verbatim; (b) re-read the live Tool | **(b) — SUPERSEDED by the Owner clarification §23.** The former pinned default (a) — "preserves exactly what the source recorded … avoids a silent 'refresh' of history" — is replaced: the new production must receive NEW snapshots of the CURRENT canonical Tool row (the source context contributes only its `tool_id`). Historical source contexts remain immutable. | the duplication service re-snapshots every copied context through its source `tool_id` using the same snapshot path as normal creation; a test where the live Tool changed before duplication asserts the duplicate carries the CURRENT values | NON-BLOCKING |
 | Q17 | Does Job On create need a client idempotency key? | No authority fixes one, and the accepted foundation has no idempotency mechanism | (a) none (the production unique index makes a repeat explicit); (b) add one | **(a).** The unique production index already converts a retry into an explicit, non-destructive `duplicate-production` refusal with the existing id, which is exactly the required "no duplicate production" behaviour without a new mechanism | no idempotency column/key | NON-BLOCKING |
 | Q18 | Is `copied_from_jobon_id` editable after duplication? | `JOB_ON.md` §8 calls the lineage "optional … structural lineage and does not make the new Job On a version of the source"; it fixes no edit rule | (a) set once, never rewritten; (b) editable | **(a).** Rewriting recorded lineage would silently rewrite history; making it immutable is the conservative reading and is also what the `RESTRICT` self-FK implies | lineage is not part of the update command | NON-BLOCKING |
 | Q19 | How do "Create implies the reads it needs" and the frozen one-policy-per-module mechanism coexist? | `ACCESS_MODEL.md` §8 says Create grants the reads required to operate the surface, but the accepted policy projection is exactly one requirement per module with no OR/implication, and modifying it is a protected-area change | (a) provide the Create workflow's reads on Create-gated routes (route 5 + Create pages); (b) modify the access foundation to express implication/OR; (c) let a Create-only user depend on also holding View | **(a).** It satisfies §8 without touching protected foundation and without inventing composition rules. (b) is a separate, authorized change to protected foundation; (c) would contradict the accepted sibling/non-satisfaction semantics | one extra Create-gated read route; JobOnView keeps only read routes | NON-BLOCKING |
@@ -2620,3 +2638,79 @@ P2-T04 CONTRACT AUTHORED — AWAITING ARCHITECT PLAN REVIEW
 B1 AWAITING PLAN ACCEPT
 NOT IMPLEMENTED
 ```
+
+---
+
+## 23. OWNER CLARIFICATION — JOB ON CONTEXT SNAPSHOT INVARIANT (SUPERSEDES THE AFFECTED DUPLICATION RULES)
+
+**Authority:** direct OWNER clarification to the Job On / P2-T04 authority, issued after P2-T04 is
+CLOSED, as a focused clarification of Job On context creation only. P2-T04 is **not reopened** as a
+whole; P2-T07 is **not modified**. This section is a NEW OWNER CLARIFICATION and **supersedes every
+affected duplication-related rule of this contract**: where any earlier section conflicts with this
+section, THIS section wins. Everything else — the frozen set of §7.2, the edit/re-selection rules of
+§7.4, historical immutability of §7.6, the create/edit/delete transactions of §11, the delete
+dependency rule, the 14-route matrix, failure vocabulary, concurrency, the migration contract and
+the protected files — is preserved as-is.
+
+### 23.1 The rule (normative)
+
+> **Every new Job On creates new component context snapshots from the current canonical Tool
+> identities selected for that Job On. This applies both to normal creation and duplication.
+> Duplication reuses `tool_id` identities, never `cm_id`/`mf_id`/`bq_id` context identities.**
+
+1. **New `jobon_id` ⇒ new context identities.** Whenever a NEW Job On is created — from scratch or
+   by duplicating a previous Job On — it receives NEW `cm_id` / `mf_id` / `bq_id` context rows.
+   Context identities from another Job On are NEVER reused: new `jobon_id` ⇒ new
+   `cm_id` / `mf_id` / `bq_id`.
+2. **The snapshot source is the current canonical Tool row.** Each new context row snapshots the
+   CURRENT canonical Tool row (through the canonical `tool_id` selected for that Job On) at the
+   moment the new Job On is created. The snapshot is composed with the existing snapshot schema and
+   the existing snapshot composition logic: the accepted frozen set
+   `tool_type` / `tool_reference` / `tool_lot` of §7.2 — **no new snapshot fields are invented**.
+3. **Duplication reuses `tool_id`, never the previous context.** When duplicating a Job On, the
+   source context is used ONLY to obtain the canonical `tool_id` needed to locate the Tool. The new
+   context row is created from the CURRENT Tool state, never by cloning the previous context row:
+   the previous `cm_id`/`mf_id`/`bq_id` snapshot is NOT the source of truth for the new context.
+   Normal creation and duplication converge on the SAME snapshot creation path.
+   Example: source snapshot `tool_id_CM, reference '5447T173'`; the Tool later becomes reference
+   `5447T173X`; duplicating the source creates the new context with `5447T173X`, not with
+   `5447T173`.
+4. **Historical contexts stay immutable.** Creating or duplicating a new Job On never updates the
+   source `cm_id` / `mf_id` / `bq_id`, never rewrites their frozen triples and never touches the
+   source Job On (version, `updated_at`, contexts). The new production receives new snapshots; the
+   previous production keeps its historical snapshots exactly as they were.
+5. **P2-T07 interaction.** The only relationship that matters here is: new Job On → new `bq_id`
+   snapshot. Boquilhas movements remain associated with the `bq_id` of their own production
+   (202601 `bq_id_A` holds 202601's movements; 202602 `bq_id_B` holds 202602's; both may point at
+   the same canonical `tool_id_BQ`). Old Boquilhas movements are NEVER migrated to a new `bq_id`.
+
+### 23.2 Superseded duplication wording (explicit list)
+
+The following earlier readings are **REPLACED** as of this clarification:
+
+1. former §10.3 step 6: "tool_type/tool_reference/tool_lot = the SOURCE CONTEXT's frozen triple
+   (copied verbatim; the live Tool is NOT re-read — JOB_ON.md §8 'copy captured/manual values as
+   reviewable starting values')" — replaced by a FRESH snapshot of the CURRENT canonical Tool row
+   read through the source context's `tool_id`;
+2. former §10.5 bullet "never re-reads the live Tool to 'refresh' the copied triple (§21 Q16
+   records this pinned default)" — replaced by §23.1.3;
+3. former §21 Q16 pinned default (a) "copy the source's frozen triple verbatim" — replaced by
+   default (b) "re-read the live Tool" as re-pinned in §21;
+4. former §20.4 row DUP7 ("duplication still copies the **source context's** frozen triple") and
+   former §20.3 row CTX14 duplication wording — replaced by the current-state snapshot reading.
+
+`JOB_ON.md` §8 "copy captured/manual values as reviewable starting values" is read, for the frozen
+context triple, as: the operator's duplication action IS the selection moment for the new
+production; the new production starts from the CURRENT canonical Tool state, and the historical
+source snapshot stays untouched as reviewable history. The operator can always explicitly
+re-select (§7.4) after duplication.
+
+### 23.3 Deliberately NOT introduced
+
+Keep this a simple Job On snapshot invariant. NOT introduced: `production_id`,
+`job_on_revision_id`, any rollover entity, any Tool history table, any snapshot version entity,
+any context reuse, any reverse array on Tool, and any synchronization framework. No migration, no
+schema change, no new table, no new column, no new route and no new domain concept. The
+implementation of this clarification is a service-level correction of the duplication snapshot
+path plus focused tests; the existing context schema and the existing snapshot composition logic
+are reused unchanged.

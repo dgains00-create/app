@@ -799,7 +799,227 @@ public sealed class JobOnEndpointsTests
         Assert.Equal(1, store.ContextCount);
     }
 
-    // ---- arrangement helpers -------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
+    // Owner clarification §23 — Job On context snapshot invariant (focused rows)
+    // ---------------------------------------------------------------------------------------------
+
+    /// <summary>SNAP1 (Owner clarification §23, invariant 1): a Job On created FROM SCRATCH with
+    /// CM/MF/BQ Tools selected receives three NEW context identities, each pointing at the selected
+    /// canonical <c>tool_id</c> and freezing the Tool's CURRENT triple.</summary>
+    [Fact]
+    public async Task SNAP1_CreateFromScratchProducesNewContextsPointingAtTheSelectedCanonicalTools()
+    {
+        var store = new P2T04TestStore();
+        var cmTool = store.SeedTool(ToolType.Cm, "5447T173", "LOTE-SNAP1A");
+        var mfTool = store.SeedTool(ToolType.Mf, "MF-100", "LOTE-SNAP1B");
+        var bqTool = store.SeedTool(ToolType.Bq, "BQ-200", "LOTE-SNAP1C");
+
+        using var factory = P2T04TestHost.ForUser([CreateOnly()], store);
+        using var client = factory.CreateClient();
+
+        using var response = await P2T04TestHost.SendJsonAsync(
+            client,
+            HttpMethod.Post,
+            JobOnPath,
+            CreateBody("REF-SNAP1", "1000", cmToolId: cmTool.ToolId.Value, mfToolId: mfTool.ToolId.Value, bqToolId: bqTool.ToolId.Value));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var payload = await ReadJsonAsync(response);
+        var jobOnId = payload.GetProperty("jobonId").GetGuid();
+
+        var repository = factory.Services.GetRequiredService<IJobOnRepository>();
+        var persisted = await repository.GetByIdAsync(jobOnId, CancellationToken.None);
+        Assert.NotNull(persisted);
+
+        var byType = persisted!.Contexts.ToDictionary(context => context.ContextType);
+        Assert.Equal(3, persisted.Contexts.Count);
+
+        // New cm_id / mf_id / bq_id — each pointing at the selected canonical tool_id.
+        Assert.Equal(cmTool.ToolId.Value, byType[ToolContextType.Cm].ToolId.Value);
+        Assert.Equal(mfTool.ToolId.Value, byType[ToolContextType.Mf].ToolId.Value);
+        Assert.Equal(bqTool.ToolId.Value, byType[ToolContextType.Bq].ToolId.Value);
+        Assert.Equal(
+            3,
+            new[] { byType[ToolContextType.Cm].ContextId, byType[ToolContextType.Mf].ContextId, byType[ToolContextType.Bq].ContextId }
+                .Distinct().Count());
+
+        // Each snapshot is the CURRENT canonical triple of the selected Tool.
+        Assert.Equal(new ToolContextSnapshot(cmTool.Type, cmTool.Reference, cmTool.Lot), byType[ToolContextType.Cm].Frozen);
+        Assert.Equal(new ToolContextSnapshot(mfTool.Type, mfTool.Reference, mfTool.Lot), byType[ToolContextType.Mf].Frozen);
+        Assert.Equal(new ToolContextSnapshot(bqTool.Type, bqTool.Reference, bqTool.Lot), byType[ToolContextType.Bq].Frozen);
+    }
+
+    /// <summary>SNAP2 (Owner clarification §23, invariants 2–4): duplication creates NEW context
+    /// identities that re-snapshot the CURRENT canonical Tool state, never the source context's
+    /// frozen triple, and leaves the source Job On and its contexts unchanged.</summary>
+    [Fact]
+    public async Task SNAP2_DuplicationSnapshotsCurrentToolStateWithNewIdentitiesAndLeavesTheSourceUntouched()
+    {
+        var store = new P2T04TestStore();
+        var cmTool = store.SeedTool(ToolType.Cm, "5447T173", "LOTE-SNAP2A");
+        var mfTool = store.SeedTool(ToolType.Mf, "MF-100", "LOTE-SNAP2B");
+        var bqTool = store.SeedTool(ToolType.Bq, "BQ-200", "LOTE-SNAP2C");
+        var source = store.SeedJobOn(
+            "REF-SNAP2",
+            "1000",
+            contexts:
+            [
+                Context(ToolContextType.Cm, cmTool),
+                Context(ToolContextType.Mf, mfTool),
+                Context(ToolContextType.Bq, bqTool),
+            ]);
+
+        var sourceIds = source.Contexts.ToDictionary(context => context.ContextType, context => context.ContextId);
+
+        // The live canonical Tools change AFTER the source recorded its historical snapshots: any
+        // allowed Tool fact (here the reference/lot triple) moves to a NEW value.
+        store.ChangeToolMetadata(cmTool.ToolId.Value, "5447T173-live", "LOTE-SNAP2A-live");
+        store.ChangeToolMetadata(mfTool.ToolId.Value, "MF-100-live", "LOTE-SNAP2B-live");
+        store.ChangeToolMetadata(bqTool.ToolId.Value, "BQ-200-live", "LOTE-SNAP2C-live");
+
+        using var factory = P2T04TestHost.ForUser([CreateOnly()], store);
+        using var client = factory.CreateClient();
+
+        using var response = await P2T04TestHost.SendJsonAsync(
+            client,
+            HttpMethod.Post,
+            $"{JobOnPath}/{source.JobOnId.Value}/duplicate",
+            DuplicateBody(expectedSourceVersion: source.Version, productionNumber: "1001"));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var repository = factory.Services.GetRequiredService<IJobOnRepository>();
+        var persistedSource = await repository.GetByIdAsync(source.JobOnId.Value, CancellationToken.None);
+        var persistedDuplicate = await repository.GetByIdAsync(
+            (await ReadJsonAsync(response)).GetProperty("jobonId").GetGuid(),
+            CancellationToken.None);
+
+        Assert.NotNull(persistedSource);
+        Assert.NotNull(persistedDuplicate);
+
+        // NEW context identities: A != B for every context type.
+        var byType = persistedDuplicate!.Contexts.ToDictionary(context => context.ContextType);
+        Assert.Equal(3, byType.Count);
+        Assert.All(
+            byType,
+            entry => Assert.NotEqual(sourceIds[entry.Key], entry.Value.ContextId));
+
+        // SAME canonical tool_ids: the tool_id is the continuing identity of each physical Tool.
+        Assert.Equal(cmTool.ToolId.Value, byType[ToolContextType.Cm].ToolId.Value);
+        Assert.Equal(mfTool.ToolId.Value, byType[ToolContextType.Mf].ToolId.Value);
+        Assert.Equal(bqTool.ToolId.Value, byType[ToolContextType.Bq].ToolId.Value);
+
+        // CURRENT Tool state, not the source snapshot: the duplicate carries the post-change values.
+        Assert.Equal(new ToolContextSnapshot(cmTool.Type, "5447T173-live", "LOTE-SNAP2A-live"), byType[ToolContextType.Cm].Frozen);
+        Assert.Equal(new ToolContextSnapshot(mfTool.Type, "MF-100-live", "LOTE-SNAP2B-live"), byType[ToolContextType.Mf].Frozen);
+        Assert.Equal(new ToolContextSnapshot(bqTool.Type, "BQ-200-live", "LOTE-SNAP2C-live"), byType[ToolContextType.Bq].Frozen);
+
+        // SOURCE immutability: the source Job On and its historical contexts are byte-identical.
+        Assert.Equal(source.Version, persistedSource!.Version);
+        Assert.Equal(
+            new ToolContextSnapshot(cmTool.Type, cmTool.Reference, cmTool.Lot),
+            Assert.Single(persistedSource.Contexts, context => context.ContextType == ToolContextType.Cm).Frozen);
+        Assert.Equal(
+            new ToolContextSnapshot(mfTool.Type, mfTool.Reference, mfTool.Lot),
+            Assert.Single(persistedSource.Contexts, context => context.ContextType == ToolContextType.Mf).Frozen);
+        Assert.Equal(
+            new ToolContextSnapshot(bqTool.Type, bqTool.Reference, bqTool.Lot),
+            Assert.Single(persistedSource.Contexts, context => context.ContextType == ToolContextType.Bq).Frozen);
+    }
+
+    /// <summary>SNAP3 (Owner clarification §23, invariant 5): duplicating the SAME source twice
+    /// produces two independent occurrences whose context identities are all distinct — no context
+    /// identity is ever reused across productions.</summary>
+    [Fact]
+    public async Task SNAP3_DuplicatingTheSameSourceTwiceProducesIndependentContextSets()
+    {
+        var store = new P2T04TestStore();
+        var cmTool = store.SeedTool(ToolType.Cm, "5447T173", "LOTE-SNAP3");
+        var source = store.SeedJobOn("REF-SNAP3", "1000", contexts: [Context(ToolContextType.Cm, cmTool)]);
+        var sourceId = source.Contexts[0].ContextId;
+
+        using var factory = P2T04TestHost.ForUser([CreateOnly()], store);
+        using var client = factory.CreateClient();
+
+        using var first = await P2T04TestHost.SendJsonAsync(
+            client,
+            HttpMethod.Post,
+            $"{JobOnPath}/{source.JobOnId.Value}/duplicate",
+            DuplicateBody(expectedSourceVersion: source.Version, productionNumber: "1001"));
+        using var second = await P2T04TestHost.SendJsonAsync(
+            client,
+            HttpMethod.Post,
+            $"{JobOnPath}/{source.JobOnId.Value}/duplicate",
+            DuplicateBody(expectedSourceVersion: source.Version, productionNumber: "1002"));
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
+
+        var repository = factory.Services.GetRequiredService<IJobOnRepository>();
+        var b = await repository.GetByIdAsync((await ReadJsonAsync(first)).GetProperty("jobonId").GetGuid(), CancellationToken.None);
+        var c = await repository.GetByIdAsync((await ReadJsonAsync(second)).GetProperty("jobonId").GetGuid(), CancellationToken.None);
+
+        Assert.NotNull(b);
+        Assert.NotNull(c);
+        Assert.NotEqual(b!.JobOnId, c!.JobOnId);
+
+        var bId = Assert.Single(b.Contexts).ContextId;
+        var cId = Assert.Single(c.Contexts).ContextId;
+
+        Assert.NotEqual(sourceId, bId);
+        Assert.NotEqual(sourceId, cId);
+        Assert.NotEqual(bId, cId);
+
+        // Both duplicates keep the source's canonical tool_id.
+        Assert.Equal(cmTool.ToolId.Value, Assert.Single(b.Contexts).ToolId.Value);
+        Assert.Equal(cmTool.ToolId.Value, Assert.Single(c.Contexts).ToolId.Value);
+    }
+
+    /// <summary>SNAP4 (Owner clarification §23, invariant 6 — P2-T07 identity regression): the source
+    /// <c>bq_id</c> and the duplicated <c>bq_id</c> are distinct while both reference the same
+    /// canonical BQ <c>tool_id</c>, so Boquilhas movements stay tied to their own production's
+    /// context identity.</summary>
+    [Fact]
+    public async Task SNAP4_SourceAndDuplicatedBqIdsAreDistinctWhileBothReferenceTheSameCanonicalBqTool()
+    {
+        var store = new P2T04TestStore();
+        var bqTool = store.SeedTool(ToolType.Bq, "BQ-200", "LOTE-SNAP4");
+        var source = store.SeedJobOn("REF-SNAP4", "1000", contexts: [Context(ToolContextType.Bq, bqTool)]);
+        var sourceBqId = source.Contexts[0].ContextId;
+
+        using var factory = P2T04TestHost.ForUser([CreateOnly()], store);
+        using var client = factory.CreateClient();
+
+        using var response = await P2T04TestHost.SendJsonAsync(
+            client,
+            HttpMethod.Post,
+            $"{JobOnPath}/{source.JobOnId.Value}/duplicate",
+            DuplicateBody(expectedSourceVersion: source.Version, productionNumber: "1001"));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var repository = factory.Services.GetRequiredService<IJobOnRepository>();
+        var duplicated = await repository.GetByIdAsync(
+            (await ReadJsonAsync(response)).GetProperty("jobonId").GetGuid(),
+            CancellationToken.None);
+
+        Assert.NotNull(duplicated);
+
+        var duplicatedContext = Assert.Single(duplicated!.Contexts);
+        Assert.Equal(ToolContextType.Bq, duplicatedContext.ContextType);
+
+        // bq_id_A != bq_id_B — the context identity belongs to exactly one production.
+        Assert.NotEqual(sourceBqId, duplicatedContext.ContextId);
+
+        // Both point at the SAME canonical BQ tool_id.
+        Assert.Equal(bqTool.ToolId.Value, source.Contexts[0].ToolId.Value);
+        Assert.Equal(bqTool.ToolId.Value, duplicatedContext.ToolId.Value);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // arrangement helpers
+    // ---------------------------------------------------------------------------------------------
 
     /// <summary>The Job On View grant alone.</summary>
     private static ModuleDefinition ViewOnly() =>

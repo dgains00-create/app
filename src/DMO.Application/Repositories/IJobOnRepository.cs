@@ -66,7 +66,9 @@ public interface IJobOnRepository
 
     /// <summary>
     /// Inserts the duplicated occurrence with new context identities in one transaction. The source
-    /// row is only read; the copied frozen triples come from the supplied duplicated contexts.
+    /// row is only read; the new contexts' snapshots come from the supplied duplicated contexts,
+    /// which the service builds from the CURRENT canonical Tool rows at duplication time (Owner
+    /// clarification, contract §23).
     /// </summary>
     /// <exception cref="DMO.Application.Persistence.ConcurrencyConflictException">
     /// The source version differs from the version the caller previewed.

@@ -21,14 +21,16 @@ namespace DMO.IntegrationTests.Persistence;
 
 /// <summary>
 /// P2-T04 env-gated integration test — the Job On duplication over the disposable PostgreSQL
-/// database: the explicit-source preview, the new-identity rules of §10, the verbatim frozen-triple
-/// copy and the write-transaction guarantees of §10.5/§11.
+/// database: the explicit-source preview, the new-identity rules of §10 as corrected by the Owner
+/// clarification (§23: every duplicated context re-snapshots the CURRENT canonical Tool row) and
+/// the write-transaction guarantees of §10.5/§11.
 /// </summary>
 /// <remarks>
-/// Authority: P2-T04 contract §10 (duplication rules), §10.5 (atomic write), §11 (transactions),
-/// §15 (concurrency) and §20.4 (rows DUP2–DUP10, DUP12, DUP14). Every assertion is scoped to the
-/// rows this test creates. Duplication must never modify the source, never re-read the live Tool and
-/// never touch <c>tools</c>/<c>tool_machines</c>.
+/// Authority: P2-T04 contract §10 (duplication rules) as superseded by §23 (OWNER CLARIFICATION —
+/// Job On context snapshot invariant), §10.5 (atomic write), §11 (transactions), §15 (concurrency)
+/// and §20.4 (rows DUP2–DUP10, DUP12, DUP14, DUP17, DUP18). Every assertion is scoped to the
+/// rows this test creates. Duplication must never modify the source, must never reuse a context
+/// identity and must never touch <c>tools</c>/<c>tool_machines</c>.
 /// </remarks>
 [Collection(PersistenceDatabaseCollection.Name)]
 public sealed class JobOnDuplicationIntegrationTests
@@ -257,11 +259,13 @@ public sealed class JobOnDuplicationIntegrationTests
     }
 
     /// <summary>
-    /// DUP7 (AC-61): after changing the live Tool's <c>reference</c>/<c>lot</c>, duplication still
-    /// copies the <b>source context's</b> frozen triple — the live Tool is never re-read.
+    /// DUP7 (AC-61, superseded wording): after changing the live Tool's <c>reference</c>/<c>lot</c>,
+    /// duplication snapshots the <b>current canonical Tool state</b> — the duplicate carries the NEW
+    /// values while the source context keeps its historical frozen triple (Owner clarification §23;
+    /// the old "copies the source frozen triple verbatim" reading is superseded).
     /// </summary>
     [SkippableFact]
-    public async Task DUP7_AfterTheLiveToolChangesDuplicationStillCopiesTheSourceFrozenTriple()
+    public async Task DUP7_AfterTheLiveToolChangesDuplicationSnapshotsTheCurrentToolState()
     {
         PersistenceTestDatabase.SkipIfNotConfigured();
 
@@ -297,8 +301,13 @@ public sealed class JobOnDuplicationIntegrationTests
 
             foreach (var table in ContextTables)
             {
-                // The duplicate carries the SOURCE's frozen triple (the pre-change values) verbatim.
-                Assert.Equal(sourceTriples[table], await ContextTriplesAsync(context, table, duplicated.JobOnId));
+                // The duplicate carries the CURRENT Tool state (the post-change values): the snapshot
+                // source is the canonical Tool row at duplication time, never the source context.
+                Assert.Equal(
+                    new[] { $"{reference}-live|99-live" },
+                    await ContextTriplesAsync(context, table, duplicated.JobOnId));
+
+                // The source context's historical frozen triple is untouched.
                 Assert.Equal(sourceTriples[table], await ContextTriplesAsync(context, table, source.JobOnId));
 
                 // And the live Tool row itself now holds the NEW values.
@@ -310,6 +319,127 @@ public sealed class JobOnDuplicationIntegrationTests
 
                 Assert.Equal($"{reference}-live|99-live", live);
             }
+
+            // The new occurrence itself records the lineage and nothing about the source changed.
+            Assert.Equal(source.JobOnId, duplicated.SourceJobOnId);
+            Assert.Equal(sourceTriples[ContextTables[0]], await ContextTriplesAsync(context, ContextTables[0], source.JobOnId));
+        }
+        finally
+        {
+            await CleanupAsync(context, token);
+        }
+    }
+
+    /// <summary>
+    /// DUP17 (Owner clarification §23, invariant 5): duplicating the SAME source twice produces two
+    /// independent new occurrences (B and C) whose context identities are all distinct — from each
+    /// other, from the source and from the other duplicate — while every context still references
+    /// the same canonical <c>tool_id</c> as its source context.
+    /// </summary>
+    [SkippableFact]
+    public async Task DUP17_DuplicatingTheSameSourceTwiceProducesDistinctContextIdsPerDuplicate()
+    {
+        PersistenceTestDatabase.SkipIfNotConfigured();
+
+        await using var context = PersistenceTestDatabase.CreateContext();
+        await PersistenceTestDatabase.ApplyMigrationsAsync(context);
+
+        var token = Guid.NewGuid().ToString("N");
+        var reference = $"ref-{token}";
+
+        try
+        {
+            var cmTool = await CreateToolAsync(context, "CM", reference, "01");
+            var mfTool = await CreateToolAsync(context, "MF", reference, "02");
+            var bqTool = await CreateToolAsync(context, "BQ", reference, "03");
+            var source = await CreateJobOnAsync(context, reference, $"pn-{token}-01", "B1", cmTool, mfTool, bqTool);
+
+            var duplicateB = await DuplicateAsync(
+                context,
+                new DuplicateJobOnCommand(source.JobOnId, source.Version, $"pn-{token}-02", "B1", null));
+            var duplicateC = await DuplicateAsync(
+                context,
+                new DuplicateJobOnCommand(source.JobOnId, source.Version, $"pn-{token}-03", "B1", null));
+
+            Assert.NotEqual(source.JobOnId, duplicateB.JobOnId);
+            Assert.NotEqual(source.JobOnId, duplicateC.JobOnId);
+            Assert.NotEqual(duplicateB.JobOnId, duplicateC.JobOnId);
+
+            // Every context identity is distinct across the three occurrences, per table.
+            var sourceIds = await ContextIdsByTableAsync(context, source.JobOnId);
+            var bIds = await ContextIdsByTableAsync(context, duplicateB.JobOnId);
+            var cIds = await ContextIdsByTableAsync(context, duplicateC.JobOnId);
+
+            foreach (var table in ContextTables)
+            {
+                var all = sourceIds[table].Concat(bIds[table]).Concat(cIds[table]).ToList();
+                Assert.Equal(3, all.Count);
+                Assert.Equal(3, all.Distinct(StringComparer.Ordinal).Count());
+            }
+
+            // Every duplicate context references the same canonical tool_id as the source context.
+            foreach (var table in ContextTables)
+            {
+                var canonical = Sorted(await ToolIdsAsync(context, table, source.JobOnId));
+                Assert.Equal(canonical, Sorted(await ToolIdsAsync(context, table, duplicateB.JobOnId)));
+                Assert.Equal(canonical, Sorted(await ToolIdsAsync(context, table, duplicateC.JobOnId)));
+            }
+
+            // The source row and its contexts are untouched by both duplications.
+            Assert.Equal(1, await CountAsync(context, "job_ons WHERE reference = @p AND copied_from_jobon_id IS NULL", new NpgsqlParameter("p", reference)));
+            Assert.Equal(3, await CountAsync(context, "job_ons WHERE reference = @p", new NpgsqlParameter("p", reference)));
+        }
+        finally
+        {
+            await CleanupAsync(context, token);
+        }
+    }
+
+    /// <summary>
+    /// DUP18 (Owner clarification §23, invariant 6 — P2-T07 identity regression): the source
+    /// <c>bq_id</c> and the duplicated <c>bq_id</c> are distinct context identities while both
+    /// reference the same canonical <c>tool_id</c> — every production keeps its own BQ context, so
+    /// P2-T07 movements keyed by <c>bq_id</c> stay with their own production and no migration to a
+    /// new <c>bq_id</c> is ever needed.
+    /// </summary>
+    [SkippableFact]
+    public async Task DUP18_BqIdentitiesStayDistinctWhileBothReferenceTheSameCanonicalTool()
+    {
+        PersistenceTestDatabase.SkipIfNotConfigured();
+
+        await using var context = PersistenceTestDatabase.CreateContext();
+        await PersistenceTestDatabase.ApplyMigrationsAsync(context);
+
+        var token = Guid.NewGuid().ToString("N");
+        var reference = $"ref-{token}";
+
+        try
+        {
+            var bqTool = await CreateToolAsync(context, "BQ", reference, "03");
+            var source = await CreateJobOnAsync(context, reference, $"pn-{token}-01", "B1", bqToolId: bqTool);
+
+            var sourceBqIds = await ContextIdsByTableAsync(context, source.JobOnId);
+
+            var duplicated = await DuplicateAsync(
+                context,
+                new DuplicateJobOnCommand(source.JobOnId, source.Version, $"pn-{token}-02", "B1", null));
+
+            var duplicateBqIds = await ContextIdsByTableAsync(context, duplicated.JobOnId);
+
+            // bq_id_A != bq_id_B: the context identity belongs to exactly one production.
+            Assert.Single(sourceBqIds["bq_contexts"]);
+            Assert.Single(duplicateBqIds["bq_contexts"]);
+            Assert.NotEqual(sourceBqIds["bq_contexts"][0], duplicateBqIds["bq_contexts"][0]);
+
+            // Both point at the SAME canonical BQ tool_id: the tool_id is the continuing identity.
+            Assert.Equal(
+                Sorted(await ToolIdsAsync(context, "bq_contexts", source.JobOnId)),
+                Sorted(await ToolIdsAsync(context, "bq_contexts", duplicated.JobOnId)));
+
+            // Each production's BQ context row is exclusively its own.
+            Assert.Equal(2, await CountAsync(context, "bq_contexts WHERE tool_id = @p", new NpgsqlParameter("p", bqTool)));
+            Assert.Equal(1, await CountAsync(context, "bq_contexts WHERE jobon_id = @p", new NpgsqlParameter("p", source.JobOnId)));
+            Assert.Equal(1, await CountAsync(context, "bq_contexts WHERE jobon_id = @p", new NpgsqlParameter("p", duplicated.JobOnId)));
         }
         finally
         {

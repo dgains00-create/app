@@ -429,7 +429,9 @@ internal sealed class P2T04TestStore : IToolRepository, IJobOnRepository
                 "Forced mid-transaction duplication failure (test double).");
         }
 
-        // The SOURCE contexts' frozen triples are copied verbatim: the live Tool is not re-read.
+        // Test double: persist exactly the duplicated contexts the real JobOnService supplied
+        // (each built from the CURRENT canonical Tool row at duplication time — Owner
+        // clarification, contract §23). The double itself never snapshots or clones.
         var copied = duplicatedContexts.ToList();
         var stored = duplicate with { Contexts = copied };
 

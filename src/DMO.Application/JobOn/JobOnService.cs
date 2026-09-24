@@ -289,17 +289,28 @@ public sealed class JobOnService : IJobOnService
             Version: 1,
             Contexts: []);
 
-        // Every copied context gets a NEW identity and keeps the SOURCE context's canonical tool_id
-        // and frozen triple verbatim: the live Tool is deliberately not re-read, so duplication never
-        // silently refreshes what the source recorded.
-        var duplicatedContexts = source.Contexts
-            .Select(context => new ToolContext(
+        // Every duplicated context gets a NEW identity, keeps the SOURCE context's canonical
+        // tool_id and re-snapshots the CURRENT canonical Tool row at duplication time (Owner
+        // clarification, contract §23): the source context contributes only the tool_id needed to
+        // locate the Tool. The old wording "frozen triple copied verbatim; live Tool not re-read"
+        // (former §10.3 step 6 / §21 Q16 default (a)) is SUPERSEDED.
+        var duplicatedContexts = new List<ToolContext>(source.Contexts.Count);
+
+        foreach (var context in source.Contexts)
+        {
+            var resolution = await ResolveToolAsync(context.ContextType, context.ToolId.Value, cancellationToken);
+            if (resolution.Errors.Count > 0)
+            {
+                return new JobOnResult.ValidationFailed(resolution.Errors);
+            }
+
+            duplicatedContexts.Add(new ToolContext(
                 context.ContextType,
                 Guid.NewGuid(),
                 jobOnId,
                 context.ToolId,
-                context.Frozen))
-            .ToList();
+                resolution.Frozen!));
+        }
 
         try
         {
