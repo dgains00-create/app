@@ -2791,3 +2791,83 @@ This clarification supersedes the affected contract rules pre-verification; it d
 closed P2-T04/P2-T05/P2-T06 authority. The implementation record
 (`dev/responses/P2_T07_IMPLEMENTATION_RESPONSE.md`) is updated with this clarification as a
 correction section.
+
+---
+
+## 34. OWNER CLARIFICATION — PRÉ-JOBON REGISTER ON `tool_id` WITH ASSOCIATION TO `bq_id`; REPAIRER FAMILY OWNED BY `BOQUILHAS > DEFINIÇÕES` (SUPERSEDES THE AFFECTED RULES)
+
+**Authority:** direct OWNER clarification to the Boquilhas / P2-T07 authority, issued after P2-T07
+is CLOSED. Where any earlier section of this contract — including §33 — conflicts with this
+section, **THIS section wins**. P2-T07 is **not reopened**; nothing here is implemented or
+authorized for implementation — every consequence requires its own authored, reviewed contract
+(Beta `WORKFLOW.md` plan-gate; recorded at
+`dev/responses/OWNER_CLARIFICATION_PLANNING_CONTEXT_AND_ASSOCIATIONS_RESPONSE.md`).
+
+### 34.1 The final functional rule (normative)
+
+1. **Boquilhas may start work pré-JobOn, anchored provisionally on the canonical `tool_id`.** A
+   register can be started before any Job On exists for it; its provisional anchor is the
+   canonical BQ `tool_id` (a real `tools` row, type `BQ`) — never a fake Job On, never a fake
+   `bq_id`, never a minted Tool identity.
+2. **The association point is the matching `bq_id`.** When Boquilhas receives a BQ context whose
+   `bq_id` references the **same master `tool_id`** (`bq_contexts.tool_id` = the register's
+   canonical `tool_id`), that is the point to **present and resolve the association**: the surface
+   shows the candidate association and the operator confirms it (human-confirmed, mirroring the
+   accepted Peso associate pattern of P2-T05 §4.4 — the anchor must match; no inference rule).
+3. **After resolution the register becomes `bq_id → jobon_id`.** The provisional `tool_id` anchor
+   is cleared on success; the register is then production-linked through the real `bq_id`, and
+   `jobon_id`/`tool_id` are reachable through it. Movements already recorded keep their facts;
+   nothing is migrated, rewritten or replayed.
+4. **This does NOT recreate a permanent standalone.** The `tool_id` anchor is transitional only:
+   the settled register remains production-linked — one register per real `bq_id` — and the
+   closed lifecycle/close/reopen/balance machinery of §33 stays removed. No fake Job On, no fake
+   `bq_id`, no `production_id`, no new identity.
+
+### 34.2 Superseded wording (explicit list)
+
+1. **§33.1 item 1** — "**Standalone Boquilhas flow** — there is NO standalone (`tool_id`) anchor:
+   every Boquilhas register belongs to a REAL Job On / production" — **SUPERSEDED** by §34.1:
+   a **provisional** `tool_id` anchor may exist pré-JobOn; the *permanent* standalone model stays
+   removed. The rest of §33.1 item 1 (real identity chain `jobon_id → bq_id → tool_id`; no fake
+   Job On/bq_id/`production_id`; movements valid after production end; historical association with
+   the original production) is unchanged.
+2. **§33.2 "registration: production/BQ context → Boquilhas register identity (one register per
+   BQ context…)"** — read as *excluding* a provisional pré-JobOn start; §34.1.1–34.1.3 is the
+   current reading.
+3. **§1.1 row 2** — "the **per-machine repairer assignments are owned by `Controlo_Create →
+   Definições`** (…DELTA.md §4; P2-T05 contract §11/§16.4); Boquilhas has **no settings surface
+   and no internal Definições tab**" — **SUPERSEDED for the repairer family** by §34.3: the
+   repairer register and the line/machine → repairer associations belong to
+   **`Boquilhas > Definições`** (not Controlo, not Admin).
+4. **§33.2 "repairer resolution + historical preservation … all PRESERVED per the earlier
+   sections"** — preserved in substance (resolution mechanics, historical retention); the
+   resolution source now feeds from Boquilhas' own Definições ownership (§34.3).
+5. Every statement elsewhere in this contract that Boquilhas merely **"consumes"** the repairer
+   register and "does not administer it" — superseded for register **ownership**; the data-shape
+   rules (name-only, no delete/deactivation, independent per-machine assignment, no grouping,
+   current-state with historical preservation) are **unchanged** as shape rules.
+
+### 34.3 Repairer family ownership (normative)
+
+1. **Repairers and the line/machine → repairer associations belong to `Boquilhas > Definições`**
+   — not to Controlo, not to Admin. Boquilhas owns the repairer register and the per-machine
+   (line) repairer assignments used for automatic resolution.
+2. The shape rules of the closed model remain: name is the required repairer data (no invented
+   fields beyond name), no delete/deactivation path, one **independent** assignment per machine
+   (`B1`,`B2`,`B3`,`C1`,`C2`,`C3`), **no** "Linha B"/"Linha C" grouping, current-state only, and
+   historical preservation on movement records (§§ referenced in §33.2 — unchanged as shape).
+3. The PDF/document, email-list and email-template settings are **not** moved by this
+   clarification; they remain under `Controlo_Create → Definições`.
+4. **Implementation status:** the implemented `repairers`/`machine_repairer_assignments` tables
+   (currently owned by the Controlo Create domain) and the current routes stay **exactly as they
+   are** — this clarification changes authority wording only. The physical/surface re-homing to
+   `Boquilhas > Definições` (including the provisional `tool_id` anchor of §34.1) requires future
+   workstream contracts (separate PLAN ACCEPT); **not authorized here**.
+
+### 34.4 Deliberately NOT introduced
+
+No migration, no schema change, no new table, no new column, no new route, no authorization
+change and no code change. No permanent standalone, no new lifecycle, no fake Job On, no fake
+`bq_id`, no new identity, no new settings surface, no movement-type change and no balance-model
+change. The movement types (`saida | entrada | entrada_sem_reparacao`), `Editar` as action,
+derived outstanding, business dates, edit/audit and the §33.2 negative scope remain as closed.

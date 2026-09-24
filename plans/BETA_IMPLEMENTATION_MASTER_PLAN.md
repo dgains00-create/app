@@ -31,6 +31,38 @@ for that area, and the existing files were updated in the same change. It does n
 `dmo-beta-master` or `dmo-master` outside its own area, it closes no authority blocker (see §4),
 and it changes no code, schema, route, authorization or availability.
 
+**Registered Owner clarification (planning context and association flow).** A NEW OWNER
+CLARIFICATION (direct Owner directives, registered on the clean baseline `c01d836`) makes the
+following **current authority** (authority only — **no implementation**; record:
+`dev/responses/OWNER_CLARIFICATION_PLANNING_CONTEXT_AND_ASSOCIATIONS_RESPONSE.md`; contract
+sections P2-T04 §24, P2-T05 §31, P2-T07 §34):
+
+- **Job On is the centre of planning** — it creates `jobon_id` and the `cm_id`/`mf_id`/`bq_id`
+  context snapshots, and the needed context flows out to the consuming modules (Controlo via
+  `cm_id`, Boquilhas via `bq_id`); consumers never re-create or re-own it.
+- **Controlo receives the production through the Resumo (Resumo da produção)**; the Peso is
+  populated by `cm_id`/Job On with machine, reference, lot, processo and the CM context. The
+  Resumo (`resumo_id → jobon_id`) remains an unimplemented handoff item — its **role as entry
+  point** is fixed by authority only.
+- **Peso pré-JobOn** may keep the truthful pending `tool_id` anchor; the correspondence with the
+  CM context is the **same `tool_id` UUID** (candidate `cm_id` whose `cm_contexts.tool_id` equals
+  the anchor), and on association the record passes to `cm_id` (confirmation — already the closed
+  P2-T05 behavior).
+- **Boquilhas may start work pré-JobOn provisionally anchored on `tool_id`**; when a `bq_id`
+  context with the same **master `tool_id`** arrives, that is the association point (presented,
+  human-confirmed); after resolution the register becomes `bq_id → jobon_id`. This **does NOT
+  recreate a permanent standalone** (supersedes the affected §33 wording — P2-T07 §34).
+- **Repairers and the line/machine → repairer associations belong to `Boquilhas > Definições`**
+  — not to Controlo, not to Admin (supersedes the affected delta/P2-T05 ownership wording for the
+  repairer family only; PDF/email settings stay with Controlo; no physical move now).
+- **Beta Ferramentas creation has no Armazém dependency**; absence of an Armazém location never
+  blocks creation/use of `tool_id` (confirmation).
+- **Surgical queries / light packets (standing rule):** queries and read models are context-
+  specific and carry only the data the surface needs — no global scans, no loading whole
+  relations to filter in the frontend (binds all remaining and future Beta backend work).
+- **Controlo Create and Controlo Approve remain distinct modules**; no generic architecture may
+  force their workflows/pages to be identical (preservation).
+
 > **Environment note.** This planning run was produced in an environment without a runnable
 > .NET SDK. **No build or test was executed and no build/test success is claimed.** All test
 > requirements in this document are *specifications to be executed later*.
@@ -429,7 +461,7 @@ and they must not be resolved by invention.
 |---|---|---|---|---|
 | B1 | Backend/interface contract | Concrete Tool/Job On/CM/MF/BQ query + mutation contract and physical schema have not been published as an accepted contract | P2-T04+ (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T04 per Beta `WORKFLOW.md`. **Authored:** `plans/contracts/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT.md` at contract SHA `58c6c1e8b4c9617daefc4ed02f7e65fb450bdada` (blob `799e6053a52d96acd21ed6be0475f5180e2525df`). **RESOLVED — PLAN ACCEPT:** Architect plan review `dev/reviews/P2-T04_DOMAIN_CORE_TOOL_JOBON_CONTRACT_PLAN_REVIEW.md` at `diogo-o/dmo-work` SHA `7d7a7c564027945a5c9a73cb798e9c226ee7f013` returned **PLAN ACCEPT** (22 ACCEPT DEFAULT, 0 REQUIRES CORRECTION, 0 BLOCKING) and authorized P2-T04 implementation against that contract. B1 is closed; P2-T04 is implemented and **CLOSED** (Architect re-review ACCEPT `b6f7a01c…`; snapshot-clarification focused review `787f5a9…` VERIFIED). |
 | B2 | Backend/interface contract | Concrete Peso/Pegamentos/Folha/Resumo calculate/persist/submit/read contract; **extended** to cover the Controlo_Create → Definições surfaces (repairer register, per-machine assignments, document base directory, email lists, email templates) settled in `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` | P2-T05/P2-T06 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T05. **Authored:** `plans/contracts/P2-T05_CONTROLO_CREATE_CONTRACT.md` — status at correction time **P2-T05 CONTRACT CORRECTED — AWAITING ARCHITECT RE-REVIEW** (historical, superseded — the re-review ACCEPTED, see the B2 detailed row below) (Peso create/measurement core + the five Definições surfaces; Comparação/Pegamentos/Folha/Resumo and the read-model rendering recorded as P2-T05 handoff remainder per contract Q-SCOPE). **Architect plan review `256081fae43d4192b879b65fca0bb43efe8cdbca` (dmo-work): PLAN REJECT — C1–C4 only**; **Q-PDF resolved — ACCEPT DEFAULT, server-host filesystem configuration with server-side accessibility check**; 27 authority questions ACCEPT DEFAULT / 0 BLOCKING; corrections C1 (test matrix: 66 AC / 84 rows), C2 (`RESULT_NON_POSITIVE`), C3 (calculate route identity pin) and C4 (Appendix D.3 provenance) applied at the corrected contract commit. B2 is closed: contract ACCEPTED, P2-T05 and P2-T06 implemented and **CLOSED** (see §7). |
-| B3 | Backend/interface contract | Concrete Boquilhas aggregate/movement/edit-audit/close-reopen contract and `repairer_id` schema/query shape. The canonical `repairer_id` **directory source is now settled** (Controlo_Create → Definições), as are machine-assignment autonomy and historical repairer preservation (`…DELTA.md` §3.6, §4, §5, §6); the physical schema/query/endpoint contract is still absent | P2-T07 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T07. **Authored:** `plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md` — status **P2-T07 CONTRACT CORRECTED (B1) — AWAITING FOCUSED ARCHITECT PLAN RE-REVIEW** (HISTORICAL / SUPERSEDED ONLY — this entire contracted model, incl. both flows, the DB-enforced exclusive anchor, exactly four movement types, replay-derived balance, edit+audit, close/reopen on the same `boquilhas_id`, repairer consumption, six tables / one migration 007, 18 routes, 83 AC / 86 matrix rows and the 12 NON-BLOCKING authority questions with pinned defaults, was superseded by the Owner clarification, contract §33; the current CLOSED model is in §7 P2-T07). **Architect plan review `542a08a1bcf1340306f8e337a6c597580a921f3d` (dmo-work): PLAN REJECT — blocking finding B1 only** (one-active-aggregate-per-anchor not race-safe as contracted); the B1 correction (partial unique indexes `IX_boquilhas_active_bq_id`/`IX_boquilhas_active_tool_id` + exact 23505 → `Refused(ActiveAggregateExists)` mapping + concurrent create/reopen test rows K6–K8) is applied at the corrected contract commit; **focused Architect PLAN re-review `7c2479ebae50f8fe18a770fd373cffaae65a48e1` (dmo-work): PLAN ACCEPT** — implementation AUTHORIZED against `b884dd84…` only; **B3 RESOLVED (implementation executed** per the P2-T07 implementation response; **a NEW OWNER CLARIFICATION — contract §33 — then superseded the affected rules** (production movement register: no lifecycle/standalone/Início/Irreparável/B1 machinery; 3 types; derived outstanding; one register per REAL production; 15 routes; migration 007 corrected cleanly pre-closure to THREE tables / 23 product / 24 raw) and the correction is applied and verified (unit 658/658; integration 633 + 2 pre-existing skips; focused Boquilhas 67/67); **final independent review `a96814f…` VERIFIED — P2-T07 CLOSED (see the §4 B3 detailed row and §7 P2-T07 status block)**). |
+| B3 | Backend/interface contract | Concrete Boquilhas aggregate/movement/edit-audit/close-reopen contract and `repairer_id` schema/query shape. The canonical `repairer_id` **directory source is now settled** (Controlo_Create → Definições), as are machine-assignment autonomy and historical repairer preservation (`…DELTA.md` §3.6, §4, §5, §6); the physical schema/query/endpoint contract is still absent *(**superseded for ownership** by the Owner clarification registered on `c01d836`: the Beta repairer directory source is `Boquilhas > Definições` — P2-T07 contract §34.3 / P2-T05 §31.3; machine autonomy and historical preservation are unchanged)* | P2-T07 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T07. **Authored:** `plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md` — status **P2-T07 CONTRACT CORRECTED (B1) — AWAITING FOCUSED ARCHITECT PLAN RE-REVIEW** (HISTORICAL / SUPERSEDED ONLY — this entire contracted model, incl. both flows, the DB-enforced exclusive anchor, exactly four movement types, replay-derived balance, edit+audit, close/reopen on the same `boquilhas_id`, repairer consumption, six tables / one migration 007, 18 routes, 83 AC / 86 matrix rows and the 12 NON-BLOCKING authority questions with pinned defaults, was superseded by the Owner clarification, contract §33; the current CLOSED model is in §7 P2-T07). **Architect plan review `542a08a1bcf1340306f8e337a6c597580a921f3d` (dmo-work): PLAN REJECT — blocking finding B1 only** (one-active-aggregate-per-anchor not race-safe as contracted); the B1 correction (partial unique indexes `IX_boquilhas_active_bq_id`/`IX_boquilhas_active_tool_id` + exact 23505 → `Refused(ActiveAggregateExists)` mapping + concurrent create/reopen test rows K6–K8) is applied at the corrected contract commit; **focused Architect PLAN re-review `7c2479ebae50f8fe18a770fd373cffaae65a48e1` (dmo-work): PLAN ACCEPT** — implementation AUTHORIZED against `b884dd84…` only; **B3 RESOLVED (implementation executed** per the P2-T07 implementation response; **a NEW OWNER CLARIFICATION — contract §33 — then superseded the affected rules** (production movement register: no lifecycle/standalone/Início/Irreparável/B1 machinery; 3 types; derived outstanding; one register per REAL production; 15 routes; migration 007 corrected cleanly pre-closure to THREE tables / 23 product / 24 raw) and the correction is applied and verified (unit 658/658; integration 633 + 2 pre-existing skips; focused Boquilhas 67/67); **final independent review `a96814f…` VERIFIED — P2-T07 CLOSED (see the §4 B3 detailed row and §7 P2-T07 status block)**). |
 | B4 | Backend/interface contract | Document generation contract + directory/filesystem capability (`Infrastructure/Files`, `Infrastructure/Pdf` do not exist); **extended** to cover the operator-configured base directory (configure/change/verify accessibility) and sending through configured email lists/templates (`…DELTA.md` §7, §8, §9) | P2-T08 (execution only) | Authored, reviewed `PLAN ACCEPT` for P2-T08 |
 
 These do **not** block P2-T01, P2-T02, P2-T03 (shared frontend primitives), whose authority is
@@ -898,6 +930,19 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   (`reports/P2_T04_JOB_ON_SNAPSHOT_INVARIANT_REVIEW.md`) — **OWNER CLARIFICATION CLOSED**; this
   clarification does NOT reopen P2-T04. Implementation `d2b3b3c…`; governance/response head
   `b7457ec…`.
+- **NEW OWNER CLARIFICATION (planning centre / context flow / Ferramentas without Armazém) —
+  REGISTERED (authority only, no code).** Direct Owner directives registered on the clean
+  baseline: **Job On is the centre of planning** — it creates `jobon_id` and the
+  `cm_id`/`mf_id`/`bq_id` context snapshots and the needed context flows out to the consuming
+  modules (Controlo via `cm_id`, Boquilhas via `bq_id`; consumers never re-create or re-own it);
+  and **Beta Ferramentas can be created without Armazém** — absence of an Armazém location never
+  blocks creation/use of `tool_id` (Armazém location truth stays outside Beta). Both are
+  **confirmations** of the closed P2-T04 model (contract **§24**); nothing is superseded, no
+  code/migration/route/authorization changes, P2-T04 remains CLOSED. Record:
+  `dev/responses/OWNER_CLARIFICATION_PLANNING_CONTEXT_AND_ASSOCIATIONS_RESPONSE.md`. The §7
+  P2-T04 machine-context note above ("machine-to-repairer assignment belongs to
+  Controlo_Create → Definições (P2-T05)") is **superseded for the repairer family** by the §31/
+  §34 ownership transfer to `Boquilhas > Definições` (see the P2-T05/P2-T07 records below).
 
 ### P2-T05 — Controlo Create (Peso, Comparação, Pegamentos, Folha, Resumo) + shared Peso read model
 
@@ -1035,6 +1080,28 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   remains `[]` and no destination route is registered: P2-T10 owns availability/navigation
   registration. **P2-T05 is CLOSED; P2-T06 is also CLOSED; P2-T08/P2-T09/P2-T10 remain
   NOT IMPLEMENTED.**
+- **NEW OWNER CLARIFICATION (Resumo entry / Peso anchoring / repairer family ownership) —
+  REGISTERED (authority only, no code).** Direct Owner directives on the clean baseline (contract
+  **§31**): (a) **Controlo receives the production through the Resumo da produção** and the Peso
+  is **populated by `cm_id`/Job On** with machine, reference, lot, processo and the CM context —
+  the Resumo's **role as entry point** is now authority; the `resumo_id` record remains an
+  unimplemented handoff item (Q-SCOPE) and no table/route is created; (b) **Peso pré-JobOn** may
+  use the truthful pending `tool_id` anchor and the correspondence with the CM context is the
+  **same canonical `tool_id` UUID** (candidate `cm_id` whose `cm_contexts.tool_id` equals the
+  anchor; on association the record passes to `cm_id`) — confirmation of the closed behavior;
+  (c) **repairers and the line/machine → repairer associations belong to `Boquilhas >
+  Definições`, not to Controlo, not to Admin** — SUPERSEDES the affected §7 P2-T05 scope/settings
+  wording above and the settled delta ownership (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md`
+  §3/§4) **for the repairer family only** (PDF-directory/email-list/email-template settings stay
+  with `Controlo_Create → Definições`; the data-shape rules — name-only, no delete, independent
+  per-machine assignment, no grouping, current-state with historical preservation — are
+  unchanged); (d) **Controlo Create and Controlo Approve remain distinct modules** — no generic
+  architecture may force their workflows/pages to be identical (preservation, see the P2-T06
+  record). **No implementation** — the implemented `repairers`/`machine_repairer_assignments`
+  tables and the Definições routes stay exactly as they are; the re-homing to
+  `Boquilhas > Definições` and the future Resumo contract require their own authored, reviewed
+  contracts. P2-T05 remains CLOSED. Record:
+  `dev/responses/OWNER_CLARIFICATION_PLANNING_CONTEXT_AND_ASSOCIATIONS_RESPONSE.md`.
 
 ### P2-T06 — Controlo Approve
 
@@ -1112,6 +1179,15 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   registered: P2-T10 owns availability/navigation registration. **P2-T06 is CLOSED** (final
   independent re-verification of the CP4 correction VERIFIED `8f9e4f8…`); P2-T07 is also CLOSED;
   P2-T08 / P2-T09 / P2-T10 remain **NOT IMPLEMENTED**.
+- **NEW OWNER CLARIFICATION — Controlo Create and Controlo Approve remain distinct modules
+  (REGISTERED — preservation, no code).** Direct Owner directive on the clean baseline (recorded
+  with the planning-context clarification; P2-T05 contract §31.4): the two modules continue as
+  distinct modules — distinct identities, distinct gates, sibling-non-satisfaction — and **no
+  generic architecture may be imposed that forces their workflows/pages to be identical**. The
+  shared Peso read model is the approved sharing seam; renderer reuse is contractual, workflow
+  homogenization is not. This preserves the closed P2-T06 model exactly; nothing in the current
+  §7 P2-T06 record changes, no supersession applies. Record:
+  `dev/responses/OWNER_CLARIFICATION_PLANNING_CONTEXT_AND_ASSOCIATIONS_RESPONSE.md`.
 
 ### P2-T07 — Boquilhas
 
@@ -1207,6 +1283,25 @@ Tampões, Admin audit, full Job On lifecycle, full Ferramentas lifecycle.
   (`reports/P2_T07_FINAL_INDEPENDENT_REVIEW.md`); under the simplified workflow **no additional
   Architect implementation review is required**. **P2-T07 is CLOSED.** `CurrentBuildAvailable`
   stays `[]`; P2-T08 / P2-T10 remain NOT IMPLEMENTED.
+- **NEW OWNER CLARIFICATION (contract §34) — REGISTERED (authority only, no code).** Direct
+  Owner directives on the clean baseline: (a) **Boquilhas may start work pré-JobOn,
+  provisionally anchored on the canonical `tool_id`**; when it receives a BQ context whose
+  `bq_id` references the **same master `tool_id`** (`bq_contexts.tool_id` = the register's
+  canonical `tool_id`), that is the point to **present/resolve the association** (human-confirmed,
+  mirroring the Peso associate pattern); after resolution the register becomes
+  `bq_id → jobon_id`. **This does NOT recreate a permanent standalone** — the `tool_id` anchor is
+  transitional; the settled production-linked register stands. This **supersedes the affected
+  §33 wording** ("there is NO standalone (`tool_id`) anchor") and the affected §33.2
+  registration reading (P2-T07 contract §34.1/§34.2); (b) **repairers and the line/machine →
+  repairer associations belong to `Boquilhas > Definições`, not to Controlo, not to Admin** —
+  supersedes the affected repairer-ownership wording above (the §4 items and this record's
+  "Boquilhas consumes the register and does not administer it") for the repairer family only;
+  the data-shape rules (name-only, no delete, independent per-machine assignment, no grouping,
+  current-state with historical preservation) are unchanged; PDF/email settings stay with
+  Controlo. **No implementation** — the current build (3 tables, 15 routes, movement model) is
+  unchanged; the provisional-anchor flow and the Definições re-homing require future authored,
+  reviewed contracts. P2-T07 remains CLOSED. Record:
+  `dev/responses/OWNER_CLARIFICATION_PLANNING_CONTEXT_AND_ASSOCIATIONS_RESPONSE.md`.
 
 - **HISTORICAL / SUPERSEDED ONLY (provenance — NOT current authority):** the
   pre-clarification contract and implementation record. The B3 contract is
@@ -1390,12 +1485,12 @@ UI do not acquire duplicate domain models. Authority:
 | Comparação | relation `current_peso_id -> previous_peso_id` | Controlo (Peso workflow) | explicitly selected; stale after reading change → rebuild before submit | explicit persisted relation; previous record immutable | Create, Approve | persists the exact pairing | **Not a status, not a separate identity** |
 | Pegamentos | `pegamentos_id` | Controlo | may legitimately be absent; `NotEvaluable` when nominal is missing | nominal/limits actually used are preserved | Controlo, documents | preserved closed control must not drift with live Tool changes | **No invented nominal** |
 | Folha de Controlo | `controlo_sheet_id` | Controlo | persisted component decisions/observations | persisted facts | Controlo, Approve | preserved decisions | **distinct from `resumo_id` — must not be merged** |
-| Resumo | `resumo_id` | Controlo | persisted record for one `jobon_id` context | record is authority even when the PDF is absent | Controlo, documents | record ≠ its PDF | **No projection-of-Folha** |
-| Boquilhas register | `boquilhas_id` | Boquilhas (production movement register) | **no lifecycle** — one register per real `bq_id` / Job On context; movements remain valid after the production end date | movements are append-only facts; outstanding derived (`SUM(saida) − SUM(entrada) − SUM(entrada_sem_reparacao)`) | Boquilhas, documents, HISTÓRICO GLOBAL (later) | production association and movement facts preserved; movements never rewritten | production-linked via `bq_id` only — **no standalone flow**, **no fake Job On**, **no per-piece identity**, **no close/reopen** |
+| Resumo | `resumo_id` | Controlo | persisted record for one `jobon_id` context | record is authority even when the PDF is absent | Controlo, documents | record ≠ its PDF | **No projection-of-Folha**; **entry point for Controlo** — Owner clarification (P2-T05 §31.1): the production arrives in Controlo through the Resumo and populates the Peso (machine, reference, lot, processo, CM context via `cm_id`); record itself remains an unimplemented handoff item |
+| Boquilhas register | `boquilhas_id` | Boquilhas (production movement register) | **no lifecycle** — one register per real `bq_id` / Job On context; movements remain valid after the production end date | movements are append-only facts; outstanding derived (`SUM(saida) − SUM(entrada) − SUM(entrada_sem_reparacao)`) | Boquilhas, documents, HISTÓRICO GLOBAL (later) | production association and movement facts preserved; movements never rewritten | production-linked via `bq_id` — **no permanent standalone**; **provisional pré-JobOn `tool_id` anchor allowed** by the Owner clarification (P2-T07 §34): work may start on `tool_id` and, on a `bq_id` with the same master `tool_id`, the register is associated and becomes `bq_id → jobon_id`; **no fake Job On**, **no per-piece identity**, **no close/reopen** |
 | Movement | `movement_id` | Boquilhas | append-only; exactly `saida` / `entrada` / `entrada_sem_reparacao`; `Editar` is an action producing audit, not a new movement | business date (editable) ⊥ recorded timestamp (immutable) | Boquilhas, HISTÓRICO GLOBAL (later) | before/after audit + actor + system timestamp | **no second balance authority**; no `inicio`/`irreparavel`/close-reopen machinery |
-| Repairer | `repairer_id` | **Controlo_Create → Definições** (canonical repairer register) | simple register (name is the required data); selected/consumed per machine assignment and per external Saída | current assignment resolves automatically for new Boquilhas registrations; historical records retain the value actually used | Controlo Create, Boquilhas | **not rewritten when the machine's current assignment changes** | **not administered by Boquilhas**; **not owned by Controlo_Approve**; repairer register owned by Controlo_Create → Definições (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §3) |
-| Machine repairer assignment | per machine (`B1`,`B2`,`B3`,`C1`,`C2`,`C3`) | Controlo_Create → Definições (operational configuration) | one **independent** current assignment per machine | changing one machine never changes another | Controlo Create, Boquilhas (resolution) | never rewrites historical Boquilhas records | **no grouping rule** — no "Linha B"/"Linha C", no shared B/C assignment (`…DELTA.md` §4) |
-| Operational settings (Definições) | n/a (configuration, not a domain identity) | **Controlo_Create** | repairer register, machine repairer assignments, PDF/document base directory, email lists, email templates | configuration is current-state; the facts it feeds are preserved on the records that used them | Controlo Create (owner), Boquilhas (consumes repairer resolution), P2-T08 (consumes directory/email config) | historical records preserve what they used | **not owned by Controlo_Approve**; **no new global Admin module**; not a new destination (`…DELTA.md` §1, §2, §7, §8, §10) |
+| Repairer | `repairer_id` | **Boquilhas → Definições** (canonical repairer register — Owner clarification, P2-T07 §34.3 / P2-T05 §31.3; supersedes the former Controlo_Create → Definições ownership for the repairer family; the implemented tables currently live in the Controlo Create domain until a future workstream re-homes them) | simple register (name is the required data); selected/consumed per machine assignment and per external Saída | current assignment resolves automatically for new Boquilhas registrations; historical records retain the value actually used | Boquilhas (owner), Controlo Create (reads as before until re-homed) | **not rewritten when the machine's current assignment changes** | **not owned by Controlo_Approve**; **not owned by Admin**; repairer register owned by Boquilhas → Definições |
+| Machine repairer assignment | per machine (`B1`,`B2`,`B3`,`C1`,`C2`,`C3`) | **Boquilhas → Definições** (operational configuration — Owner clarification, as above; supersedes the former Controlo_Create ownership for this family) | one **independent** current assignment per machine | changing one machine never changes another | Boquilhas (owner + resolution), Controlo Create (reads as before until re-homed) | never rewrites historical Boquilhas records | **no grouping rule** — no "Linha B"/"Linha C", no shared B/C assignment (`…DELTA.md` §4 shape preserved) |
+| Operational settings (Definições) | n/a (configuration, not a domain identity) | **split ownership (Owner clarification):** repairer register + machine/line → repairer assignments → **Boquilhas → Definições**; PDF/document base directory, email lists, email templates → **Controlo_Create → Definições** (unchanged) | repairer family, PDF/document base directory, email lists, email templates | configuration is current-state; the facts it feeds are preserved on the records that used them | Boquilhas (repairer family), Controlo Create (PDF/email), P2-T08 (consumes directory/email config) | historical records preserve what they used | **not owned by Controlo_Approve**; **no new global Admin module**; not a new destination (`…DELTA.md` §1, §2, §7, §8, §10 — ownership superseded for the repairer family) |
 | Email list | n/a (named configuration list) | Controlo_Create → Definições | named list with associated recipients | used by document sending | Controlo Create, P2-T08 sending | not a document identity | **recipient addresses are never hardcoded in application code** (`…DELTA.md` §8) |
 | Email template | n/a (configuration) | Controlo_Create → Definições | subject + body + applicable document type/context | supports contextual values already known (reference/production/machine/date) | Controlo Create, P2-T08 sending | not a document identity | **no placeholder syntax is fixed by this authority** (`…DELTA.md` §10.4) |
 | Document output | derived (no identity) | owning record's workflow | availability state, not a domain lifecycle | frozen output corresponds to a frozen record state | Controlo, Boquilhas | rendered from preserved historical context | **filename/path is never an identity; no document table for symmetry**; the base directory is operator-configurable in Controlo_Create → Definições (`…DELTA.md` §7) |
@@ -1411,19 +1506,32 @@ UI do not acquire duplicate domain models. Authority:
 5. `src/DMO.Application/Access/ModuleCatalog.cs` is the reusable identity/catalog mechanism.
    Operational modules **consume** it (for gates and availability); they must not build a
    parallel registry.
-6. **Controlo settings ownership (settled).** The operational configuration consumed by the
-   Controlo / Peso / Boquilhas workflows — repairer register, per-machine repairer assignments,
-   PDF/document base directory, email lists and email templates — belongs to
-   **Controlo_Create → Definições**. `Controlo_Approve` is restricted to **Aprovar** and
-   **Histórico de Pesos** and owns none of it. This creates **no** new module, **no** new
-   destination and **no** new global Admin requirement. Definições is gated by the Controlo_Create
-   module policy. See `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §1, §2, §7, §8, §10.
+6. **Controlo settings ownership (settled, superseded for the repairer family).** The operational
+   configuration consumed by the Controlo / Peso / Boquilhas workflows — repairer register,
+   per-machine repairer assignments, PDF/document base directory, email lists and email templates —
+   belonged to **Controlo_Create → Definições**. **Owner clarification (P2-T05 §31.3 / P2-T07
+   §34.3): the repairer register and the line/machine → repairer associations now belong to
+   `Boquilhas > Definições`** — not to Controlo, not to Admin. The PDF/document base directory,
+   email lists and email templates remain with **Controlo_Create → Definições**. `Controlo_Approve`
+   is restricted to **Aprovar** and **Histórico de Pesos** and owns none of it. This creates
+   **no** new module, **no** new destination and **no** new global Admin requirement. The
+   implemented tables/routes stay as they are until a future workstream contract re-homes the
+   repairer family. See `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §1, §2, §7, §8,
+   §10 (ownership superseded for the repairer family only).
 7. **Machine autonomy (settled).** `B1`, `B2`, `B3`, `C1`, `C2`, `C3` are independent operational
    machines, each with its **own** repairer assignment. No shared B or C repairer, no "Linha B" /
    "Linha C" model, and no cascade between machines. Boquilhas resolves the repairer automatically
    from the machine's current assignment, and the repairer actually used is **historically
    preserved** — a later assignment change must never rewrite an earlier record. See
-   `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §4, §5, §6.
+   `reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md` §4, §5, §6 (shape rules unchanged;
+   ownership per rule 6).
+8. **Surgical queries / light packets (binding standing rule — Owner clarification).** Queries and
+   read models must be **context-specific** and transport **only the data the surface needs**: no
+   global scans, no loading of whole relations/tables to filter or project in the frontend, no
+   "load the universe and filter client-side". Backend reads are built per query contract with the
+   smallest packet that satisfies the surface. This binds every remaining and future Beta
+   workstream (P2-T08, P2-T10 and any follow-on contract), including the closed modules' read
+   paths when extended.
 
 ---
 

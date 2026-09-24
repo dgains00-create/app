@@ -72,10 +72,13 @@ Boquilhas is a **production-linked movement register** per the Owner clarificati
 (contract §33):
 
 1. Search/select/create BQ Tool context (shared Tool orchestration; returns to origin).
-2. **Production-linked flow only:** `boquilhas_id -> bq_id -> jobon_id + tool_id`. One register
+2. **Production-linked flow (final):** `boquilhas_id -> bq_id -> jobon_id + tool_id`. One register
    per real `bq_id` / Job On context; movements remain valid **after** the production end date.
-   **No standalone flow** (the former `boquilhas_id -> tool_id` flow is SUPERSEDED — §16). No
-   fake Job On/`bq_id`; the register identity is created WITHOUT any quantity event.
+   **No permanent standalone** (the former permanent `boquilhas_id -> tool_id` flow is
+   SUPERSEDED — §16). **Provisional pré-JobOn `tool_id` anchor allowed** by the Owner
+   clarification (contract §34 / §4.1 below): work may start on the canonical `tool_id` and, on a
+   `bq_id` with the same master `tool_id`, the register is associated and becomes `bq_id →
+   jobon_id`. No fake Job On/`bq_id`; the register identity is created WITHOUT any quantity event.
 3. Exactly the **three** write movement types: `saida` (Saída), `entrada` (Entrada),
    `entrada_sem_reparacao` (Entrada sem reparação). `Editar` is an **action** on an existing
    movement — **never** a movement type. No `inicio` / `irreparavel`.
@@ -100,14 +103,45 @@ Boquilhas is a **production-linked movement register** per the Owner clarificati
     have to manually choose the repairer when the machine is already known. `B1`,`B2`,`B3`,`C1`,
     `C2`,`C3` resolve **independently**; there is no shared B/C repairer and no "Linha B"/"Linha C"
     model. The repairer used at the time of the movement is **historically preserved**: changing a
-    machine's assignment later must **never** rewrite an earlier Boquilhas record. Boquilhas
-    **consumes** the register and does not administer it.
+    machine's assignment later must **never** rewrite an earlier Boquilhas record. *(Ownership
+    note — **SUPERSEDED** by the Owner clarification (contract §34 / §4.1 below): Boquilhas no
+    longer merely "consumes" the register — the repairer register and the line/machine → repairer
+    associations **belong to `Boquilhas > Definições`**, not to Controlo, not to Admin. The
+    resolution mechanics and shape rules above are unchanged.)*
 13. **Removed from current visual authority:** the Boquilhas **machine/sidebar** concept that
     depends on Job On operational context is removed from the current frontend authority
     (`…DELTA.md` §11). Do **not** simulate Job On machine/reference state inside Boquilhas. If
     future Job On integration justifies such context, it may be reintroduced later from real
     backend authority. The production-line contextual panel (item 11) is a different, read-only
     reading of real supplied context and is unchanged.
+
+### 4.1 Owner clarification — pré-JobOn anchor and repairer ownership (recorded)
+
+A NEW OWNER CLARIFICATION (registered on the clean baseline; contract **§34**; record
+`dev/responses/OWNER_CLARIFICATION_PLANNING_CONTEXT_AND_ASSOCIATIONS_RESPONSE.md`) supersedes the
+affected §33 wording and registers as current authority — **authority only, no implementation**,
+P2-T07 remains CLOSED, the current build (3 tables, 15 routes, movement model) is unchanged:
+
+1. **Boquilhas may start work pré-JobOn, provisionally anchored on the canonical `tool_id`** (a
+   real `tools` row, type `BQ`; never a fake Job On/bq_id/minted identity).
+2. **The association point is the matching `bq_id`:** when Boquilhas receives a BQ context whose
+   `bq_id` references the **same master `tool_id`** (`bq_contexts.tool_id` = the register's
+   canonical `tool_id`), that is the point to **present/resolve the association** (human-confirmed,
+   mirroring the accepted Peso associate pattern of P2-T05 §4.4 — anchor must match, no inference
+   rule).
+3. **After resolution the register becomes `bq_id → jobon_id`** (provisional `tool_id` anchor
+   cleared; recorded movements keep their facts; nothing migrated/rewritten/replayed).
+4. **This does NOT recreate a permanent standalone:** the `tool_id` anchor is transitional only;
+   the settled production-linked register stands; lifecycle/close/reopen/balance machinery stays
+   removed (§33 preserved otherwise).
+5. **Repairers and the line/machine → repairer associations belong to `Boquilhas >
+   Definições`**, not to Controlo, not to Admin — superseding the affected §3/§4/§6 wording
+   ("Boquilhas consumes the register and does not administer it"; "repairer directory
+   administration … owned by Controlo_Create → Definições"). Data-shape rules unchanged (name-only,
+   no delete, independent per-machine assignment, no grouping, current-state with historical
+   preservation). PDF/email settings stay with Controlo.
+6. The provisional-anchor flow and the Definições re-homing require future authored,
+   reviewed contracts (separate PLAN ACCEPT) — **not authorized here**.
 
 ## 5. Authority blocker B3 — required contract before execution
 
@@ -134,8 +168,10 @@ The directory source half of B3 is **settled** by the delta (§3.6): the registe
 ## 6. Explicit non-scope
 
 - Mandatory Boquilhas PDF; internal Boquilhas settings/Admin tab.
-- **Repairer directory administration** — the register is owned by `Controlo_Create → Definições`;
-  Boquilhas only selects/consumes a repairer.
+- **Repairer directory administration** — *(historical ownership reading; **SUPERSEDED** by the
+  Owner clarification §4.1.5: the repairer register and the line/machine → repairer associations
+  **belong to `Boquilhas > Definições`**, not to Controlo, not to Admin; the current build keeps
+  the implemented tables/routes until a future workstream contract re-homes them.)*
 - **Any machine/reference sidebar simulating Job On context** (`…DELTA.md` §11).
 - Job On planning ownership; Armazém stock/location; per-piece BQ identity.
 - Obsolete legacy movement types.

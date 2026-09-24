@@ -181,6 +181,33 @@ workstream after P2-T05 is authorized.**
 > `ModuleRegistrations.CurrentBuildAvailable` remains `[]`, no route is registered, and
 > **P2-T06 is also CLOSED; P2-T07 CLOSED; P2-T08 / P2-T09 / P2-T10 remain NOT IMPLEMENTED**.
 
+### 5.2 Owner clarification — Resumo entry; Peso anchoring; repairer family ownership (recorded)
+
+A NEW OWNER CLARIFICATION (registered on the clean baseline; contract **§31**; record
+`dev/responses/OWNER_CLARIFICATION_PLANNING_CONTEXT_AND_ASSOCIATIONS_RESPONSE.md`) registers the
+following as current authority — **authority only, no implementation**, P2-T05 remains CLOSED:
+
+1. **Controlo receives the production through the Resumo (Resumo da produção).** The Peso is
+   **populated by `cm_id` / Job On** with machine, reference, lot, processo and the CM context.
+   The Resumo is fixed as the Controlo **entry point**; the `resumo_id` record itself remains an
+   unimplemented handoff item (Q-SCOPE) — its role is authority only, no table/route was created.
+2. **Peso pré-JobOn anchoring (confirmation).** A Peso may keep the truthful pending `tool_id`
+   anchor; the correspondence with the CM context is the **same canonical `tool_id` UUID**
+   (candidate `cm_id` whose `cm_contexts.tool_id` equals the anchor); on association the record
+   passes to `cm_id`. This pins the already-implemented associate rule — no behavior change.
+3. **Repairer family ownership transfer (SUPERSEDES).** The repairer register and the
+   line/machine → repairer associations **belong to `Boquilhas > Definições`**, not to Controlo,
+   not to Admin — superseding the affected §5.1 bullet above ("the five `Definições` surfaces
+   (name-only repairer register; independent B1..C3 assignments…)"), the §5 B3-authority wording
+   and the settled delta ownership (`reports/CONTROL_SETTINGS_REPAIRERS_EMAIL_PDF_DELTA.md`
+   §3/§4) **for the repairer family only**. PDF-directory/email-list/email-template settings stay
+   with `Controlo_Create → Definições`. The data-shape rules are unchanged (name-only, no delete,
+   independent per-machine assignment, no grouping, current-state with historical preservation).
+   The implemented `repairers`/`machine_repairer_assignments` tables and the Definições routes
+   stay exactly as they are; the re-homing requires a future workstream contract.
+4. **Controlo Create and Controlo Approve remain distinct modules.** No generic architecture may
+   force their workflows/pages to be identical (preservation; P2-T06 unaffected).
+
 ## 6. Explicit non-scope
 
 - Approval/rejection/reopen decisions (P2-T06).
@@ -189,6 +216,9 @@ workstream after P2-T05 is authorized.**
 - A new global Admin module for these settings; moving them into the existing ADMIN-only
   Administration surfaces; registering `Definições` as a destination (§1.4).
 - Repairer fields beyond name; a grouping of machines into a line/group assignment (§3.3, §4.2).
+  *(Ownership note — **SUPERSEDED** by the Owner clarification (§5.2.3): the repairer register and
+  the line/machine → repairer associations belong to `Boquilhas > Definições`, not to Controlo,
+  not to Admin; the shape rules above remain.)*
 - Automatic previous-Peso selection; same-machine-only restriction.
 - Duplicate Tool registry; independent production identity.
 - Frontend-owned formulas or persistence; approval-copy Peso.

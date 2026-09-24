@@ -159,14 +159,29 @@ the focused independent review `787f5a9…` returned **VERIFIED**
 clarification does NOT reopen P2-T04. Implementation `d2b3b3c…`; governance/response head
 `b7457ec…`.
 
+### 5.3 Owner clarification — planning centre; Ferramentas without Armazém (recorded)
+
+A NEW OWNER CLARIFICATION (registered on the clean baseline; contract **§24**; record
+`dev/responses/OWNER_CLARIFICATION_PLANNING_CONTEXT_AND_ASSOCIATIONS_RESPONSE.md`) confirms the
+closed P2-T04 model as current authority: **Job On is the centre of planning** — it creates
+`jobon_id` and the `cm_id`/`mf_id`/`bq_id` context snapshots, and the needed context **flows out
+to the consuming modules** (Controlo via `cm_id`, Boquilhas via `bq_id`; consumers never
+re-create or re-own it) — and **Beta Ferramentas can be created without Armazém**: absence of an
+Armazém location never blocks creation/use of `tool_id` (Armazém location truth stays outside
+Beta). Both are confirmations — no supersession, no code/migration/route/authorization change;
+P2-T04 remains CLOSED.
+
 ## 6. Explicit non-scope
 
 - Full Job On lifecycle (revisions, verification catalogue, family sheets, print orchestration).
 - Full Ferramentas change-request/approve lifecycle, technical-condition and utilisation
   dossier.
 - Controlo calculations, Boquilhas movement ownership, Armazém.
-- Repairers, machine-to-repairer assignment and any machine/line grouping (owned by
-  Controlo_Create → Definições).
+- Repairers, machine-to-repairer assignment and any machine/line grouping. *(Historical
+  ownership reading "owned by Controlo_Create → Definições" — **SUPERSEDED** by the Owner
+  clarification for the repairer family: the repairer register and the line/machine → repairer
+  associations belong to `Boquilhas > Definições`, not to Controlo, not to Admin — P2-T07 §34.3 /
+  P2-T05 §31.3. This workstream still models none of it.)*
 - Any `production_id`, `job_on_revision_id`, or `tool.jobons[]` reverse array.
 - Any fake `cm_id`/`jobon_id`.
 - No `CurrentBuildAvailable` change and no route registration (P2-T10 does that).

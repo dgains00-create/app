@@ -2460,3 +2460,80 @@ P2-T05 CONTRACT CORRECTED — AWAITING ARCHITECT RE-REVIEW
 B2 AWAITING PLAN ACCEPT
 NOT IMPLEMENTED
 ```
+
+---
+
+## 31. OWNER CLARIFICATION — CONTROLO ENTERS THROUGH THE RESUMO; PESO ANCHORING; REPAIRER FAMILY OWNED BY BOQUILHAS (SUPERSEDES THE AFFECTED OWNERSHIP WORDING)
+
+**Authority:** direct OWNER clarification to the Controlo / P2-T05 authority, issued after P2-T05
+is CLOSED. Where any earlier section of this contract conflicts with this section, **THIS section
+wins**. P2-T05 is **not reopened**; nothing here is implemented or authorized for implementation —
+every consequence requires its own authored, reviewed contract (Beta `WORKFLOW.md` plan-gate;
+recorded at `dev/responses/OWNER_CLARIFICATION_PLANNING_CONTEXT_AND_ASSOCIATIONS_RESPONSE.md`).
+
+### 31.1 The Resumo is the Controlo entry point (normative; registration only)
+
+1. **Controlo receives the production through the Resumo (Resumo da produção).** The production
+   summary is the entry into Controlo: a production (Job On) is brought into Controlo from the
+   Resumo.
+2. **The Peso is populated by `cm_id` / Job On** with the production context — machine,
+   reference, lot, processo and the CM context. The populated facts come from the real identity
+   chain (`peso_id → cm_id → jobon_id + tool_id`; `processo` consumed through `tool_id`), never
+   re-entered and never duplicated on the Peso.
+3. The `resumo_id` record (`resumo_id → jobon_id`) remains an **unimplemented P2-T05 handoff
+   remainder** (Q-SCOPE / §2.3 / §29 — no `resumo` table, column or route exists and none is
+   created by this clarification). This clarification **fixes its role as current authority**: when
+   a future contract authors the Resumo, it is the Controlo entry point carrying the production
+   context that populates the Peso surface. The existing production-selection path of §4.3/§4.4
+   stays valid until then.
+
+### 31.2 Peso pré-JobOn: pending `tool_id` → `cm_id` correspondence (normative, confirmation)
+
+1. A Peso created before its Job On / CM context may keep the **truthful pending `tool_id` anchor**
+   (§3.2, `Job On por associar`) — never an error, fully measurable and submittable.
+2. **The correspondence is the same canonical `tool_id` UUID.** When the corresponding CM context
+   exists, the Peso's pending anchor and the `cm_contexts.tool_id` of the target context are the
+   **same UUID**: candidate `cm_id` values are exactly those whose `cm_contexts.tool_id` equals the
+   Peso's anchor `tool_id` (§4.4 candidate rule — confirmed by this clarification as the Owner's
+   rule, no other matching key exists).
+3. On association the record **passes to `cm_id`**: `cm_id` set, direct `tool_id` cleared, one
+   transaction, version += 1 (§4.4 association contract — unchanged). Confirmation only: this is
+   the implemented, closed P2-T05 behavior.
+
+### 31.3 Repairer family ownership moves to `Boquilhas > Definições` (SUPERSEDES)
+
+1. **Repairers and the line/machine → repairer associations belong to `Boquilhas >
+   Definições`** — not to Controlo, not to Admin. The repairer register and the per-machine
+   (line) repairer assignments are no longer owned by `Controlo_Create → Definições`.
+2. **Superseded wording (explicit list):** §9 "Definições ownership" (repairer-register and
+   per-machine-assignment ownership reading), §10 "Repairer registry" (ownership reading), §11
+   "Machine assignment" (ownership reading), the §1.1 authority-table deltas citing
+   `…DELTA.md` §3/§4 for that ownership, and §8.7/§21.5 statements that make Definições a
+   Controlo_Create-only settings surface **for the repairer family**. The settled *shape* rules
+   that are NOT ownership are preserved: name-only repairer data (no invented fields), no delete/
+   deactivation path, one **independent** assignment per machine, no "Linha B"/"Linha C" grouping,
+   current-state only with historical preservation on Boquilhas records (§10, §11 — unchanged as
+   data-shape rules).
+3. **What does NOT move:** the PDF/document base directory (§12), the email recipient lists
+   (§13) and the email templates (§14) remain owned by `Controlo_Create → Definições`. The
+   Controlo_Create/Approve split (Approve owns no settings) is unchanged (§31.4).
+4. **Implementation status:** the implemented `repairers`/`machine_repairer_assignments` tables,
+   the Definições routes and the Boquilhas consumption seam stay **exactly as they are** — this
+   clarification changes authority wording only. The physical/surface re-homing of the repairer
+   family to `Boquilhas > Definições` requires a future workstream contract (same workstream
+   family, separate PLAN ACCEPT); it is **not authorized here**.
+
+### 31.4 Controlo Create and Controlo Approve remain distinct modules (normative, preservation)
+
+1. Controlo Create and Controlo Approve **continue as distinct modules** — distinct identities
+   (`controlo-create`, `controlo-approve`), distinct gates, sibling-non-satisfaction, the shared
+   destination never merging grants (§22, §21.5).
+2. **No generic architecture may be imposed** that forces their workflows, pages or surfaces to be
+   identical. The shared Peso read model (§26) is the approved sharing seam; rendering reuses
+   contract, not workflow homogenization.
+
+### 31.5 Deliberately NOT introduced
+
+No migration, no schema change, no new table, no new column, no new route, no authorization
+change and no code change. No Resumo table/route is created. The repairer family is not
+physically moved. No new settings surface is created.

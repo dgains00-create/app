@@ -2714,3 +2714,44 @@ schema change, no new table, no new column, no new route and no new domain conce
 implementation of this clarification is a service-level correction of the duplication snapshot
 path plus focused tests; the existing context schema and the existing snapshot composition logic
 are reused unchanged.
+
+---
+
+## 24. OWNER CLARIFICATION — JOB ON IS THE PLANNING CENTRE; BETA TOOLS ARE CREATED WITHOUT ARMAZÉM (CONFIRMATION — NO SUPERSESSION)
+
+**Authority:** direct OWNER clarification to the Job On / P2-T04 authority, issued after P2-T04 is
+CLOSED. This section **confirms** the closed P2-T04 model and registers the Owner's planning and
+creation decisions as current authority for all remaining Beta work. It **supersedes nothing**: it
+contradicts no earlier section and no other contract. P2-T04 is **not reopened**; no implementation
+is authorized or executed by this section (recorded at `dev/responses/OWNER_CLARIFICATION_PLANNING_CONTEXT_AND_ASSOCIATIONS_RESPONSE.md`).
+
+### 24.1 The planning-centre rule (normative, confirmation)
+
+1. **Job On is the centre of planning.** The `jobon_id` production occurrence, together with its
+   `cm_id` / `mf_id` / `bq_id` context snapshots, is the planning centre from which the other
+   operational modules receive their production context.
+2. **The context flows to the modules.** The necessary context **escapes to the consuming
+   modules** — Controlo consumes the CM context through `cm_id` (P2-T05), Boquilhas consumes the
+   BQ context through `bq_id` (P2-T07). No consuming module re-creates, re-owns or re-derives that
+   context; consumers read it (and may trigger its creation **through** `IJobOnService`, exactly as
+   the closed P2-T05/P2-T07 contracts already contract).
+3. This is the already-implemented, closed P2-T04 model (§6.1, §7); the Owner decision makes the
+   planning-centre reading explicit current authority so no future workstream re-interprets it.
+
+### 24.2 Tools can be created without Armazém (normative, confirmation)
+
+1. **Beta Ferramentas creation is canonical and has no Armazém dependency.** A canonical `tool_id`
+   can be created through the shared Tool orchestration without any Armazém involvement.
+2. **Absence of an Armazém location never blocks** creation or use of the `tool_id` — no
+   warehouse-location fact is required to create, keep, select, associate, snapshot or consume a
+   Tool in the Beta build.
+3. Armazém location/movement truth remains **outside Beta scope** (Armazém owns location truth —
+   §5.2 note, §21 Q6; master plan §14). Nothing here invents a location field, a warehouse
+   relation or an availability gating on the Tool.
+4. Confirmation only: this matches the implemented P2-T04 model (`tools` has no Armazém
+   dependency); the Owner decision registers it as explicit authority for all future Beta work.
+
+### 24.3 Deliberately NOT introduced
+
+No migration, no schema change, no new table, no new column, no new route, no new domain concept
+and no authorization change. No implementation is authorized by this section.
