@@ -137,6 +137,23 @@ availability/navigation registration, so P2-T04's surfaces exist but stay unreac
 workstream registers the Module as available. P2-T04 is **not** closed, and P2-T05 and later remain
 **NOT AUTHORIZED**.
 
+### 5.2 Owner clarification — Job On context snapshot invariant (recorded)
+
+A NEW OWNER CLARIFICATION to the Job On / P2-T04 authority (contract §23) SUPERSEDED the affected
+duplication wording: **every new Job On — normal creation AND duplication — creates new
+`cm_id`/`mf_id`/`bq_id` context snapshots from the CURRENT canonical Tool identities selected for
+that Job On; duplication reuses `tool_id` identities, never `cm_id`/`mf_id`/`bq_id` context
+identities.** Duplication now re-snapshots the current canonical Tool row through each source
+context's `tool_id` (the same snapshot path normal creation already used) instead of cloning the
+source context's frozen triple; the former readings (old §10.3 step 6, old §10.5 bullet, old §21
+Q16 default (a), old DUP7/CTX14 rows) are superseded and marked as such in the contract. Old
+contexts and source Job Ons remain immutable; P2-T07 movements stay keyed by each production's own
+`bq_id`; no new schema, snapshot field or domain concept was introduced (the frozen set
+`tool_type`/`tool_reference`/`tool_lot` and the existing snapshot composition logic are reused
+unchanged). Implementation and verification record:
+`dev/responses/P2_T04_JOB_ON_SNAPSHOT_OWNER_CLARIFICATION_RESPONSE.md`. P2-T04 remains CLOSED;
+waiting for ONE focused independent review of this snapshot invariant.
+
 ## 6. Explicit non-scope
 
 - Full Job On lifecycle (revisions, verification catalogue, family sheets, print orchestration).
