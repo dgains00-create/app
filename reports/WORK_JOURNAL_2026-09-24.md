@@ -109,3 +109,27 @@ Repo roles: `dgains00-create/app` = IMPLEMENTATION + historical decisions; `dgai
 * **Follow-up recommended:** do the small shared error-token extraction, then a narrow member removal
   slice; migrate the repairer cases of `ControloSettingsRepositoryIntegrationTests` and
   `ControloDefinicoesValidatorTests` to the Boquilhas service.
+
+---
+
+## ~14:35 — Controlo repairer dead-surface verification (expanded checklist re-run)
+
+* **Task:** Re-run the F-06 dead-surface verification against an expanded checklist (private helpers,
+  DI dependencies, module availability as a separate risk row) and anchor the baseline at current
+  `app/main`.
+* **Files/reports created:** updated `reports/CONTROLO_REPAIRER_DEAD_SURFACE_VERIFICATION.md`
+  (commit `3d955fc`); this journal entry.
+* **What was learned or changed:** no change to the verdict or findings — the re-run **confirmed**
+  the prior result. Added §2.4 (DI dependencies: the two repository registrations stay because
+  Boquilhas resolves them; only the Controlo service's `_repairers`/`_assignments` fields become
+  unused), §2.5 (private helpers `AssertVersion`/`Refuse`/`Map` are all shared with the retained
+  PDF/email/glass members — none is exclusive to the repairer family), and a distinct §9
+  module-availability row (`CurrentBuildAvailable` stays `[]`).
+* **Important authority/architecture impact:** none new. Confirms `Boquilhas > Definições` is the
+  sole operational owner and the Controlo residual is dead; cleanup is a code move, not a schema
+  change.
+* **Decisions resolved:** none new (verdict unchanged at **B. CLEANUP REQUIRES SHARED EXTRACTION
+  FIRST**).
+* **Decisions still open:** the extraction option for the three shared error tokens; cleanup
+  scheduling.
+* **Follow-up recommended:** unchanged from the prior entry.
