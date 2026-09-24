@@ -179,8 +179,9 @@ P2-T08, P2-T10.
 
 ## 14. Contract-authored record
 
-**Status: CORRECTED (B1) — AWAITING FOCUSED ARCHITECT PLAN RE-REVIEW** (contract-authoring and
-B1-correction tasks, planning gate only; **no implementation**).
+**Status: IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW**
+(contract-authoring and B1-correction tasks recorded in §14–§15 below; the implementation is
+executed per §15).
 
 The implementation contract is `plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md` (authoring
 response `dev/responses/P2_T07_CONTRACT_AUTHORING_RESPONSE.md`). It fixes — over the accepted,
@@ -208,9 +209,23 @@ The Architect PLAN review (dmo-work `542a08a1…`) returned **PLAN REJECT — bl
 only**: the one-active-aggregate-per-anchor refusal was not race-safe as contracted. The B1
 correction (partial unique indexes `IX_boquilhas_active_bq_id`/`IX_boquilhas_active_tool_id` +
 exact 23505 → `Refused(ActiveAggregateExists)` mapping + race-safe create/reopen semantics) is
-applied at the corrected contract commit.
+applied at the corrected contract commit (`b884dd84…`).
 
-The contract is **not** self-accepted: it awaits the Architect focused PLAN re-review (B1) per
-`dmo-beta-master/WORKFLOW.md` step 6 (B3 remains OPEN until PLAN ACCEPT). Implementation is
-**NOT STARTED — NOT AUTHORIZED**. `ModuleRegistrations.CurrentBuildAvailable` remains `[]`.
+## 15. Implementation record
+
+**Status: IMPLEMENTED — AWAITING INDEPENDENT VERIFICATION / ARCHITECT IMPLEMENTATION REVIEW.**
+
+The focused Architect PLAN re-review (dmo-work `7c2479ebae50f8fe18a770fd373cffaae65a48e1`)
+returned **PLAN ACCEPT** — implementation AUTHORIZED against the corrected contract
+`b884dd84…` only. The P2-T07 implementation is executed per
+`dev/responses/P2_T07_IMPLEMENTATION_RESPONSE.md`: migration 007 `BoquilhasDomain` (the SIX
+contracted tables; the two ACTIVE partial unique active-anchor backstops; the scoped 23505 →
+`Refused(ActiveAggregateExists)` mapping), the movement ledger + replay-derived balance, the
+edit+audit single-event semantics, close/reopen on the SAME `boquilhas_id`, the local
+Histórico, 18 routes all gated `dmo.module.boquilhas`, and the full P2-T07 matrix (83 AC ↔ 86
+rows incl. K6/K7/K8 REAL PostgreSQL races). Full unit + integration suites green on a fresh
+disposable PostgreSQL.
+
+The workstream is **NOT self-verified and NOT closed**: it awaits independent verification and
+the Architect implementation review. `ModuleRegistrations.CurrentBuildAvailable` remains `[]`.
 **P2-T08 / P2-T10 remain NOT AUTHORIZED.**
