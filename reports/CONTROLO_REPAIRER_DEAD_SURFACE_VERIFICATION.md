@@ -13,11 +13,17 @@ route, frontend or namespace was modified. The only artifact produced is this re
 
 | Item | Value |
 |---|---|
-| `app/main` SHA (verified against `origin/main`) | `6c39a481353f1ab9f6c71ac133d243424a55416f` |
+| `app/main` SHA (verified against `origin/main`) | `c1898c106586b0ea00f9a4a35f92b2ec1c285539` |
+| Source-code state examined for this verification | `6c39a481353f1ab9f6c71ac133d243424a55416f` |
 | `reference/main` SHA (verified against `origin/main`) | `cca33d472830ee52953b3cfa90018d20251d4983` |
 | `app` working tree at start | CLEAN |
 | `reference` working tree at start | CLEAN |
 | Application code modified by this task | **NO** (report only) |
+
+Note: `app/main` advanced from the examined source-code state `6c39a48` to the current
+`c1898c1` only by documentation commits (this report and the work journal). No `src/**`, `tests/**`
+or `**/Migrations/**` file differs between the two states, so every line reference below remains
+valid at the current `app/main`.
 
 ---
 
@@ -69,6 +75,31 @@ Declared in `src/DMO.Application/ControloCreate/IControloDefinicoesService.cs`, 
 **Inventory note:** `ControloDefinicoesValidator.Validate(ClearMachineAssignmentCommand)` exists but
 is **only** reached by the residual member 6 and by a unit test; the refused-`CLEAR` path does not
 appear in production.
+
+### 2.4 DI dependencies of the residual surface
+
+| Dependency | Registered | Role in the residual surface | Still needed after cleanup? |
+|---|---|---|---|
+| `IControloDefinicoesService` → `ControloDefinicoesService` | `src/DMO.Web/Program.cs:149` (`AddScoped`) | the whole Controlo Definições service | **YES** — resolves the retained PDF/email/glass members |
+| `IRepairerRepository` → `RepairerRepository` | persistence registration | member 1–3 reads/writes; member 5 repairer existence check | **YES** (shared with Boquilhas); only the Controlo service's **field** becomes unused |
+| `IMachineRepairerAssignmentRepository` → `MachineRepairerAssignmentRepository` | persistence registration | member 4–6 reads/writes | **YES** (shared with Boquilhas); only the Controlo service's **field** becomes unused |
+| `IBoquilhasDefinicoesService` → `BoquilhasDefinicoesService` | `src/DMO.Web/Program.cs:171` (`AddScoped`) | the live owner surface over the same two repositories | **YES** (untouched) |
+
+The Controlo service's constructor takes seven dependencies; the two repairer repositories
+(`_repairers`, `_assignments`) are used **only** by the six residual members. Removing those members
+leaves those two constructor parameters/fields unused (a cleanup detail, not a DI registration
+change). The repository **registrations** themselves stay, because Boquilhas resolves them.
+
+### 2.5 Private helpers of the Controlo service (repairer path)
+
+| Helper | Location | Used by the residual surface | Still needed after cleanup? |
+|---|---|---|---|
+| `AssertVersion(int persisted, int expected, string label)` | `ControloDefinicoesService.cs` | members 3, 5 (version guard) | **YES** — also used by the retained PDF/email members |
+| `Refuse(SettingsRefusalReason, string)` | `ControloDefinicoesService.cs` | members 3, 5, 6 (stale-version refusal) | **YES** — also used by retained members |
+| `Map(ControloPersistenceException)` | `ControloDefinicoesService.cs` | members 2, 3, 5 (23505/23503 mapping) | **YES** — also used by retained members |
+
+**Helper conclusion:** no private helper is exclusive to the repairer family; all three helpers are
+shared with the retained members, so none is a removal candidate. (This matches §8.2.)
 
 ---
 
@@ -302,6 +333,7 @@ assignments and existing Boquilhas behavior.
 | Boquilhas movement history | **NO** | Historical preservation is the stored `boquilha_movements.repairer_id` (+ audit before/after columns) and its FK to `repairers`. The cleanup removes no table/column/FK and does not touch `BoquilhasService` or the Boquilhas repository. |
 | Database migrations | **NO** | No migration is added, changed or removed; migrations 001–008 stay byte-identical; no column/table/FK is dropped. |
 | Authorization / module gates | **NO** | The six dead members are not bound to any route; the Controlo group policy (`controlo-create`) and the Boquilhas group policy are unchanged. Removing an unbound service member changes no gate. |
+| Module availability | **NO** | `ModuleRegistrations.CurrentBuildAvailable` stays `[]`; the cleanup registers nothing and removes no availability entry. No module becomes available or unavailable. |
 | **Build (the one real risk)** | **YES (must handle)** | Boquilhas references `ControloDefinicoesValidationErrors.{NameRequired,RepairerNotFound,MachineUnknown}`. Deleting that class without extracting the three constants would break the build. This is the sole blocker and it is a code-move, not a behavior change. |
 
 ---
