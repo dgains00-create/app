@@ -1,14 +1,19 @@
-/* P2-T07 Boquilhas page-owned styles (Registo + Novo + Histórico).
+/* P2-T07 Boquilhas page-owned styles (Registo + Novo + Histórico) — the production movement
+ * register (OWNER CLARIFICATION).
  *
- * Authority: P2-T07 contract §25/App. C — DMO FIXED DESKTOP LAYOUT POLICY.
- * Canonical validation viewport: 1366 × 768. Region-stable composition (R1–R6, N1–N4, H1–H3):
+ * Authority: P2-T07 fixed-desktop layout policy — DMO FIXED DESKTOP LAYOUT POLICY.
+ * Canonical validation viewport: 1366 × 768. Region-stable composition:
  * NO @media / @container / @supports structural rule, NO width listener, NO table→card
  * conversion, NO required-column hiding and NO action relocation exist in this file — the
- * layout, scrolling and the shared primitives (DenseDataTable, DecisionBar, AuditTrail,
+ * layout, scrolling and the shared primitives (DenseDataTable, AuditTrail,
  * ToolPicker, RecordStatus) come from the shared A1/A2 contract styles; this file only composes
  * the page-owned regions on top of the shared design tokens of dmo-tokens.css. No token is
  * re-declared and no colour-literal system is introduced: every value below comes from the
  * shared tokens.
+ *
+ * Superseded (OWNER CLARIFICATION): the lifecycle styles (status/close/reopen/open-facts/
+ * reason/standalone-flow) are removed with the lifecycle model — there is no close/reopen UI,
+ * no standalone flow and no opening-facts surface anywhere.
  */
 .dmo-boquilhas {
   display: flex;
@@ -76,11 +81,16 @@
   color: var(--dmo-muted);
 }
 
+.dmo-boquilhas__hint {
+  color: var(--dmo-muted);
+  margin: 0;
+}
+
 .dmo-boquilhas__route-map {
   display: none;
 }
 
-/* R2/H3 — the opened aggregate register ------------------------------------------------ */
+/* The opened register head + production-context panel (REAL facts; never a simulated sidebar) */
 .dmo-boquilhas__ficha-head {
   display: flex;
   align-items: center;
@@ -95,14 +105,20 @@
   color: var(--dmo-ink);
 }
 
-.dmo-boquilhas__anchor,
 .dmo-boquilhas__facts,
-.dmo-boquilhas__balance,
 .dmo-boquilhas__panel-facts {
   display: flex;
   flex-wrap: wrap;
   gap: var(--dmo-space-3) var(--dmo-space-5);
   margin: 0;
+}
+
+/* The production-line contextual panel (read-only REAL context). */
+.dmo-boquilhas__panel-facts {
+  border: 1px solid var(--dmo-line);
+  border-radius: var(--dmo-radius);
+  padding: var(--dmo-space-3) var(--dmo-space-4);
+  background: var(--dmo-surface-muted);
 }
 
 .dmo-boquilhas__fact {
@@ -124,19 +140,6 @@
 
 .dmo-boquilhas__negative {
   color: var(--dmo-danger);
-}
-
-/* R6 — production-line contextual panel (read-only REAL context; never a simulated sidebar) */
-.dmo-boquilhas__panel {
-  border: 1px solid var(--dmo-line);
-  border-radius: var(--dmo-radius);
-  padding: var(--dmo-space-3) var(--dmo-space-4);
-  background: var(--dmo-surface-muted);
-}
-
-.dmo-boquilhas__panel-standalone {
-  margin: 0;
-  color: var(--dmo-muted);
 }
 
 /* Movement ledger (selection/open arbitration is the shared DenseDataTable rule; the ledger
@@ -170,10 +173,12 @@
   outline-offset: -3px;
 }
 
-/* R3/N4 — entry / opening-facts forms -------------------------------------------------- */
+.dmo-boquilhas__ledger .dmo-boquilhas__selected {
+  background: var(--dmo-surface-muted);
+}
+
+/* Movement entry / Tool-create forms (actions OUTSIDE the tables) */
 .dmo-boquilhas__entry,
-.dmo-boquilhas__opening,
-.dmo-boquilhas__flow,
 .dmo-boquilhas__tool-create {
   display: flex;
   flex-direction: column;
@@ -190,12 +195,6 @@
 
 .dmo-boquilhas__entry[disabled] {
   opacity: .7;
-}
-
-.dmo-boquilhas__flow-option {
-  display: flex;
-  align-items: center;
-  gap: var(--dmo-space-2);
 }
 
 .dmo-boquilhas__machines {
@@ -217,22 +216,60 @@
   flex-wrap: wrap;
 }
 
-.dmo-boquilhas__reason {
+.dmo-boquilhas__tool-create-actions {
   display: flex;
   align-items: center;
   gap: var(--dmo-space-3);
   flex-wrap: wrap;
 }
 
-/* R5 — movement edit/detail trail ----------------------------------------------------- */
+.dmo-boquilhas__productions,
+.dmo-boquilhas__jobon {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dmo-space-2);
+}
+
+.dmo-boquilhas__production {
+  font: inherit;
+  text-align: left;
+  padding: .3rem .5rem;
+  border: 1px solid var(--dmo-line);
+  border-radius: var(--dmo-radius);
+  background: var(--dmo-surface);
+  color: var(--dmo-ink);
+  cursor: pointer;
+  min-height: var(--dmo-control-height);
+}
+
+/* Movement edit/detail trail */
 .dmo-boquilhas__trail {
   border: 1px solid var(--dmo-line);
   border-radius: var(--dmo-radius);
   padding: var(--dmo-space-3) var(--dmo-space-4);
 }
 
-/* Adapter-hidden states (never display:block) ----------------------------------------- */
-.dmo-boquilhas__adapter-state,
+/* Adapter state surface (D2): the explicit errors/conflict presentation with the reload recovery */
+.dmo-boquilhas__state {
+  border: 1px solid var(--dmo-line);
+  border-radius: var(--dmo-radius);
+  padding: var(--dmo-space-3) var(--dmo-space-4);
+  background: var(--dmo-surface-muted);
+}
+
+.dmo-boquilhas__state--error {
+  border-color: var(--dmo-danger);
+}
+
+.dmo-boquilhas__state--conflict {
+  border-color: var(--dmo-warning, goldenrod);
+}
+
+.dmo-boquilhas__state p {
+  margin: 0 0 var(--dmo-space-2);
+}
+
+/* Adapter-hidden states (never display:block) */
 .dmo-boquilhas__candidate-map,
 .dmo-boquilhas__resolutions {
   display: none;

@@ -1,881 +1,742 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Text.Json;
-using DMO.Application.Access;
+using DMO.Application.Boquilhas;
+using DMO.Domain.Boquilhas;
+using DMO.Domain.Tools;
 using DMO.IntegrationTests.JobOn;
-using DMO.IntegrationTests.Navigation;
-using DMO.Web.Endpoints;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Xunit;
 
 namespace DMO.IntegrationTests.Boquilhas;
 
 /// <summary>
-/// P2-T07 endpoint behavior tests (contract §29 HTTP-class rows): the 15 minimal-API routes over
-/// the real <see cref="BoquilhasService"/> and the in-memory composition — transport shapes,
-/// typed results, the exact 400/404/409 vocabulary and the consumed reads.
+/// P2-T07 endpoint tests (OWNER CLARIFICATION): the critical executable coverage of the
+/// production movement register — production association, movements after the production end
+/// date, the three-type vocabulary, the derived outstanding replay, the Entrada sem reparação
+/// semantics, the edit/audit single-event rule, the repairer historical preservation, the local
+/// Histórico and the register identity creation WITHOUT a quantity event.
 /// </summary>
 public sealed class BoquilhasEndpointsTests
 {
-    private static readonly Guid MissingId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    // ------------------------------------------------------------------ arrangement
 
-    private static string Json(object value) => P2T07TestHost.Json(value);
-
-    // ================================================================== create (route 7)
-
-    /// <summary>I3 (AC-I3) — a supplied non-existent bq_id is refused: 400 BQ_CONTEXT_NOT_FOUND.</summary>
-    [Fact]
-    public async Task I3_ANonExistentBqIdIsRefusedWithBqContextNotFound()
+    private static (P2T07TestStore Store, Guid JobOnId, Guid BqId) ArrangeProduction(
+        P2T07TestStore store,
+        string reference = "REF-1",
+        string production = "P1",
+        string machine = "B1",
+        DateOnly? productionDate = null)
     {
-        using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted());
-        using var client = factory.CreateClient();
-
-        var response = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, "/boquilhas/aggregates", Json(new
-        {
-            bqId = MissingId,
-            machines = new[] { "B1" },
-            initialQuantity = 10,
-            openingDate = "2026-09-10",
-        }));
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var payload = JsonSerializer.Deserialize<JsonElement>(await response.Content.ReadAsStringAsync());
-        Assert.Equal("validation-failed", payload.GetProperty("reason").GetString());
-        Assert.Contains("BQ_CONTEXT_NOT_FOUND", payload.GetProperty("errors").EnumerateArray().Select(e => e.GetString()));
+        var tool = store.SeedTool(ToolType.Bq, "5447T173", "LOTE-1");
+        var (jobOnId, bqId) = store.SeedProductionWithBq(
+            reference, production, tool.ToolId.Value, machine, productionDate);
+        return (store, jobOnId, bqId);
     }
 
-    /// <summary>I2/I3 (AC-I2/AC-I3) — a standalone create anchors a real BQ Tool and succeeds;
-    /// a non-BQ Tool is refused with TOOL_TYPE_MISMATCH.</summary>
+    private static Guid SeedRepairer(P2T07TestStore store, string name = "Reparador Externo A") =>
+        store.SeedRepairer(name).RepairerId.Value;
+
+    // 1. production association — every register belongs to a REAL Job On/BQ context ----------
+
     [Fact]
-    public async Task I2I3_StandaloneCreateAnchorsTheRealBqToolAndNonBqToolsAreRefused()
+    public async Task T1_RegisterCreationAnchorsARealBqContext()
     {
         var store = new P2T07TestStore();
-        var bqTool = store.SeedTool(DMO.Domain.Tools.ToolType.Bq, "BQ-100", "L1", machines: "B1");
-        var cmTool = store.SeedTool(DMO.Domain.Tools.ToolType.Cm, "CM-200", "L2", machines: "B1");
+        var (_, _, bqId) = ArrangeProduction(store);
 
         using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
-        using var client = factory.CreateClient();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        // A CM Tool can never anchor a Boquilhas aggregate (TOOL_TYPE_MISMATCH).
-        var mismatch = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, "/boquilhas/aggregates", Json(new
-        {
-            toolId = cmTool.ToolId.Value,
-            machines = new[] { "B1" },
-            initialQuantity = 10,
-            openingDate = "2026-09-10",
-        }));
-        Assert.Equal(HttpStatusCode.BadRequest, mismatch.StatusCode);
+        using var create = await P2T07TestHost.SendJsonAsync(
+            client, HttpMethod.Post, "/boquilhas/registers", P2T07TestHost.Json(new { bqId }));
 
-        var created = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, "/boquilhas/aggregates", Json(new
-        {
-            toolId = bqTool.ToolId.Value,
-            machines = new[] { "B1", "C1" },
-            initialQuantity = 10,
-            openingDate = "2026-09-10",
-            utilisationPercent = 25.5m,
-        }));
-        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
-        var createdPayload = JsonSerializer.Deserialize<JsonElement>(await created.Content.ReadAsStringAsync());
-        var id = createdPayload.GetProperty("boquilhasId").GetGuid();
-        Assert.Equal(1, createdPayload.GetProperty("version").GetInt32());
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
 
-        // The ficha anchors tool_id ONLY: no bq_id, no fake Job On (I2).
-        var ficha = await P2T07TestHost.GetAsync(client, $"/boquilhas/aggregates/{id}");
-        var fichaPayload = JsonSerializer.Deserialize<JsonElement>(await ficha.Content.ReadAsStringAsync());
-        var fichaBody = fichaPayload.GetProperty("ficha");
-        Assert.Equal(bqTool.ToolId.Value, fichaBody.GetProperty("toolId").GetGuid());
-        Assert.Equal(JsonValueKind.Null, fichaBody.GetProperty("bqId").ValueKind);
-        Assert.Equal("BQ-100", fichaBody.GetProperty("reference").GetString());
-        Assert.Equal(10, fichaBody.GetProperty("balance").GetProperty("disponivel").GetInt32());
-        Assert.Equal(2, fichaBody.GetProperty("machines").EnumerateArray().Count());
+        var created = await create.Content.ReadFromJsonAsync<RegisterCreatedResponse>();
+        Assert.NotNull(created?.BoquilhasId);
+        Assert.NotEqual(Guid.Empty, created.BoquilhasId);
+
+        // The register belongs to the REAL production: the ficha resolves the context.
+        using var ficha = await P2T07TestHost.GetAsync(
+            client, $"/boquilhas/registers/{created.BoquilhasId}");
+
+        Assert.Equal(HttpStatusCode.OK, ficha.StatusCode);
+        var payload = await ficha.Content.ReadFromJsonAsync<FichaEnvelope>();
+        Assert.NotNull(payload?.Ficha);
+        Assert.Equal(bqId, payload.Ficha.BqId);
+        Assert.NotNull(payload.Ficha.Production);
+        Assert.Equal("P1", payload.Ficha.Production.ProductionNumber);
     }
 
-    /// <summary>I1 (AC-I1) — a production-linked create anchors the REAL bq_id: jobon_id and the
-    /// canonical tool_id are reachable through it, never duplicated.</summary>
     [Fact]
-    public async Task I1_ProductionLinkedCreateAnchorsTheRealBqId()
+    public async Task T2_RegisterCreationWithAFakeBqId_IsRefused()
     {
         var store = new P2T07TestStore();
-        var tool = store.SeedTool(DMO.Domain.Tools.ToolType.Bq, "BQ-100", "L1", machines: "B1");
-        var jobOn = store.SeedJobOnWithBqContext(
-            "REF-1", "P1", "B1", tool.ToolId.Value, tool.Reference, tool.Lot);
-        var bqId = jobOn.Contexts[0].ContextId;
 
         using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
-        using var client = factory.CreateClient();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var created = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, "/boquilhas/aggregates", Json(new
-        {
-            bqId,
-            machines = new[] { "B1" },
-            initialQuantity = 10,
-            openingDate = "2026-09-10",
-        }));
-        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
-        var createdPayload = JsonSerializer.Deserialize<JsonElement>(await created.Content.ReadAsStringAsync());
-        var id = createdPayload.GetProperty("boquilhasId").GetGuid();
+        using var create = await P2T07TestHost.SendJsonAsync(
+            client, HttpMethod.Post, "/boquilhas/registers",
+            P2T07TestHost.Json(new { bqId = Guid.NewGuid() }));
 
-        // The ficha presents the REAL production context via bq_id → job_ons and the frozen triple.
-        var ficha = await P2T07TestHost.GetAsync(client, $"/boquilhas/aggregates/{id}");
-        var fichaBody = JsonSerializer.Deserialize<JsonElement>(await ficha.Content.ReadAsStringAsync())
-            .GetProperty("ficha");
-        Assert.Equal(bqId, fichaBody.GetProperty("bqId").GetGuid());
-        Assert.Equal("REF-1", fichaBody.GetProperty("production").GetProperty("reference").GetString());
-        Assert.Equal("P1", fichaBody.GetProperty("production").GetProperty("productionNumber").GetString());
-        Assert.Equal("BQ-100", fichaBody.GetProperty("anchor").GetProperty("frozenToolReference").GetString());
-        Assert.Equal("L1", fichaBody.GetProperty("anchor").GetProperty("frozenToolLot").GetString());
+        Assert.Equal(HttpStatusCode.BadRequest, create.StatusCode);
+        var payload = await create.Content.ReadFromJsonAsync<ValidationEnvelope>();
+        Assert.Contains(BoquilhasValidationErrors.BqContextNotFound, payload?.Errors ?? []);
+        Assert.Equal(0, store.RegisterCount);
     }
 
-    /// <summary>S7/Q-CREATE (AC-C6 facet) — a second ACTIVE aggregate for the same anchor is refused
-    /// with 409 active-aggregate-exists, nothing written.</summary>
     [Fact]
-    public async Task ActiveAggregateExists_SecondActiveAggregateForTheSameAnchorIsRefused()
+    public async Task T3_RegisterCreation_DoesNotManufactureAMovement()
     {
         var store = new P2T07TestStore();
-        var tool = store.SeedTool(DMO.Domain.Tools.ToolType.Bq, "BQ-100", "L1", machines: "B1");
+        var (_, _, bqId) = ArrangeProduction(store);
 
         using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
-        using var client = factory.CreateClient();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var create = new Action<Task<HttpResponseMessage>>(_ => { });
-        var payload = Json(new
-        {
-            toolId = tool.ToolId.Value,
-            machines = new[] { "B1" },
-            initialQuantity = 10,
-            openingDate = "2026-09-10",
-        });
+        using var create = await P2T07TestHost.SendJsonAsync(
+            client, HttpMethod.Post, "/boquilhas/registers", P2T07TestHost.Json(new { bqId }));
+        var created = await create.Content.ReadFromJsonAsync<RegisterCreatedResponse>();
 
-        var first = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, "/boquilhas/aggregates", payload);
+        using var ficha = await P2T07TestHost.GetAsync(
+            client, $"/boquilhas/registers/{created!.BoquilhasId}");
+
+        var payload = await ficha.Content.ReadFromJsonAsync<FichaEnvelope>();
+        Assert.NotNull(payload?.Ficha);
+        Assert.Equal(0, payload.Ficha.Outstanding);
+        Assert.Empty(payload.Ficha.Movements);
+    }
+
+    [Fact]
+    public async Task T4_RegisterCreation_OneRegisterPerBqContext()
+    {
+        var store = new P2T07TestStore();
+        var (_, _, bqId) = ArrangeProduction(store);
+
+        using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        using var first = await P2T07TestHost.SendJsonAsync(
+            client, HttpMethod.Post, "/boquilhas/registers", P2T07TestHost.Json(new { bqId }));
         Assert.Equal(HttpStatusCode.Created, first.StatusCode);
 
-        var second = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, "/boquilhas/aggregates", payload);
+        using var second = await P2T07TestHost.SendJsonAsync(
+            client, HttpMethod.Post, "/boquilhas/registers", P2T07TestHost.Json(new { bqId }));
+
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
-        var refusal = JsonSerializer.Deserialize<JsonElement>(await second.Content.ReadAsStringAsync());
-        Assert.Equal("active-aggregate-exists", refusal.GetProperty("reason").GetString());
-
-        Assert.Equal(1, store.AggregateCount);
+        var refusal = await second.Content.ReadFromJsonAsync<RefusalEnvelope>();
+        Assert.Equal("register-exists", refusal?.Reason);
     }
 
-    // ================================================================== movements (routes 8/9)
+    // 2. production-ended case — movement recorded after the production end date --------------
 
-    /// <summary>V3 (AC-V3) — any other type string → 400 MOVEMENT_TYPE_INVALID, nothing written.</summary>
     [Fact]
-    public async Task V3_AnInvalidMovementTypeIsRefusedWithMovementTypeInvalid()
+    public async Task T5_AProductionEndedOn09027_StillAcceptsAMovementOn09029()
     {
         var store = new P2T07TestStore();
-        var tool = store.SeedTool(DMO.Domain.Tools.ToolType.Bq, "BQ-100", "L1", machines: "B1");
+        var (_, _, bqId) = ArrangeProduction(
+            store, productionDate: new DateOnly(2026, 9, 27));
+        var repairerId = SeedRepairer(store);
+        var register = store.SeedRegister(bqId, (MovementKind.Saida, 10, new DateOnly(2026, 9, 25), "B1", repairerId));
 
         using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
-        using var client = factory.CreateClient();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var id = await CreateAsync(client, Json(new
-        {
-            toolId = tool.ToolId.Value,
-            machines = new[] { "B1" },
-            initialQuantity = 10,
-            openingDate = "2026-09-10",
-        }));
+        // 29/09 — AFTER the production ended on 27/09: perfectly valid.
+        using var append = await P2T07TestHost.SendJsonAsync(
+            client,
+            HttpMethod.Post,
+            $"/boquilhas/registers/{register.BoquilhasId.Value}/movements",
+            P2T07TestHost.Json(new
+            {
+                movementType = "entrada_sem_reparacao",
+                quantity = 6,
+                businessDate = "2026-09-29",
+            }));
 
-        var append = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, $"/boquilhas/aggregates/{id}/movements", Json(new
-        {
-            expectedAggregateVersion = 1,
-            movementType = "editar",
-            quantity = 2,
-            businessDate = "2026-09-11",
-        }));
-        Assert.Equal(HttpStatusCode.BadRequest, append.StatusCode);
-        var payload = JsonSerializer.Deserialize<JsonElement>(await append.Content.ReadAsStringAsync());
-        Assert.Equal("validation-failed", payload.GetProperty("reason").GetString());
-        Assert.Contains("MOVEMENT_TYPE_INVALID", payload.GetProperty("errors").EnumerateArray().Select(e => e.GetString()));
+        Assert.Equal(HttpStatusCode.Created, append.StatusCode);
 
-        Assert.Equal(1, store.AggregateCount);
+        using var ficha = await P2T07TestHost.GetAsync(
+            client, $"/boquilhas/registers/{register.BoquilhasId.Value}");
+
+        var payload = await ficha.Content.ReadFromJsonAsync<FichaEnvelope>();
+        Assert.NotNull(payload?.Ficha);
+        Assert.Equal(2, payload.Ficha.Movements.Count);
+        Assert.Equal(4, payload.Ficha.Outstanding);
+        // The production stays the historical context.
+        Assert.Equal("P1", payload.Ficha.Production?.ProductionNumber);
+        Assert.Equal(new DateOnly(2026, 9, 27), payload.Ficha.Production?.ProductionDate);
     }
 
-    /// <summary>V4 (AC-V4) — a second Início append → 409 only-one-inicio; exactly one Início exists.</summary>
+    // 3. movement vocabulary — Saída / Entrada / Entrada sem reparação; no Início, no Irreparável
+
     [Fact]
-    public async Task V4_ASecondInicioAppendIsRefusedWithOnlyOneInicio()
+    public async Task T6_TheThreeMovementTypes_AreAcceptedAndDistinct()
     {
         var store = new P2T07TestStore();
-        var tool = store.SeedTool(DMO.Domain.Tools.ToolType.Bq, "BQ-100", "L1", machines: "B1");
+        var (_, _, bqId) = ArrangeProduction(store);
+        var repairerId = SeedRepairer(store);
+        var register = store.SeedRegister(bqId);
 
         using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
-        using var client = factory.CreateClient();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var id = await CreateAsync(client, Json(new
-        {
-            toolId = tool.ToolId.Value,
-            machines = new[] { "B1" },
-            initialQuantity = 10,
-            openingDate = "2026-09-10",
-        }));
+        // Saída (machine + repairer required), Entrada, Entrada sem reparação.
+        var saida = await AppendAsync(client, register, "saida", 10, "2026-09-25", "B1", repairerId);
+        var entrada = await AppendAsync(client, register, "entrada", 4, "2026-09-27", null, null);
+        var semReparacao = await AppendAsync(client, register, "entrada_sem_reparacao", 6, "2026-09-29", null, null);
 
-        var append = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, $"/boquilhas/aggregates/{id}/movements", Json(new
-        {
-            expectedAggregateVersion = 1,
-            movementType = "inicio",
-            quantity = 5,
-            businessDate = "2026-09-11",
-        }));
-        Assert.Equal(HttpStatusCode.Conflict, append.StatusCode);
-        var payload = JsonSerializer.Deserialize<JsonElement>(await append.Content.ReadAsStringAsync());
-        Assert.Equal("only-one-inicio", payload.GetProperty("reason").GetString());
-    }
-
-    /// <summary>B3 (AC-B3) — a Saída exceeding Disponível → 409 saida-exceeds-available, nothing
-    /// written; a Saída exactly equal to Disponível succeeds.</summary>
-    [Fact]
-    public async Task B3_SaidaExceedingAvailableIsRefusedAndExactlyAvailableSucceeds()
-    {
-        var store = new P2T07TestStore();
-        var tool = store.SeedTool(DMO.Domain.Tools.ToolType.Bq, "BQ-100", "L1", machines: "B1");
-        var repairer = store.SeedRepairer("Reparador A");
-
-        using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
-        using var client = factory.CreateClient();
-
-        var id = await CreateAsync(client, Json(new
-        {
-            toolId = tool.ToolId.Value,
-            machines = new[] { "B1" },
-            initialQuantity = 10,
-            openingDate = "2026-09-10",
-        }));
-
-        var exceed = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, $"/boquilhas/aggregates/{id}/movements", Json(new
-        {
-            expectedAggregateVersion = 1,
-            movementType = "saida",
-            quantity = 11,
-            businessDate = "2026-09-11",
-            machine = "B1",
-            repairerId = repairer.RepairerId.Value,
-        }));
-        Assert.Equal(HttpStatusCode.Conflict, exceed.StatusCode);
-        var refusal = JsonSerializer.Deserialize<JsonElement>(await exceed.Content.ReadAsStringAsync());
-        Assert.Equal("saida-exceeds-available", refusal.GetProperty("reason").GetString());
-
-        var exact = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, $"/boquilhas/aggregates/{id}/movements", Json(new
-        {
-            expectedAggregateVersion = 1,
-            movementType = "saida",
-            quantity = 10,
-            businessDate = "2026-09-11",
-            machine = "B1",
-            repairerId = repairer.RepairerId.Value,
-        }));
-        Assert.Equal(HttpStatusCode.Created, exact.StatusCode);
-    }
-
-    /// <summary>B6/D1 (AC-B6/AC-D1) — an excess Entrada is neither clamped nor rejected and saves
-    /// normally with the operator-editable business date; the ficha shows the excess and the
-    /// negative Em reparação projection (non-blocking).</summary>
-    [Fact]
-    public async Task B6D1_ExcessEntradaIsRecordedWithAnOperatorEditableBusinessDate()
-    {
-        var store = new P2T07TestStore();
-        var tool = store.SeedTool(DMO.Domain.Tools.ToolType.Bq, "BQ-100", "L1", machines: "B1");
-        var repairer = store.SeedRepairer("Reparador A");
-
-        using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
-        using var client = factory.CreateClient();
-
-        var id = await CreateAsync(client, Json(new
-        {
-            toolId = tool.ToolId.Value,
-            machines = new[] { "B1" },
-            initialQuantity = 10,
-            openingDate = "2026-09-10",
-        }));
-
-        await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, $"/boquilhas/aggregates/{id}/movements", Json(new
-        {
-            expectedAggregateVersion = 1,
-            movementType = "saida",
-            quantity = 6,
-            businessDate = "2026-09-11",
-            machine = "B1",
-            repairerId = repairer.RepairerId.Value,
-        }));
-
-        // 8 returned when only 6 were in repair: recorded in full, NEVER clamped/rejected (AC-B6).
-        var entrada = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, $"/boquilhas/aggregates/{id}/movements", Json(new
-        {
-            expectedAggregateVersion = 2,
-            movementType = "entrada",
-            quantity = 8,
-            businessDate = "2026-09-12",
-        }));
+        Assert.Equal(HttpStatusCode.Created, saida.StatusCode);
         Assert.Equal(HttpStatusCode.Created, entrada.StatusCode);
-        var entradaPayload = JsonSerializer.Deserialize<JsonElement>(await entrada.Content.ReadAsStringAsync());
-        Assert.NotEqual(Guid.Empty, entradaPayload.GetProperty("movementId").GetGuid());
+        Assert.Equal(HttpStatusCode.Created, semReparacao.StatusCode);
 
-        var ficha = await P2T07TestHost.GetAsync(client, $"/boquilhas/aggregates/{id}");
-        var body = JsonSerializer.Deserialize<JsonElement>(await ficha.Content.ReadAsStringAsync()).GetProperty("ficha");
-        var ledger = body.GetProperty("movements").EnumerateArray().ToList();
+        using var ficha = await P2T07TestHost.GetAsync(
+            client, $"/boquilhas/registers/{register.BoquilhasId.Value}");
 
-        var entradaRow = ledger.Single(m => m.GetProperty("movementType").GetString() == "entrada");
-        Assert.Equal(8, entradaRow.GetProperty("quantity").GetInt32());
-        Assert.Equal(6, entradaRow.GetProperty("expectedReturnQuantity").GetInt32());
-        Assert.Equal(2, entradaRow.GetProperty("excessReceivedQuantity").GetInt32());
-        Assert.Equal("2026-09-12", entradaRow.GetProperty("businessDate").GetString());
-
-        // Disponível 10 - 6 + 8 = 12; Em reparação 6 - 8 = -2 (negative, visible, non-blocking).
-        Assert.Equal(12, body.GetProperty("balance").GetProperty("disponivel").GetInt32());
-        Assert.Equal(-2, body.GetProperty("balance").GetProperty("emReparacao").GetInt32());
-        Assert.Equal(2, body.GetProperty("balance").GetProperty("entradaExcecional").GetInt32());
+        var payload = await ficha.Content.ReadFromJsonAsync<FichaEnvelope>();
+        Assert.NotNull(payload?.Ficha);
+        Assert.Equal(
+            ["saida", "entrada", "entrada_sem_reparacao"],
+            payload.Ficha.Movements.Select(movement => movement.MovementType));
     }
 
-    /// <summary>R1 (AC-R1) — the machine → current assignment → repairer resolution: the
-    /// assignments read returns the current assignment and the saved Saída stores the final
-    /// selected repairer.</summary>
-    [Fact]
-    public async Task R1_MachineAssignmentsResolveAndTheSavedSaidaStoresTheFinalRepairer()
+    [Theory]
+    [InlineData("inicio")]
+    [InlineData("irreparavel")]
+    [InlineData("editar")]
+    public async Task T7_SupersededMovementTypes_AreRefused(string supersededType)
     {
         var store = new P2T07TestStore();
-        var tool = store.SeedTool(DMO.Domain.Tools.ToolType.Bq, "BQ-100", "L1", machines: "B1");
-        var repairer = store.SeedRepairer("Reparador B1");
-        store.SeedAssignment("B1", repairer.RepairerId.Value);
+        var (_, _, bqId) = ArrangeProduction(store);
+        var register = store.SeedRegister(bqId);
 
         using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
-        using var client = factory.CreateClient();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var assignments = await P2T07TestHost.GetAsync(client, "/boquilhas/machine-assignments");
-        var assignmentPayload = JsonSerializer.Deserialize<JsonElement>(await assignments.Content.ReadAsStringAsync());
-        var b1 = assignmentPayload.GetProperty("assignments").EnumerateArray()
-            .Single(entry => entry.GetProperty("machine").GetString() == "B1");
-        Assert.Equal(repairer.RepairerId.Value, b1.GetProperty("repairerId").GetGuid());
-        Assert.Equal("Reparador B1", b1.GetProperty("repairerName").GetString());
-        Assert.False(b1.GetProperty("assignmentUnavailable").GetBoolean());
+        using var response = await AppendAsync(
+            client, register, supersededType, 1, "2026-09-25", null, null);
 
-        var c1 = assignmentPayload.GetProperty("assignments").EnumerateArray()
-            .Single(entry => entry.GetProperty("machine").GetString() == "C1");
-        Assert.True(c1.GetProperty("assignmentUnavailable").GetBoolean());
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ValidationEnvelope>();
+        Assert.Contains(BoquilhasValidationErrors.MovementTypeInvalid, payload?.Errors ?? []);
     }
 
-    /// <summary>R5 (AC-R5) — an external Saída without machine/repairer → 400 MACHINE_REQUIRED /
-    /// REPAIRER_REQUIRED with nothing written.</summary>
     [Fact]
-    public async Task R5_ExternalSaidaRequiresMachineAndRepairer()
+    public async Task T8_SaidaRequiresMachineAndRepairer()
     {
         var store = new P2T07TestStore();
-        var tool = store.SeedTool(DMO.Domain.Tools.ToolType.Bq, "BQ-100", "L1", machines: "B1");
+        var (_, _, bqId) = ArrangeProduction(store);
+        var register = store.SeedRegister(bqId);
 
         using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
-        using var client = factory.CreateClient();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var id = await CreateAsync(client, Json(new
+        var payload = new
         {
-            toolId = tool.ToolId.Value,
-            machines = new[] { "B1" },
-            initialQuantity = 10,
-            openingDate = "2026-09-10",
-        }));
-
-        var noMachine = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, $"/boquilhas/aggregates/{id}/movements", Json(new
-        {
-            expectedAggregateVersion = 1,
             movementType = "saida",
-            quantity = 2,
-            businessDate = "2026-09-11",
-        }));
-        Assert.Equal(HttpStatusCode.BadRequest, noMachine.StatusCode);
-        var payload = JsonSerializer.Deserialize<JsonElement>(await noMachine.Content.ReadAsStringAsync());
-        var errors = payload.GetProperty("errors").EnumerateArray().Select(e => e.GetString()).ToList();
-        Assert.Contains("MACHINE_REQUIRED", errors);
-        Assert.DoesNotContain(errors, error => error == "editar");
-
-        Assert.Equal(1, store.AggregateCount);
-    }
-
-    // ================================================================== edit + audit (routes 9/6)
-
-    /// <summary>E1/E2 (AC-E1/AC-E2) — Editar updates the SAME movement_id row with the exact
-    /// before/after audit values; the entry row count is unchanged.</summary>
-    [Fact]
-    public async Task E1E2_EditUpdatesTheSameMovementRowWithExactAuditFacts()
-    {
-        var store = new P2T07TestStore();
-        var tool = store.SeedTool(DMO.Domain.Tools.ToolType.Bq, "BQ-100", "L1", machines: "B1");
-        var repairer = store.SeedRepairer("Reparador A");
-
-        using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
-        using var client = factory.CreateClient();
-
-        var id = await CreateAsync(client, Json(new
-        {
-            toolId = tool.ToolId.Value,
-            machines = new[] { "B1" },
-            initialQuantity = 10,
-            openingDate = "2026-09-10",
-        }));
-
-        var appended = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, $"/boquilhas/aggregates/{id}/movements", Json(new
-        {
-            expectedAggregateVersion = 1,
-            movementType = "saida",
-            quantity = 6,
-            businessDate = "2026-09-11",
-            machine = "B1",
-            repairerId = repairer.RepairerId.Value,
-        }));
-        var appendedPayload = JsonSerializer.Deserialize<JsonElement>(await appended.Content.ReadAsStringAsync());
-        var movementId = appendedPayload.GetProperty("movementId").GetGuid();
-        var aggregateVersion = appendedPayload.GetProperty("aggregateVersion").GetInt32();
-
-        var edited = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Put, $"/boquilhas/aggregates/{id}/movements/{movementId}", Json(new
-        {
-            expectedAggregateVersion = aggregateVersion,
-            expectedMovementVersion = 1,
-            quantity = 4,
-            businessDate = "2026-09-13",
-            machine = "B1",
-            repairerId = repairer.RepairerId.Value,
-            observations = "corrigido",
-        }));
-        Assert.Equal(HttpStatusCode.OK, edited.StatusCode);
-
-        var ficha = await P2T07TestHost.GetAsync(client, $"/boquilhas/aggregates/{id}");
-        var body = JsonSerializer.Deserialize<JsonElement>(await ficha.Content.ReadAsStringAsync()).GetProperty("ficha");
-        var saida = body.GetProperty("movements").EnumerateArray()
-            .Single(m => m.GetProperty("movementType").GetString() == "saida");
-        Assert.Equal(movementId, saida.GetProperty("movementId").GetGuid());
-        Assert.Equal(4, saida.GetProperty("quantity").GetInt32());
-        Assert.Equal("2026-09-13", saida.GetProperty("businessDate").GetString());
-
-        // The movement row count is UNCHANGED by the edit: Início + the SAME edited Saída row —
-        // no second quantity event was created (AC-E1/E3).
-        Assert.Equal(2, body.GetProperty("movements").EnumerateArray().Count());
-
-        var trail = await P2T07TestHost.GetAsync(client, $"/boquilhas/aggregates/{id}/movements/{movementId}/audit");
-        var trailPayload = JsonSerializer.Deserialize<JsonElement>(await trail.Content.ReadAsStringAsync());
-        var entry = trailPayload.GetProperty("entries").EnumerateArray().Single();
-        Assert.Equal(6, entry.GetProperty("beforeQuantity").GetInt32());
-        Assert.Equal(4, entry.GetProperty("afterQuantity").GetInt32());
-        Assert.Equal("2026-09-11", entry.GetProperty("beforeBusinessDate").GetString());
-        Assert.Equal("2026-09-13", entry.GetProperty("afterBusinessDate").GetString());
-        Assert.Equal(P2T07TestHost.ActorUserId, entry.GetProperty("editedByUserId").GetGuid());
-    }
-
-    /// <summary>D2/D3 (AC-D2/AC-D3) — recorded_at is immutable across edits and changing
-    /// business_date never rewrites it nor changes the balance.</summary>
-    [Fact]
-    public async Task D2D3_RecordedAtIsImmutableAcrossBusinessDateEdits()
-    {
-        var store = new P2T07TestStore();
-        var tool = store.SeedTool(DMO.Domain.Tools.ToolType.Bq, "BQ-100", "L1", machines: "B1");
-
-        using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
-        using var client = factory.CreateClient();
-
-        var id = await CreateAsync(client, Json(new
-        {
-            toolId = tool.ToolId.Value,
-            machines = new[] { "B1" },
-            initialQuantity = 10,
-            openingDate = "2026-09-10",
-        }));
-
-        var before = await P2T07TestHost.GetAsync(client, $"/boquilhas/aggregates/{id}");
-        var beforeLedger = JsonSerializer.Deserialize<JsonElement>(await before.Content.ReadAsStringAsync())
-            .GetProperty("ficha").GetProperty("movements").EnumerateArray().ToList();
-        var inicio = beforeLedger.Single(m => m.GetProperty("movementType").GetString() == "inicio");
-        var recordedAtBefore = inicio.GetProperty("recordedAt").GetString();
-        var movementId = inicio.GetProperty("movementId").GetGuid();
-
-        // Edit only business_date (AC-D3).
-        await P2T07TestHost.SendJsonAsync(client, HttpMethod.Put, $"/boquilhas/aggregates/{id}/movements/{movementId}", Json(new
-        {
-            expectedAggregateVersion = 1,
-            expectedMovementVersion = 1,
             quantity = 10,
-            businessDate = "2026-09-01",
-        }));
+            businessDate = "2026-09-25",
+        };
 
-        var after = await P2T07TestHost.GetAsync(client, $"/boquilhas/aggregates/{id}");
-        var afterLedger = JsonSerializer.Deserialize<JsonElement>(await after.Content.ReadAsStringAsync())
-            .GetProperty("ficha").GetProperty("movements").EnumerateArray().ToList();
-        var edited = afterLedger.Single(m => m.GetProperty("movementType").GetString() == "inicio");
+        using var noFacts = await P2T07TestHost.SendJsonAsync(
+            client, HttpMethod.Post, $"/boquilhas/registers/{register.BoquilhasId.Value}/movements",
+            P2T07TestHost.Json(payload));
 
-        Assert.Equal(recordedAtBefore, edited.GetProperty("recordedAt").GetString());
-        Assert.Equal(10, afterLedger.Single(m => m.GetProperty("movementType").GetString() == "inicio")
-            .GetProperty("quantity").GetInt32());
-        Assert.Equal(10, JsonSerializer.Deserialize<JsonElement>(await (await P2T07TestHost.GetAsync(client, $"/boquilhas/aggregates/{id}")).Content.ReadAsStringAsync())
-            .GetProperty("ficha").GetProperty("balance").GetProperty("disponivel").GetInt32());
+        Assert.Equal(HttpStatusCode.BadRequest, noFacts.StatusCode);
+        var errors = await noFacts.Content.ReadFromJsonAsync<ValidationEnvelope>();
+        Assert.Contains(BoquilhasValidationErrors.MachineRequired, errors?.Errors ?? []);
+        Assert.Contains(BoquilhasValidationErrors.RepairerRequired, errors?.Errors ?? []);
+        Assert.Equal(0, store.GetByIdAsync(register.BoquilhasId.Value, CancellationToken.None).Result?.Movements.Count);
     }
 
-    // ================================================================== close/reopen (routes 10/11)
+    // 4. quantity replay — Saída 10 → Entrada 4 → Entrada sem reparação 6 → outstanding 0 -------
 
-    /// <summary>C2/C3/C4/C5/C6 (AC-C2…C6) — the close/reopen lifecycle over HTTP: atomic close with
-    /// the immutable snapshot, eligibility refusals and reopen on the SAME id.</summary>
     [Fact]
-    public async Task C2C3C4C5C6_CloseAndReopenLifecycleAcrossTheRoutes()
+    public async Task T9_Replay_OwnerExample_EndsAtZero()
     {
         var store = new P2T07TestStore();
-        var tool = store.SeedTool(DMO.Domain.Tools.ToolType.Bq, "BQ-100", "L1", machines: "B1");
+        var (_, _, bqId) = ArrangeProduction(store);
+        var repairerId = SeedRepairer(store);
+        var register = store.SeedRegister(bqId);
 
         using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
-        using var client = factory.CreateClient();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var id = await CreateAsync(client, Json(new
-        {
-            toolId = tool.ToolId.Value,
-            machines = new[] { "B1" },
-            initialQuantity = 10,
-            openingDate = "2026-09-10",
-            utilisationPercent = 30m,
-        }));
+        await AppendAsync(client, register, "saida", 10, "2026-09-25", "B1", repairerId);
+        await AppendAsync(client, register, "entrada", 4, "2026-09-27", null, null);
+        await AppendAsync(client, register, "entrada_sem_reparacao", 6, "2026-09-29", null, null);
 
-        // Close (C2: atomic — the snapshot carries the closing facts).
-        var closed = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, $"/boquilhas/aggregates/{id}/close", Json(new
-        {
-            expectedVersion = 1,
-        }));
-        Assert.Equal(HttpStatusCode.OK, closed.StatusCode);
-        var closedPayload = JsonSerializer.Deserialize<JsonElement>(await closed.Content.ReadAsStringAsync());
-        Assert.Equal(2, closedPayload.GetProperty("version").GetInt32());
-        var closedAt = closedPayload.GetProperty("closedAt").GetString();
+        using var ficha = await P2T07TestHost.GetAsync(
+            client, $"/boquilhas/registers/{register.BoquilhasId.Value}");
 
-        // A second close is refused (already-closed) and the aggregate left the active grid (C3).
-        var doubleClose = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, $"/boquilhas/aggregates/{id}/close", Json(new
-        {
-            expectedVersion = 2,
-        }));
-        Assert.Equal(HttpStatusCode.Conflict, doubleClose.StatusCode);
-        var activeGrid = await P2T07TestHost.GetAsync(client, "/boquilhas/aggregates");
-        var activeRows = JsonSerializer.Deserialize<JsonElement>(await activeGrid.Content.ReadAsStringAsync())
-            .GetProperty("rows").EnumerateArray().ToList();
-        Assert.DoesNotContain(activeRows, row => row.GetProperty("boquilhasId").GetGuid() == id);
-
-        // Reopen without a reason → 400 REOPEN_REASON_REQUIRED, nothing written (C5).
-        var reasonless = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, $"/boquilhas/aggregates/{id}/reopen", Json(new
-        {
-            expectedVersion = 2,
-            reason = "",
-        }));
-        Assert.Equal(HttpStatusCode.BadRequest, reasonless.StatusCode);
-        var reasonlessPayload = JsonSerializer.Deserialize<JsonElement>(await reasonless.Content.ReadAsStringAsync());
-        Assert.Contains("REOPEN_REASON_REQUIRED", reasonlessPayload.GetProperty("errors").EnumerateArray().Select(e => e.GetString()));
-
-        // Reopen on the SAME id with a reason (C4/C5).
-        var reopened = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, $"/boquilhas/aggregates/{id}/reopen", Json(new
-        {
-            expectedVersion = 2,
-            reason = "devolução parcial detetada",
-        }));
-        Assert.Equal(HttpStatusCode.OK, reopened.StatusCode);
-        Assert.Equal(3, JsonSerializer.Deserialize<JsonElement>(await reopened.Content.ReadAsStringAsync()).GetProperty("version").GetInt32());
-        Assert.Equal(1, store.AggregateCount);
-
-        // The ficha shows the close snapshot and the reopen record (C7 history preserved).
-        var ficha = await P2T07TestHost.GetAsync(client, $"/boquilhas/aggregates/{id}");
-        var body = JsonSerializer.Deserialize<JsonElement>(await ficha.Content.ReadAsStringAsync()).GetProperty("ficha");
-        Assert.Equal(closedAt, body.GetProperty("lastClose").GetProperty("closedAt").GetString());
-        Assert.Equal("devolução parcial detetada", body.GetProperty("lastReopen").GetProperty("reason").GetString());
-
-        // Not-closed refusal: an ACTIVE aggregate cannot be reopened (C6).
-        var notClosed = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, $"/boquilhas/aggregates/{id}/reopen", Json(new
-        {
-            expectedVersion = 3,
-            reason = "outra vez",
-        }));
-        Assert.Equal(HttpStatusCode.Conflict, notClosed.StatusCode);
-        Assert.Equal("not-closed", JsonSerializer.Deserialize<JsonElement>(await notClosed.Content.ReadAsStringAsync())
-            .GetProperty("reason").GetString());
+        var payload = await ficha.Content.ReadFromJsonAsync<FichaEnvelope>();
+        Assert.NotNull(payload?.Ficha);
+        Assert.Equal(0, payload.Ficha.Outstanding);
+        Assert.Equal(0, payload.Ficha.Movements[^1].Saldo);
     }
 
-    /// <summary>B8 (AC-B8) — a zero-balance aggregate still exists and remains queryable after a
-    /// full return; further valid movements remain possible.</summary>
     [Fact]
-    public async Task B8_ZeroBalanceNeverDeletesTheAggregate()
+    public async Task T10_NegativeOutstanding_IsVisibleAndNonBlocking()
     {
         var store = new P2T07TestStore();
-        var tool = store.SeedTool(DMO.Domain.Tools.ToolType.Bq, "BQ-100", "L1", machines: "B1");
-        var repairer = store.SeedRepairer("Reparador A");
+        var (_, _, bqId) = ArrangeProduction(store);
+        var repairerId = SeedRepairer(store);
+        var register = store.SeedRegister(bqId);
 
         using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
-        using var client = factory.CreateClient();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var id = await CreateAsync(client, Json(new
-        {
-            toolId = tool.ToolId.Value,
-            machines = new[] { "B1" },
-            initialQuantity = 4,
-            openingDate = "2026-09-10",
-        }));
+        await AppendAsync(client, register, "saida", 2, "2026-09-25", "B1", repairerId);
+        using var entrada = await AppendAsync(client, register, "entrada", 5, "2026-09-27", null, null);
 
-        await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, $"/boquilhas/aggregates/{id}/movements", Json(new
-        {
-            expectedAggregateVersion = 1,
-            movementType = "saida",
-            quantity = 4,
-            businessDate = "2026-09-11",
-            machine = "B1",
-            repairerId = repairer.RepairerId.Value,
-        }));
-        await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, $"/boquilhas/aggregates/{id}/movements", Json(new
-        {
-            expectedAggregateVersion = 2,
-            movementType = "entrada",
-            quantity = 4,
-            businessDate = "2026-09-12",
-        }));
+        Assert.Equal(HttpStatusCode.Created, entrada.StatusCode);
 
-        var ficha = await P2T07TestHost.GetAsync(client, $"/boquilhas/aggregates/{id}");
+        using var ficha = await P2T07TestHost.GetAsync(
+            client, $"/boquilhas/registers/{register.BoquilhasId.Value}");
+
+        var payload = await ficha.Content.ReadFromJsonAsync<FichaEnvelope>();
+        Assert.NotNull(payload?.Ficha);
+        Assert.Equal(-3, payload.Ficha.Outstanding);
+    }
+
+    // 5. Entrada sem reparação — returns quantity, explicit in history, no Tool mutation --------
+
+    [Fact]
+    public async Task T11_EntradaSemReparacao_IsExplicitInHistory_andDoesNotMutateTheTool()
+    {
+        var store = new P2T07TestStore();
+        var tool = store.SeedTool(ToolType.Bq, "5447T173", "LOTE-1");
+        var (_, _, bqId) = ArrangeProduction(store);
+        var repairerId = SeedRepairer(store);
+        var register = store.SeedRegister(
+            bqId,
+            (MovementKind.Saida, 6, new DateOnly(2026, 9, 25), "B1", repairerId));
+
+        using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        await AppendAsync(client, register, "entrada_sem_reparacao", 6, "2026-09-29", null, null);
+
+        // History shows the exact movement with its distinct meaning (token preserved).
+        using var history = await P2T07TestHost.GetAsync(client, "/boquilhas/history?movementType=entrada_sem_reparacao");
+        var historyPayload = await history.Content.ReadFromJsonAsync<HistoryEnvelope>();
+        var row = Assert.Single(historyPayload?.Rows ?? []);
+        Assert.Equal("entrada_sem_reparacao", row.MovementType);
+        Assert.Equal(6, row.Quantity);
+        // The reference is the frozen BQ triple reference of the REAL context (the Tool identity).
+        Assert.Equal("5447T173", row.Reference);
+
+        // The Tool is NOT marked irreparable, NOT separated, NOT destroyed: it still resolves.
+        var canonical = await store.JobOnToolStore
+            .GetByIdAsync(tool.ToolId.Value, CancellationToken.None);
+        Assert.NotNull(canonical);
+        Assert.Equal(ToolType.Bq, canonical.Type);
+    }
+
+    // 6. edit — same movement_id, no double-count, audit preserved -----------------------------
+
+    [Fact]
+    public async Task T12_Edit_KeepsTheSameMovementId_NoDoubleCount_AuditPreserved()
+    {
+        var store = new P2T07TestStore();
+        var (_, _, bqId) = ArrangeProduction(store);
+        var repairerId = SeedRepairer(store);
+        var register = store.SeedRegister(bqId);
+
+        using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        using var append = await AppendAsync(client, register, "saida", 10, "2026-09-25", "B1", repairerId);
+        var appended = await append.Content.ReadFromJsonAsync<MovementAppliedEnvelope>();
+        var movementId = appended!.MovementId;
+
+        using var edit = await P2T07TestHost.SendJsonAsync(
+            client,
+            HttpMethod.Put,
+            $"/boquilhas/registers/{register.BoquilhasId.Value}/movements/{movementId}",
+            P2T07TestHost.Json(new
+            {
+                expectedMovementVersion = 1,
+                quantity = 7,
+                businessDate = "2026-09-26",
+                machine = "B1",
+                repairerId,
+            }));
+
+        Assert.Equal(HttpStatusCode.OK, edit.StatusCode);
+
+        using var ficha = await P2T07TestHost.GetAsync(
+            client, $"/boquilhas/registers/{register.BoquilhasId.Value}");
+
+        var payload = await ficha.Content.ReadFromJsonAsync<FichaEnvelope>();
+        Assert.NotNull(payload?.Ficha);
+
+        // The SAME movement row was replaced: count unchanged, id unchanged, type immutable.
+        Assert.Single(payload.Ficha.Movements);
+        Assert.Equal(movementId, payload.Ficha.Movements[0].MovementId);
+        Assert.Equal("saida", payload.Ficha.Movements[0].MovementType);
+        Assert.Equal(7, payload.Ficha.Movements[0].Quantity);
+        Assert.Equal(2, payload.Ficha.Movements[0].Version);
+
+        // One quantity event only: the outstanding reflects the single edited movement.
+        Assert.Equal(7, payload.Ficha.Outstanding);
+
+        // The audit trail holds the exact before/after facts.
+        using var audit = await P2T07TestHost.GetAsync(
+            client, $"/boquilhas/registers/{register.BoquilhasId.Value}/movements/{movementId}/audit");
+        var auditPayload = await audit.Content.ReadFromJsonAsync<AuditEnvelope>();
+        Assert.NotNull(auditPayload?.Entries);
+        var entry = Assert.Single(auditPayload.Entries);
+        Assert.Equal(10, entry.BeforeQuantity);
+        Assert.Equal(7, entry.AfterQuantity);
+        Assert.Equal("B1", entry.BeforeMachine);
+        Assert.Equal("B1", entry.AfterMachine);
+    }
+
+    [Fact]
+    public async Task T13_EditWithAStaleMovementVersion_IsRefused_AndNothingIsWritten()
+    {
+        var store = new P2T07TestStore();
+        var (_, _, bqId) = ArrangeProduction(store);
+        var repairerId = SeedRepairer(store);
+        var register = store.SeedRegister(bqId);
+
+        using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        using var append = await AppendAsync(client, register, "saida", 10, "2026-09-25", "B1", repairerId);
+        var appended = await append.Content.ReadFromJsonAsync<MovementAppliedEnvelope>();
+
+        using var stale = await P2T07TestHost.SendJsonAsync(
+            client,
+            HttpMethod.Put,
+            $"/boquilhas/registers/{register.BoquilhasId.Value}/movements/{appended!.MovementId}",
+            P2T07TestHost.Json(new
+            {
+                expectedMovementVersion = 42,
+                quantity = 1,
+                businessDate = "2026-09-26",
+                machine = "B1",
+                repairerId,
+            }));
+
+        Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+        var refusal = await stale.Content.ReadFromJsonAsync<RefusalEnvelope>();
+        Assert.Equal("stale-version", refusal?.Reason);
+
+        // Nothing was written: the ledger still holds the original single movement at version 1.
+        var current = store.GetByIdAsync(register.BoquilhasId.Value, CancellationToken.None).Result!;
+        Assert.Single(current.Movements);
+        Assert.Equal(10, current.Movements[0].Quantity);
+        Assert.Equal(1, current.Movements[0].Version);
+    }
+
+    // 7. repairer history — a later assignment change does not rewrite the movement -------------
+
+    [Fact]
+    public async Task T14_LaterAssignmentChange_DoesNotRewriteTheMovementRepairer()
+    {
+        var store = new P2T07TestStore();
+        var (_, _, bqId) = ArrangeProduction(store);
+        var firstRepairer = SeedRepairer(store, "Reparador A");
+        var secondRepairer = SeedRepairer(store, "Reparador B");
+        store.SeedAssignment("B1", firstRepairer);
+
+        var register = store.SeedRegister(
+            bqId,
+            (MovementKind.Saida, 10, new DateOnly(2026, 9, 25), "B1", firstRepairer));
+
+        // A LATER assignment change happens (arranged after the movement was recorded).
+        store.ChangeAssignment("B1", secondRepairer);
+
+        using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        using var ficha = await P2T07TestHost.GetAsync(
+            client, $"/boquilhas/registers/{register.BoquilhasId.Value}");
+
+        var payload = await ficha.Content.ReadFromJsonAsync<FichaEnvelope>();
+        Assert.NotNull(payload?.Ficha);
+
+        // The movement still carries the repairer used AT THE TIME of the movement.
+        Assert.Equal(firstRepairer, payload.Ficha.Movements[0].RepairerId);
+    }
+
+    // 8. local Histórico — movement-level chronological history with filters --------------------
+
+    [Fact]
+    public async Task T15_History_IsMovementLevel_Chronological_WithTheProductionContext()
+    {
+        var store = new P2T07TestStore();
+        var (_, _, bqId) = ArrangeProduction(store);
+        var repairerId = SeedRepairer(store);
+        var register = store.SeedRegister(
+            bqId,
+            (MovementKind.Saida, 10, new DateOnly(2026, 9, 25), "B1", repairerId),
+            (MovementKind.Entrada, 4, new DateOnly(2026, 9, 27), null, null));
+
+        using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        using var history = await P2T07TestHost.GetAsync(client, "/boquilhas/history");
+        var payload = await history.Content.ReadFromJsonAsync<HistoryEnvelope>();
+
+        Assert.NotNull(payload);
+        Assert.Equal(2, payload.Total);
+        Assert.Equal(2, payload.Rows.Count);
+        Assert.Equal("saida", payload.Rows[0].MovementType);
+        Assert.Equal("entrada", payload.Rows[1].MovementType);
+        // The reference/lot are the frozen BQ triple of the REAL context (the Tool identity).
+        Assert.Equal("5447T173", payload.Rows[0].Reference);
+        Assert.Equal("P1", payload.Rows[0].ProductionNumber);
+
+        // Unknown filter values are refused (never a silent full list).
+        using var invalid = await P2T07TestHost.GetAsync(
+            client, "/boquilhas/history?movementType=irreparavel");
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+    }
+
+    [Fact]
+    public async Task T16_RegisterList_RendersTheDerivedOutstanding()
+    {
+        var store = new P2T07TestStore();
+        var (_, _, bqId) = ArrangeProduction(store);
+        var repairerId = SeedRepairer(store);
+        store.SeedRegister(
+            bqId,
+            (MovementKind.Saida, 10, new DateOnly(2026, 9, 25), "B1", repairerId));
+
+        using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        using var list = await P2T07TestHost.GetAsync(client, "/boquilhas/registers");
+        var payload = await list.Content.ReadFromJsonAsync<RegisterListEnvelope>();
+
+        Assert.NotNull(payload);
+        Assert.Equal(1, payload.Total);
+        Assert.Equal(10, payload.Rows[0].Outstanding);
+        // The reference is the frozen BQ triple reference of the REAL context (the Tool identity).
+        Assert.Equal("5447T173", payload.Rows[0].Reference);
+        Assert.Equal("P1", payload.Rows[0].ProductionNumber);
+    }
+
+    // 9. productions / ficha / BQ association (Job On composition) ------------------------------
+
+    [Fact]
+    public async Task T17_ProductionsAndFicha_ComposeTheRealJobOnReads()
+    {
+        var store = new P2T07TestStore();
+        var (_, jobOnId, _) = ArrangeProduction(store, reference: "REF-X", production: "PX");
+
+        using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        using var productions = await P2T07TestHost.GetAsync(client, "/boquilhas/productions?reference=REF-X");
+        var productionsPayload = await productions.Content.ReadFromJsonAsync<ProductionsEnvelope>();
+        Assert.Single(productionsPayload?.Productions ?? []);
+        Assert.Equal(jobOnId, productionsPayload!.Productions[0].JobonId);
+
+        using var ficha = await P2T07TestHost.GetAsync(client, $"/boquilhas/jobons/{jobOnId}");
         Assert.Equal(HttpStatusCode.OK, ficha.StatusCode);
-        var body = JsonSerializer.Deserialize<JsonElement>(await ficha.Content.ReadAsStringAsync()).GetProperty("ficha");
-        Assert.Equal(4, body.GetProperty("balance").GetProperty("disponivel").GetInt32());
-
-        // A new valid Saída remains possible AFTER the full return (history stays queryable).
-        var again = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, $"/boquilhas/aggregates/{id}/movements", Json(new
-        {
-            expectedAggregateVersion = 3,
-            movementType = "saida",
-            quantity = 1,
-            businessDate = "2026-09-13",
-            machine = "B1",
-            repairerId = repairer.RepairerId.Value,
-        }));
-        Assert.Equal(HttpStatusCode.Created, again.StatusCode);
     }
 
-    // ================================================================== history (route 18)
-
-    /// <summary>H1/H4/H5 (AC-H1/H4/H5) — the local Histórico filters are backend-applied with
-    /// deterministic paging and a backend-counted total; invalid values are refused.</summary>
     [Fact]
-    public async Task H1H4H5_HistoryFiltersPagingAndTotals()
+    public async Task T18_BqAssociation_CreatesTheContextThroughJobOn_ReturningTheRealBqId()
     {
         var store = new P2T07TestStore();
-        var tool = store.SeedTool(DMO.Domain.Tools.ToolType.Bq, "BQ-100", "L1", machines: "B1");
-        var otherTool = store.SeedTool(DMO.Domain.Tools.ToolType.Bq, "BQ-101", "L2", machines: "B1");
-        var repairer = store.SeedRepairer("Reparador A");
-        store.SeedAssignment("B1", repairer.RepairerId.Value);
+        // A production WITHOUT a BQ context (standalone-ish start, no context slot at all).
+        var jobOn = store.JobOnToolStore.SeedJobOn("REF-BQ", "P-BQ");
+        var tool = store.SeedTool(ToolType.Bq, "5447BQ1", "LOTE-BQ");
 
         using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
-        using var client = factory.CreateClient();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var id1 = await CreateAsync(client, Json(new
+        using var associate = await P2T07TestHost.SendJsonAsync(
+            client,
+            HttpMethod.Post,
+            $"/boquilhas/jobons/{jobOn.JobOnId.Value}/bq-association",
+            P2T07TestHost.Json(new { toolId = tool.ToolId.Value, expectedJobOnVersion = 1 }));
+
+        if (associate.StatusCode != HttpStatusCode.Created)
         {
-            toolId = tool.ToolId.Value,
-            machines = new[] { "B1" },
-            initialQuantity = 10,
-            openingDate = "2026-09-10",
-        }));
-        var id2 = await CreateAsync(client, Json(new
-        {
-            toolId = otherTool.ToolId.Value,
-            machines = new[] { "B1" },
-            initialQuantity = 5,
-            openingDate = "2026-09-11",
-        }));
+            var body = await associate.Content.ReadAsStringAsync();
+            Assert.Fail($"BQ association failed with body: {body}");
+        }
 
-        // A saída (with repairer) on the FIRST aggregate only.
-        await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, $"/boquilhas/aggregates/{id1}/movements", Json(new
-        {
-            expectedAggregateVersion = 1,
-            movementType = "saida",
-            quantity = 2,
-            businessDate = "2026-09-12",
-            machine = "B1",
-            repairerId = repairer.RepairerId.Value,
-        }));
+        var payload = await associate.Content.ReadFromJsonAsync<BqAssociatedEnvelope>();
+        Assert.NotNull(payload?.BqId);
 
-        // Reference traversal filter + totals.
-        var byReference = await P2T07TestHost.GetAsync(client, $"/boquilhas/history?reference=BQ-100");
-        var historyPayload = JsonSerializer.Deserialize<JsonElement>(await byReference.Content.ReadAsStringAsync());
-        Assert.Equal(1, historyPayload.GetProperty("total").GetInt32());
-        Assert.Equal(id1, historyPayload.GetProperty("rows")[0].GetProperty("boquilhasId").GetGuid());
-
-        // Movement-type filter (EXISTS).
-        var byType = await P2T07TestHost.GetAsync(client, "/boquilhas/history?movementType=saida");
-        var byTypePayload = JsonSerializer.Deserialize<JsonElement>(await byType.Content.ReadAsStringAsync());
-        Assert.Equal(1, byTypePayload.GetProperty("total").GetInt32());
-        Assert.Equal(id1, byTypePayload.GetProperty("rows")[0].GetProperty("boquilhasId").GetGuid());
-
-        // Repairer filter (EXISTS).
-        var byRepairer = await P2T07TestHost.GetAsync(client, $"/boquilhas/history?repairerId={repairer.RepairerId}");
-        Assert.Equal(1, JsonSerializer.Deserialize<JsonElement>(await byRepairer.Content.ReadAsStringAsync())
-            .GetProperty("total").GetInt32());
-
-        // Business-date period (EXISTS over movement business_date).
-        var byPeriod = await P2T07TestHost.GetAsync(client, "/boquilhas/history?businessDateFrom=2026-09-12&businessDateTo=2026-09-12");
-        Assert.Equal(1, JsonSerializer.Deserialize<JsonElement>(await byPeriod.Content.ReadAsStringAsync())
-            .GetProperty("total").GetInt32());
-
-        // Paging: 1-based bounds; pageSize outside 1..100 is refused (H5).
-        var onePerPage = await P2T07TestHost.GetAsync(client, $"/boquilhas/history?page=1&pageSize=1");
-        var onePayload = JsonSerializer.Deserialize<JsonElement>(await onePerPage.Content.ReadAsStringAsync());
-        Assert.Single(onePayload.GetProperty("rows").EnumerateArray());
-        Assert.Equal(2, onePayload.GetProperty("total").GetInt32());
-
-        var badPageSize = await P2T07TestHost.GetAsync(client, "/boquilhas/history?pageSize=101");
-        Assert.Equal(HttpStatusCode.BadRequest, badPageSize.StatusCode);
-        var badPayload = JsonSerializer.Deserialize<JsonElement>(await badPageSize.Content.ReadAsStringAsync());
-        Assert.Contains("FILTER_INVALID", badPayload.GetProperty("errors").EnumerateArray().Select(e => e.GetString()));
-
-        var badState = await P2T07TestHost.GetAsync(client, "/boquilhas/history?state=rascunho");
-        Assert.Equal(HttpStatusCode.BadRequest, badState.StatusCode);
+        // The bq_id is REAL: a register can now anchor it.
+        using var create = await P2T07TestHost.SendJsonAsync(
+            client, HttpMethod.Post, "/boquilhas/registers", P2T07TestHost.Json(new { bqId = payload!.BqId }));
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
     }
 
-    /// <summary>H6 (AC-H6) — empty ≠ lookup-failed: an empty history page is an explicit empty
-    /// result, never an error; a non-existent aggregate is a 404, never an empty list.</summary>
+    // 10. repairer / assignment reads ------------------------------------------------------------
+
     [Fact]
-    public async Task H6_EmptyIsExplicitAndNotFoundIsNeverAnEmptyList()
-    {
-        using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted());
-        using var client = factory.CreateClient();
-
-        var empty = await P2T07TestHost.GetAsync(client, "/boquilhas/history");
-        Assert.Equal(HttpStatusCode.OK, empty.StatusCode);
-        var payload = JsonSerializer.Deserialize<JsonElement>(await empty.Content.ReadAsStringAsync());
-        Assert.Equal(0, payload.GetProperty("total").GetInt32());
-        Assert.Empty(payload.GetProperty("rows").EnumerateArray());
-
-        var missing = await P2T07TestHost.GetAsync(client, $"/boquilhas/aggregates/{MissingId}");
-        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
-        var missingPayload = JsonSerializer.Deserialize<JsonElement>(await missing.Content.ReadAsStringAsync());
-        Assert.Equal("not-found", missingPayload.GetProperty("reason").GetString());
-    }
-
-    // ================================================================== productions/jobon (routes 13/14/15)
-
-    /// <summary>Route 13/14 — the opening-flow reads: reference → productions (REFERENCE_REQUIRED
-    /// when blank) and the Job On ficha read.</summary>
-    [Fact]
-    public async Task ProductionsAndJobOnReadsServeTheOpeningFlow()
+    public async Task T19_MachineAssignmentsAndRepairers_AreConsumedReads()
     {
         var store = new P2T07TestStore();
-        var tool = store.SeedTool(DMO.Domain.Tools.ToolType.Bq, "BQ-100", "L1", machines: "B1");
-        var jobOn = store.SeedJobOnWithBqContext("REF-1", "P1", "B1", tool.ToolId.Value, tool.Reference, tool.Lot);
+        var repairerId = SeedRepairer(store, "Reparador A");
+        store.SeedAssignment("B1", repairerId);
 
         using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
-        using var client = factory.CreateClient();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var blank = await P2T07TestHost.GetAsync(client, "/boquilhas/productions");
-        Assert.Equal(HttpStatusCode.BadRequest, blank.StatusCode);
+        using var assignments = await P2T07TestHost.GetAsync(client, "/boquilhas/machine-assignments");
+        var assignmentsPayload = await assignments.Content.ReadFromJsonAsync<AssignmentsEnvelope>();
+        Assert.NotNull(assignmentsPayload?.Assignments);
+        Assert.Equal(6, assignmentsPayload.Assignments.Count);
 
-        var found = await P2T07TestHost.GetAsync(client, "/boquilhas/productions?reference=REF-1");
-        var productions = JsonSerializer.Deserialize<JsonElement>(await found.Content.ReadAsStringAsync())
-            .GetProperty("productions").EnumerateArray().ToList();
-        Assert.Single(productions);
-        Assert.Equal(jobOn.JobOnId.Value, productions[0].GetProperty("jobonId").GetGuid());
+        var b1 = assignmentsPayload.Assignments.Single(row => row.Machine == "B1");
+        Assert.Equal(repairerId, b1.RepairerId);
+        var unassigned = assignmentsPayload.Assignments.Single(row => row.Machine == "B3");
+        Assert.True(unassigned.AssignmentUnavailable);
 
-        var ficha = await P2T07TestHost.GetAsync(client, $"/boquilhas/jobons/{jobOn.JobOnId.Value}");
-        var fichaBody = JsonSerializer.Deserialize<JsonElement>(await ficha.Content.ReadAsStringAsync()).GetProperty("ficha");
-        Assert.Equal("P1", fichaBody.GetProperty("productionNumber").GetString());
-        Assert.Single(fichaBody.GetProperty("contexts").EnumerateArray());
+        using var repairers = await P2T07TestHost.GetAsync(client, "/boquilhas/repairers");
+        var repairersPayload = await repairers.Content.ReadFromJsonAsync<RepairersEnvelope>();
+        Assert.Single(repairersPayload?.Repairers ?? []);
     }
 
-    /// <summary>Route 15 (AC-I3) — the BQ association composes IJobOnService: the real bq_id is
-    /// returned and a missing tool is refused.</summary>
     [Fact]
-    public async Task BqAssociationCreatesTheRealContextThroughJobOn()
+    public async Task T20_AppendWithAnUnknownRepairer_IsRefused()
     {
         var store = new P2T07TestStore();
-        var tool = store.SeedTool(DMO.Domain.Tools.ToolType.Bq, "BQ-100", "L1", machines: "B1");
-        var jobOn = store.SeedJobOnWithBqContext("REF-1", "P1", "B1", tool.ToolId.Value, tool.Reference, tool.Lot);
-        var bqId = jobOn.Contexts[0].ContextId;
+        var (_, _, bqId) = ArrangeProduction(store);
+        var register = store.SeedRegister(bqId);
 
         using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted(), store);
-        using var client = factory.CreateClient();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var associated = await P2T07TestHost.SendJsonAsync(
-            client, HttpMethod.Post, $"/boquilhas/jobons/{jobOn.JobOnId.Value}/bq-association", Json(new
+        using var append = await AppendAsync(
+            client, register, "saida", 10, "2026-09-25", "B1", Guid.NewGuid());
+
+        Assert.Equal(HttpStatusCode.BadRequest, append.StatusCode);
+        var payload = await append.Content.ReadFromJsonAsync<ValidationEnvelope>();
+        Assert.Contains(BoquilhasValidationErrors.RepairerNotFound, payload?.Errors ?? []);
+    }
+
+    // ------------------------------------------------------------------ transport shapes
+
+    private static async Task<HttpResponseMessage> AppendAsync(
+        HttpClient client,
+        DMO.Domain.Boquilhas.BoquilhaRegister register,
+        string movementType,
+        int quantity,
+        string businessDate,
+        string? machine,
+        Guid? repairerId) =>
+        await P2T07TestHost.SendJsonAsync(
+            client,
+            HttpMethod.Post,
+            $"/boquilhas/registers/{register.BoquilhasId.Value}/movements",
+            P2T07TestHost.Json(new
             {
-                toolId = tool.ToolId.Value,
-                expectedJobOnVersion = jobOn.Version,
+                movementType,
+                quantity,
+                businessDate,
+                machine,
+                repairerId,
             }));
-        Assert.Equal(HttpStatusCode.Created, associated.StatusCode);
-        var payload = JsonSerializer.Deserialize<JsonElement>(await associated.Content.ReadAsStringAsync());
-        Assert.Equal(bqId, payload.GetProperty("bqId").GetGuid());
-        Assert.Equal(jobOn.JobOnId.Value, payload.GetProperty("jobonId").GetGuid());
 
-        // A CM Tool is refused by Job On's own validation (TOOL_TYPE_MISMATCH): a fresh occurrence
-        // without a prior association is used so the expected version is still 1.
-        var cmTool = store.SeedTool(DMO.Domain.Tools.ToolType.Cm, "CM-200", "L2", machines: "B1");
-        var freshJobOn = store.SeedJobOnWithBqContext("REF-2", "P2", "B1", tool.ToolId.Value, tool.Reference, tool.Lot);
-
-        var mismatched = await P2T07TestHost.SendJsonAsync(
-            client, HttpMethod.Post, $"/boquilhas/jobons/{freshJobOn.JobOnId.Value}/bq-association", Json(new
-            {
-                toolId = cmTool.ToolId.Value,
-                expectedJobOnVersion = freshJobOn.Version,
-            }));
-        Assert.Equal(HttpStatusCode.BadRequest, mismatched.StatusCode);
-    }
-
-    /// <summary>T1 (AC-T1) — the shared picker query uses type=BQ: candidates returned by the
-    /// ferramentas route with type=BQ are BQ Tools only; non-BQ Tools never appear.</summary>
-    [Fact]
-    public async Task T1_TheSharedPickerQueryIsBqTypeFiltered()
-    {
-        var store = new P2T07TestStore();
-        store.SeedTool(DMO.Domain.Tools.ToolType.Bq, "BQ-100", "L1", machines: "B1");
-        store.SeedTool(DMO.Domain.Tools.ToolType.Bq, "BQ-101", "L2", machines: "B1");
-        store.SeedTool(DMO.Domain.Tools.ToolType.Cm, "CM-200", "L3", machines: "B1");
-
-        var granted = new[]
-        {
-            TestNavigationComposition.Definition(ModuleCatalog.Boquilhas, "Boquilhas", "boquilhas", "Boquilhas"),
-            TestNavigationComposition.Definition(ModuleCatalog.Ferramentas, "Ferramentas", null, "Ferramentas", contextual: true),
-        };
-
-        using var factory = P2T07TestHost.ForUser(granted, store);
-        using var client = factory.CreateClient();
-
-        var search = await P2T07TestHost.GetAsync(client, "/ferramentas/tools?type=BQ&query=BQ&limit=50");
-        Assert.Equal(HttpStatusCode.OK, search.StatusCode);
-        var items = JsonSerializer.Deserialize<JsonElement>(await search.Content.ReadAsStringAsync())
-            .GetProperty("items").EnumerateArray().ToList();
-        Assert.Equal(2, items.Count);
-        Assert.All(items, item => Assert.Equal("BQ", item.GetProperty("type").GetString()));
-        Assert.DoesNotContain(items, item => item.GetProperty("reference").GetString() == "CM-200");
-    }
-
-    /// <summary>T5 (AC-T5) — Tool creation through the shared orchestration is validated and a
-    /// duplicate identity is refused on the origin surface.</summary>
-    [Fact]
-    public async Task T5_ToolCreateThroughTheSharedOrchestrationIsValidatedAndDuplicatesRefused()
-    {
-        var store = new P2T07TestStore();
-        store.SeedTool(DMO.Domain.Tools.ToolType.Bq, "BQ-100", "L1", machines: "B1");
-
-        var granted = new[]
-        {
-            TestNavigationComposition.Definition(ModuleCatalog.Boquilhas, "Boquilhas", "boquilhas", "Boquilhas"),
-            TestNavigationComposition.Definition(ModuleCatalog.Ferramentas, "Ferramentas", null, "Ferramentas", contextual: true),
-        };
-
-        using var factory = P2T07TestHost.ForUser(granted, store);
-        using var client = factory.CreateClient();
-
-        var created = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, "/ferramentas/tools", Json(new
-        {
-            type = "BQ",
-            reference = "BQ-200",
-            lot = "L9",
-            machines = new[] { "B1", "C1" },
-        }));
-        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
-
-        var duplicate = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, "/ferramentas/tools", Json(new
-        {
-            type = "BQ",
-            reference = "BQ-100",
-            lot = "L1",
-            machines = new[] { "B1" },
-        }));
-        Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
-        var payload = JsonSerializer.Deserialize<JsonElement>(await duplicate.Content.ReadAsStringAsync());
-        Assert.Equal("duplicate-identity", payload.GetProperty("reason").GetString());
-    }
-
-    // ================================================================== helpers
-
-    private static async Task<Guid> CreateAsync(HttpClient client, string payload)
-    {
-        var response = await P2T07TestHost.SendJsonAsync(client, HttpMethod.Post, "/boquilhas/aggregates", payload);
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var body = JsonSerializer.Deserialize<JsonElement>(await response.Content.ReadAsStringAsync());
-        return body.GetProperty("boquilhasId").GetGuid();
-    }
+    private sealed record RegisterCreatedResponse(Guid BoquilhasId);
+    private sealed record FichaEnvelope(FichaResponse? Ficha);
+    private sealed record FichaResponse(
+        Guid BoquilhasId,
+        Guid BqId,
+        string? Reference,
+        string? Lot,
+        int Outstanding,
+        Guid CreatedByUserId,
+        DateTimeOffset CreatedAt,
+        AnchorResponse? Anchor,
+        ProductionContextResponse? Production,
+        IReadOnlyList<MovementResponse> Movements);
+    private sealed record AnchorResponse(
+        Guid ToolId,
+        string FrozenToolType,
+        string FrozenToolReference,
+        string FrozenToolLot);
+    private sealed record ProductionContextResponse(
+        string Reference,
+        string ProductionNumber,
+        string Machine,
+        DateOnly? ProductionDate);
+    private sealed record MovementResponse(
+        Guid MovementId,
+        string MovementType,
+        int Quantity,
+        DateOnly BusinessDate,
+        DateTimeOffset RecordedAt,
+        Guid RecordedByUserId,
+        string? Machine,
+        Guid? RepairerId,
+        string? Observations,
+        int Version,
+        int Saldo);
+    private sealed record ValidationEnvelope(string Reason, IReadOnlyList<string> Errors);
+    private sealed record RefusalEnvelope(string Reason, string Message);
+    private sealed record MovementAppliedEnvelope(Guid MovementId, int Version);
+    private sealed record AuditEnvelope(Guid MovementId, IReadOnlyList<AuditEntryResponse> Entries);
+    private sealed record AuditEntryResponse(
+        Guid MovementAuditId,
+        Guid MovementId,
+        Guid EditedByUserId,
+        DateTimeOffset EditedAt,
+        int BeforeQuantity,
+        int AfterQuantity,
+        DateOnly BeforeBusinessDate,
+        DateOnly AfterBusinessDate,
+        string? BeforeMachine,
+        string? AfterMachine,
+        Guid? BeforeRepairerId,
+        Guid? AfterRepairerId,
+        string? BeforeObservations,
+        string? AfterObservations);
+    private sealed record HistoryEnvelope(IReadOnlyList<HistoryRowResponse> Rows, int Total);
+    private sealed record HistoryRowResponse(
+        Guid MovementId,
+        Guid BoquilhasId,
+        string MovementType,
+        int Quantity,
+        DateOnly BusinessDate,
+        DateTimeOffset RecordedAt,
+        Guid RecordedByUserId,
+        string? Machine,
+        Guid? RepairerId,
+        string? Observations,
+        string? Reference,
+        string? Lot,
+        string? ProductionNumber,
+        string? ProductionMachine);
+    private sealed record RegisterListEnvelope(IReadOnlyList<RegisterRowResponse> Rows, int Total);
+    private sealed record RegisterRowResponse(
+        Guid BoquilhasId,
+        Guid BqId,
+        string? Reference,
+        string? Lot,
+        string? ProductionNumber,
+        string? ProductionMachine,
+        DateOnly? ProductionDate,
+        int Outstanding,
+        int MovementCount,
+        DateTimeOffset? LastMovementAt);
+    private sealed record ProductionsEnvelope(IReadOnlyList<ProductionRowResponse> Productions);
+    private sealed record ProductionRowResponse(
+        Guid JobonId,
+        string Reference,
+        string ProductionNumber,
+        string Machine,
+        DateOnly? ProductionDate);
+    private sealed record BqAssociatedEnvelope(Guid JobonId, Guid BqId, int Version);
+    private sealed record AssignmentsEnvelope(IReadOnlyList<AssignmentRowResponse> Assignments);
+    private sealed record AssignmentRowResponse(
+        string Machine,
+        Guid? RepairerId,
+        string? RepairerName,
+        bool AssignmentUnavailable);
+    private sealed record RepairersEnvelope(IReadOnlyList<RepairerRowResponse> Repairers);
+    private sealed record RepairerRowResponse(Guid RepairerId, string Name);
 }

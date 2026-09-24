@@ -118,6 +118,20 @@ internal sealed class P2T04TestStore : IToolRepository, IJobOnRepository
         _contexts.Remove(jobOnId);
     }
 
+    /// <summary>
+    /// Disclosed P2-T07 additive test-arrangement helpers: the LIVE context rows of one production
+    /// and the known production ids (the same rows/ids the real Job On service reads). The
+    /// Boquilhas test store resolves contexts created through the REAL association flow
+    /// (<c>IJobOnService.UpdateAsync</c>, BQ-slot Set) from this single source of truth instead of
+    /// duplicating them in its mirror.
+    /// </summary>
+    public IReadOnlyList<ToolContext> ContextsOf(Guid jobOnId) =>
+        _contexts.TryGetValue(jobOnId, out var contexts) ? contexts : [];
+
+    /// <summary>The ids of every known production occurrence.</summary>
+    public IReadOnlyList<Guid> JobOnIds() =>
+        _contexts.Keys.ToList();
+
     // ---- IToolRepository ------------------------------------------------------------------
 
     public Task<Tool?> GetByIdAsync(Guid toolId, CancellationToken cancellationToken) =>

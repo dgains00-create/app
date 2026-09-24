@@ -11,30 +11,28 @@ using JobOnFindProductionsQuery = DMO.Application.JobOn.FindProductionsQuery;
 namespace DMO.Application.Boquilhas;
 
 /// <summary>
-/// The Boquilhas application service: aggregate opening (production-linked | standalone), movement
-/// ledger append/edit, derived balance reads, close/reopen on the SAME <c>boquilhas_id</c>,
-/// opening-facts updates and the local Histórico — composing the closed P2-T04/P2-T05 application
-/// contracts.
+/// The Boquilhas application service: the production movement register — register identity
+/// creation, the three-type movement ledger, edit/audit on the SAME movement, the derived
+/// outstanding and the local Histórico — composing the closed P2-T04/P2-T05 application contracts.
 /// </summary>
 /// <remarks>
-/// Authority: P2-T07 contract §9 (service composition + decision rules), §17–§19 (movements/
-/// balance/edit), §21 (repairer resolution reads), §22–§24 (creation, close/reopen, Histórico).
+/// Authority: P2-T07 OWNER CLARIFICATION (the production movement register), preserving: the
+/// production association (every register belongs to a REAL Job On/BQ context; movements remain
+/// valid AFTER the production end date — the production stays the historical context), the
+/// movement vocabulary (Saída / Entrada / Entrada sem reparação), the derived outstanding formula
+/// (Σ Saída − Σ Entrada − Σ Entrada sem reparação; negative is a valid visible projection), the
+/// edit/audit single-event semantics, the immutable dates and the repairer historical preservation.
 /// <para>
-/// Decision rules of the service (exact, §9.1): (1) balance-relative validation is computed by
-/// replay over the ledger (the single pure <see cref="BalanceProjection.Replay"/> helper, §18) as a
-/// UX pre-check AND again authoritatively by the repository inside the same write transaction —
-/// never from a stored total; (2) edit validation replays with the edited movement's current values
-/// excluded, then validates the new values exactly like an append (§19.2) — guaranteeing a single
-/// net event; (3) the Web layer never queries the database directly; the service never calls a
-/// P2-T05/P2-T04/P2-T06-gated HTTP route (no cross-module HTTP calls). Every persisted-state refusal
-/// is a typed <see cref="BoquilhasResult"/>; actor/time facts are backend-authored
-/// (<c>ICurrentAccountContext</c>/backend clock) and never client-supplied.</para>
+/// There is NO lifecycle: no close/reopen/opening-facts operation, no status, no one-active rule,
+/// no standalone anchor, and the register creation never manufactures a quantity event. The
+/// Web layer never queries the database directly; the service never calls a P2-T05/P2-T04/P2-T06-
+/// gated HTTP route. Every persisted-state refusal is a typed <see cref="BoquilhasResult"/>;
+/// actor/time facts are backend-authored and never client-supplied.</para>
 /// </remarks>
 public sealed class BoquilhasService : IBoquilhasService
 {
     private readonly IBoquilhasRepository _boquilhas;
     private readonly IJobOnService _jobOns;
-    private readonly IToolService _tools;
     private readonly IRepairerRepository _repairers;
     private readonly IMachineRepairerAssignmentRepository _assignments;
     private readonly IBoquilhasContextRead _bqContexts;
@@ -44,7 +42,6 @@ public sealed class BoquilhasService : IBoquilhasService
     public BoquilhasService(
         IBoquilhasRepository boquilhas,
         IJobOnService jobOns,
-        IToolService tools,
         IRepairerRepository repairers,
         IMachineRepairerAssignmentRepository assignments,
         IBoquilhasContextRead bqContexts,
@@ -52,21 +49,19 @@ public sealed class BoquilhasService : IBoquilhasService
     {
         ArgumentNullException.ThrowIfNull(boquilhas);
         ArgumentNullException.ThrowIfNull(jobOns);
-        ArgumentNullException.ThrowIfNull(tools);
         ArgumentNullException.ThrowIfNull(repairers);
         ArgumentNullException.ThrowIfNull(assignments);
         ArgumentNullException.ThrowIfNull(bqContexts);
         ArgumentNullException.ThrowIfNull(currentAccount);
         _boquilhas = boquilhas;
         _jobOns = jobOns;
-        _tools = tools;
         _repairers = repairers;
         _assignments = assignments;
         _bqContexts = bqContexts;
         _currentAccount = currentAccount;
     }
 
-    // ------------------------------------------------------------------ reads (§9.1)
+    // ------------------------------------------------------------------ reads
 
     /// <inheritdoc />
     public async Task<BoquilhasResult> GetListAsync(
@@ -82,27 +77,20 @@ public sealed class BoquilhasService : IBoquilhasService
         }
 
         var rows = await _boquilhas.ListAsync(query, cancellationToken);
-
-        // Total = the backend count for the SAME predicate + filters (§24.2 discipline, applied to
-        // the Registo grid too); never a fabricated grand total.
         var total = await _boquilhas.CountListAsync(query, cancellationToken);
 
         return new BoquilhasResult.ListFound(
-            rows.Select(row => new BoquilhaListItemReadModel(
+            rows.Select(row => new RegisterListItemReadModel(
                 row.BoquilhasId,
-                row.Version,
-                row.State,
                 row.BqId,
-                row.ToolId,
                 row.Reference,
                 row.Lot,
-                row.Machines,
-                row.OpeningDate,
-                row.InitialQuantity,
-                row.Disponivel,
-                row.EmReparacao,
-                row.Irreparavel,
-                row.EntradaExcecional))
+                row.ProductionNumber,
+                row.ProductionMachine,
+                row.ProductionDate,
+                row.Outstanding,
+                row.MovementCount,
+                row.LastMovementAt))
                 .ToList(),
             total);
     }
@@ -121,30 +109,24 @@ public sealed class BoquilhasService : IBoquilhasService
         }
 
         var rows = await _boquilhas.GetHistoryAsync(query, cancellationToken);
-
-        // Total = backend-counted rows for the same predicate + filters (§24.2).
         var total = await _boquilhas.CountHistoryAsync(query, cancellationToken);
 
         return new BoquilhasResult.HistoryFound(
-            rows.Select(row => new HistoryItemReadModel(
+            rows.Select(row => new HistoryMovementItemReadModel(
+                row.MovementId,
                 row.BoquilhasId,
-                row.Version,
-                row.State,
-                row.BqId,
-                row.ToolId,
+                row.MovementType,
+                row.Quantity,
+                row.BusinessDate,
+                row.RecordedAt,
+                row.RecordedByUserId,
+                row.Machine,
+                row.RepairerId,
+                row.Observations,
                 row.Reference,
                 row.Lot,
-                row.Machines,
-                row.OpeningDate,
-                row.InitialQuantity,
-                row.Disponivel,
-                row.EmReparacao,
-                row.Irreparavel,
-                row.EntradaExcecional,
-                row.MovementCount,
-                row.ClosedAt,
-                row.ClosedByUserId,
-                row.LastMovementAt))
+                row.ProductionNumber,
+                row.ProductionMachine))
                 .ToList(),
             total);
     }
@@ -152,13 +134,13 @@ public sealed class BoquilhasService : IBoquilhasService
     /// <inheritdoc />
     public async Task<BoquilhasResult> GetAsync(Guid boquilhasId, CancellationToken cancellationToken)
     {
-        var aggregate = await _boquilhas.GetByIdAsync(boquilhasId, cancellationToken);
-        if (aggregate is null)
+        var register = await _boquilhas.GetByIdAsync(boquilhasId, cancellationToken);
+        if (register is null)
         {
             return new BoquilhasResult.NotFound(boquilhasId);
         }
 
-        return new BoquilhasResult.Ficha(await BuildFichaAsync(aggregate, cancellationToken));
+        return new BoquilhasResult.Ficha(await BuildFichaAsync(register, cancellationToken));
     }
 
     /// <inheritdoc />
@@ -167,8 +149,8 @@ public sealed class BoquilhasService : IBoquilhasService
         Guid movementId,
         CancellationToken cancellationToken)
     {
-        var aggregate = await _boquilhas.GetByIdAsync(boquilhasId, cancellationToken);
-        if (aggregate is null || !aggregate.Movements.Any(movement => movement.MovementId.Value == movementId))
+        var register = await _boquilhas.GetByIdAsync(boquilhasId, cancellationToken);
+        if (register is null || !register.Movements.Any(movement => movement.MovementId.Value == movementId))
         {
             return new BoquilhasResult.NotFound(movementId);
         }
@@ -195,11 +177,11 @@ public sealed class BoquilhasService : IBoquilhasService
                 .ToList());
     }
 
-    // ------------------------------------------------------------------ create (§22)
+    // ------------------------------------------------------------------ register creation (route 4)
 
     /// <inheritdoc />
     public async Task<BoquilhasResult> CreateAsync(
-        CreateBoquilhasCommand command,
+        CreateBoquilhaRegisterCommand command,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -210,57 +192,22 @@ public sealed class BoquilhasService : IBoquilhasService
             return new BoquilhasResult.ValidationFailed(errors);
         }
 
-        // Anchor truthfulness: a production-linked aggregate anchors a REAL bq_contexts row (AC-I3);
-        // a standalone aggregate anchors a real canonical BQ Tool (AC-I2). The repository repeats
-        // both resolutions authoritatively inside the create transaction.
-        if (command.BqId is { } bqId)
+        // Production association: the register anchors a REAL bq_contexts row (never a fake
+        // production/bq id). The repository re-asserts the same check authoritatively inside the
+        // create transaction.
+        if (await _bqContexts.GetBqContextAsync(command.BqId, cancellationToken) is null)
         {
-            if (await _bqContexts.GetBqContextAsync(bqId, cancellationToken) is null)
-            {
-                return new BoquilhasResult.ValidationFailed(
-                    [BoquilhasValidationErrors.BqContextNotFound]);
-            }
+            return new BoquilhasResult.ValidationFailed(
+                [BoquilhasValidationErrors.BqContextNotFound]);
         }
-
-        if (command.ToolId is { } toolId)
-        {
-            var toolResult = await _tools.GetAsync(toolId, cancellationToken);
-            if (toolResult is not ToolResult.Found(var ficha))
-            {
-                return new BoquilhasResult.ValidationFailed([BoquilhasValidationErrors.ToolNotFound]);
-            }
-
-            if (ficha.Type != ToolType.Bq)
-            {
-                return new BoquilhasResult.ValidationFailed(
-                    [BoquilhasValidationErrors.ToolTypeMismatch]);
-            }
-        }
-
-        // Application pre-check (normal-path refusal for UX only — NOT the concurrency authority;
-        // the partial unique indexes of §7.2 are the race-safe backstop, §22.2).
-        if (await HasActiveAggregateForAnchorAsync(command.BqId, command.ToolId, Guid.Empty, cancellationToken))
-        {
-            return Refuse(
-                BoquilhasRefusalReason.ActiveAggregateExists,
-                "Já existe um registo ativo para este contexto BQ; nada foi criado.");
-        }
-
-        var unit = new BoqCreateUnit(
-            command.BqId,
-            command.ToolId,
-            command.Machines,
-            command.InitialQuantity,
-            command.OpeningDate,
-            command.UtilisationPercent,
-            Trimmed(command.Observations),
-            command.CreatedByUserId);
 
         try
         {
-            var created = await _boquilhas.CreatedAsync(unit, cancellationToken);
+            var created = await _boquilhas.CreatedAsync(
+                new BoqCreateUnit(command.BqId, command.CreatedByUserId),
+                cancellationToken);
 
-            return new BoquilhasResult.Created(created.BoquilhasId.Value, created.Version);
+            return new BoquilhasResult.RegisterCreated(created.BoquilhasId.Value);
         }
         catch (ConcurrencyConflictException exception)
         {
@@ -272,7 +219,7 @@ public sealed class BoquilhasService : IBoquilhasService
         }
     }
 
-    // ------------------------------------------------------------------ append (§17)
+    // ------------------------------------------------------------------ append (route 5)
 
     /// <inheritdoc />
     public async Task<BoquilhasResult> AppendMovementAsync(
@@ -287,49 +234,14 @@ public sealed class BoquilhasService : IBoquilhasService
             return new BoquilhasResult.ValidationFailed(errors);
         }
 
-        var aggregate = await _boquilhas.GetByIdAsync(command.BoquilhasId, cancellationToken);
-        if (aggregate is null)
+        var register = await _boquilhas.GetByIdAsync(command.BoquilhasId, cancellationToken);
+        if (register is null)
         {
             return new BoquilhasResult.NotFound(command.BoquilhasId);
         }
 
-        if (aggregate.Version != command.ExpectedAggregateVersion)
-        {
-            return Refuse(
-                BoquilhasRefusalReason.StaleVersion,
-                $"O registo foi alterado depois de observado (versão esperada {command.ExpectedAggregateVersion}, atual {aggregate.Version}); nada foi guardado.");
-        }
-
-        if (!aggregate.IsActive)
-        {
-            return Refuse(
-                BoquilhasRefusalReason.AggregateClosed,
-                "O registo está fechado; reabra-o antes de registar movimentos.");
-        }
-
-        var movementKind = MovementKindTokens.Parse(command.MovementType)!.Value;
-
-        if (movementKind == MovementKind.Inicio)
-        {
-            return Refuse(
-                BoquilhasRefusalReason.OnlyOneInicio,
-                "O Início é criado com o registo; não pode ser registado um segundo Início.");
-        }
-
-        // §17.2 steps 3–4 (UX pre-check; the repository re-asserts the same rules authoritatively
-        // inside its transaction from the ledger loaded there).
-        var refusal = ValidateMovementAgainstLedger(
-            aggregate,
-            beforeState: aggregate.Movements,
-            kind: movementKind,
-            command.Quantity,
-            command.Machine,
-            command.RepairerId);
-        if (refusal is not null)
-        {
-            return refusal;
-        }
-
+        // The repairer is the consumed canonical register read (never administered here) and the
+        // historical fact is frozen on the movement row.
         var repairerError = await ValidateRepairerAsync(command.RepairerId, cancellationToken);
         if (repairerError is not null)
         {
@@ -338,7 +250,6 @@ public sealed class BoquilhasService : IBoquilhasService
 
         var unit = new BoqAppendUnit(
             command.BoquilhasId,
-            command.ExpectedAggregateVersion,
             command.MovementType,
             command.Quantity,
             command.BusinessDate,
@@ -349,15 +260,9 @@ public sealed class BoquilhasService : IBoquilhasService
 
         try
         {
-            // The same-aggregate version marker: every guarded write bumps the aggregate version
-            // exactly once (so a concurrent append/edit/close/reopen always loses with
-            // stale-version, §11).
             var movement = await _boquilhas.AppendMovementAsync(unit, cancellationToken);
 
-            return new BoquilhasResult.MovementAppended(
-                movement.MovementId.Value,
-                movement.Version,
-                aggregate.Version + 1);
+            return new BoquilhasResult.MovementAppended(movement.MovementId.Value, movement.Version);
         }
         catch (ConcurrencyConflictException exception)
         {
@@ -369,7 +274,7 @@ public sealed class BoquilhasService : IBoquilhasService
         }
     }
 
-    // ------------------------------------------------------------------ edit (§19)
+    // ------------------------------------------------------------------ edit (route 6)
 
     /// <inheritdoc />
     public async Task<BoquilhasResult> EditMovementAsync(
@@ -384,27 +289,13 @@ public sealed class BoquilhasService : IBoquilhasService
             return new BoquilhasResult.ValidationFailed(errors);
         }
 
-        var aggregate = await _boquilhas.GetByIdAsync(command.BoquilhasId, cancellationToken);
-        if (aggregate is null)
+        var register = await _boquilhas.GetByIdAsync(command.BoquilhasId, cancellationToken);
+        if (register is null)
         {
             return new BoquilhasResult.NotFound(command.BoquilhasId);
         }
 
-        if (aggregate.Version != command.ExpectedAggregateVersion)
-        {
-            return Refuse(
-                BoquilhasRefusalReason.StaleVersion,
-                $"O registo foi alterado depois de observado (versão esperada {command.ExpectedAggregateVersion}, atual {aggregate.Version}); nada foi guardado.");
-        }
-
-        if (!aggregate.IsActive)
-        {
-            return Refuse(
-                BoquilhasRefusalReason.AggregateClosed,
-                "O registo está fechado; reabra-o antes de editar movimentos.");
-        }
-
-        var movement = aggregate.Movements.FirstOrDefault(candidate => candidate.MovementId.Value == command.MovementId);
+        var movement = register.Movements.FirstOrDefault(candidate => candidate.MovementId.Value == command.MovementId);
         if (movement is null)
         {
             return new BoquilhasResult.NotFound(command.MovementId);
@@ -417,22 +308,19 @@ public sealed class BoquilhasService : IBoquilhasService
                 $"O movimento foi alterado depois de observado (versão esperada {command.ExpectedMovementVersion}, atual {movement.Version}); nada foi guardado.");
         }
 
-        // §19.2: replay with the edited movement's CURRENT values excluded, then validate the NEW
-        // values exactly like an append — a single net quantity event, no double balance effect.
-        var beforeState = aggregate.Movements
-            .Where(candidate => candidate.MovementId.Value != command.MovementId)
-            .ToList();
-
-        var refusal = ValidateMovementAgainstLedger(
-            aggregate,
-            beforeState,
-            movement.Kind,
-            command.Quantity,
-            command.Machine,
-            command.RepairerId);
-        if (refusal is not null)
+        // The stored type is immutable; a Saída keeps requiring its machine/repairer facts
+        // (the repository re-asserts the same rule in-transaction from the stored type).
+        if (movement.Kind == MovementKind.Saida)
         {
-            return refusal;
+            if (command.Machine is null)
+            {
+                return new BoquilhasResult.ValidationFailed([BoquilhasValidationErrors.MachineRequired]);
+            }
+
+            if (command.RepairerId is null)
+            {
+                return new BoquilhasResult.ValidationFailed([BoquilhasValidationErrors.RepairerRequired]);
+            }
         }
 
         var repairerError = await ValidateRepairerAsync(command.RepairerId, cancellationToken);
@@ -443,7 +331,6 @@ public sealed class BoquilhasService : IBoquilhasService
 
         var unit = new BoqEditUnit(
             command.BoquilhasId,
-            command.ExpectedAggregateVersion,
             command.MovementId,
             command.ExpectedMovementVersion,
             command.Quantity,
@@ -459,8 +346,7 @@ public sealed class BoquilhasService : IBoquilhasService
 
             return new BoquilhasResult.MovementEdited(
                 result.Movement.MovementId.Value,
-                result.Movement.Version,
-                result.AggregateVersion);
+                result.Movement.Version);
         }
         catch (ConcurrencyConflictException exception)
         {
@@ -472,183 +358,7 @@ public sealed class BoquilhasService : IBoquilhasService
         }
     }
 
-    // ------------------------------------------------------------------ close/reopen (§23)
-
-    /// <inheritdoc />
-    public async Task<BoquilhasResult> CloseAsync(
-        CloseBoquilhasCommand command,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(command);
-
-        var aggregate = await _boquilhas.GetByIdAsync(command.BoquilhasId, cancellationToken);
-        if (aggregate is null)
-        {
-            return new BoquilhasResult.NotFound(command.BoquilhasId);
-        }
-
-        if (aggregate.Version != command.ExpectedVersion)
-        {
-            return Refuse(
-                BoquilhasRefusalReason.StaleVersion,
-                $"O registo foi alterado depois de observado (versão esperada {command.ExpectedVersion}, atual {aggregate.Version}); nada foi guardado.");
-        }
-
-        if (!aggregate.IsActive)
-        {
-            return Refuse(
-                BoquilhasRefusalReason.AlreadyClosed,
-                "O registo já está fechado.");
-        }
-
-        try
-        {
-            var result = await _boquilhas.CloseAsync(
-                new BoqCloseUnit(
-                    command.BoquilhasId,
-                    command.ExpectedVersion,
-                    await ResolveUserIdAsync(cancellationToken)),
-                cancellationToken);
-
-            return new BoquilhasResult.Closed(
-                command.BoquilhasId,
-                result.AggregateVersion,
-                result.Snapshot.ClosedAt);
-        }
-        catch (ConcurrencyConflictException exception)
-        {
-            return Refuse(BoquilhasRefusalReason.StaleVersion, exception.Message);
-        }
-        catch (BoquilhasPersistenceException exception)
-        {
-            return Map(exception);
-        }
-    }
-
-    /// <inheritdoc />
-    public async Task<BoquilhasResult> ReopenAsync(
-        ReopenBoquilhasCommand command,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(command);
-
-        var errors = BoquilhasValidator.Validate(command);
-        if (errors.Count > 0)
-        {
-            return new BoquilhasResult.ValidationFailed(errors);
-        }
-
-        var aggregate = await _boquilhas.GetByIdAsync(command.BoquilhasId, cancellationToken);
-        if (aggregate is null)
-        {
-            return new BoquilhasResult.NotFound(command.BoquilhasId);
-        }
-
-        if (aggregate.Version != command.ExpectedVersion)
-        {
-            return Refuse(
-                BoquilhasRefusalReason.StaleVersion,
-                $"O registo foi alterado depois de observado (versão esperada {command.ExpectedVersion}, atual {aggregate.Version}); nada foi guardado.");
-        }
-
-        if (!aggregate.IsClosed)
-        {
-            return Refuse(
-                BoquilhasRefusalReason.NotClosed,
-                "O registo não está fechado; apenas registos fechados podem ser reabertos.");
-        }
-
-        // §23.3 steps 6–8 (UX pre-checks; the repository re-asserts the same rules authoritatively
-        // inside its transaction, and the partial unique index is the race-safe backstop).
-        var eligibility = await ReopenEligibilityAsync(aggregate, cancellationToken);
-        if (eligibility is not null)
-        {
-            return eligibility;
-        }
-
-        try
-        {
-            var result = await _boquilhas.ReopenAsync(
-                new BoqReopenUnit(
-                    command.BoquilhasId,
-                    command.ExpectedVersion,
-                    command.Reason.Trim(),
-                    await ResolveUserIdAsync(cancellationToken)),
-                cancellationToken);
-
-            return new BoquilhasResult.Reopened(
-                command.BoquilhasId,
-                result.AggregateVersion,
-                result.Reopen.ReopenedAt);
-        }
-        catch (ConcurrencyConflictException exception)
-        {
-            return Refuse(BoquilhasRefusalReason.StaleVersion, exception.Message);
-        }
-        catch (BoquilhasPersistenceException exception)
-        {
-            return Map(exception);
-        }
-    }
-
-    /// <inheritdoc />
-    public async Task<BoquilhasResult> UpdateOpeningFactsAsync(
-        UpdateOpeningFactsCommand command,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(command);
-
-        var errors = BoquilhasValidator.Validate(command);
-        if (errors.Count > 0)
-        {
-            return new BoquilhasResult.ValidationFailed(errors);
-        }
-
-        var aggregate = await _boquilhas.GetByIdAsync(command.BoquilhasId, cancellationToken);
-        if (aggregate is null)
-        {
-            return new BoquilhasResult.NotFound(command.BoquilhasId);
-        }
-
-        if (aggregate.Version != command.ExpectedVersion)
-        {
-            return Refuse(
-                BoquilhasRefusalReason.StaleVersion,
-                $"O registo foi alterado depois de observado (versão esperada {command.ExpectedVersion}, atual {aggregate.Version}); nada foi guardado.");
-        }
-
-        if (!aggregate.IsActive)
-        {
-            return Refuse(
-                BoquilhasRefusalReason.AggregateClosed,
-                "O registo está fechado; reabra-o antes de alterar os dados de abertura.");
-        }
-
-        try
-        {
-            var updated = await _boquilhas.UpdateOpeningFactsAsync(
-                new BoqOpeningFactsUnit(
-                    command.BoquilhasId,
-                    command.ExpectedVersion,
-                    command.OpeningDate,
-                    command.UtilisationPercent,
-                    Trimmed(command.Observations),
-                    command.Machines),
-                cancellationToken);
-
-            return new BoquilhasResult.OpeningFactsUpdated(updated.BoquilhasId.Value, updated.Version);
-        }
-        catch (ConcurrencyConflictException exception)
-        {
-            return Refuse(BoquilhasRefusalReason.StaleVersion, exception.Message);
-        }
-        catch (BoquilhasPersistenceException exception)
-        {
-            return Map(exception);
-        }
-    }
-
-    // ------------------------------------------------------------------ consumed reads (§21)
+    // ------------------------------------------------------------------ consumed reads
 
     /// <inheritdoc />
     public async Task<BoquilhasResult> GetMachineAssignmentsAsync(CancellationToken cancellationToken)
@@ -693,7 +403,7 @@ public sealed class BoquilhasService : IBoquilhasService
                 repairer.Name)).ToList());
     }
 
-    // ------------------------------------------------------------------ Job On composition (§22)
+    // ------------------------------------------------------------------ Job On composition
 
     /// <inheritdoc />
     public async Task<BoquilhasResult> FindProductionsAsync(
@@ -743,8 +453,8 @@ public sealed class BoquilhasService : IBoquilhasService
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        // §22.3: compose ONLY IJobOnService — Keep every fact + Set the BQ slot. The bq_contexts
-        // row is created by Job On's own application/repository code (the accepted P2-T05 §21.4
+        // Compose ONLY IJobOnService — Keep every fact + Set the BQ slot. The bq_contexts row is
+        // created by Job On's own application/repository code (the accepted P2-T05 §21.4
         // composition, BQ slot); the canonical Tool existence/type is validated by Job On itself
         // (TOOL_NOT_FOUND/TOOL_TYPE_MISMATCH) and by the FK backstop.
         var fichaResult = await _jobOns.GetAsync(command.JobOnId, cancellationToken);
@@ -768,8 +478,6 @@ public sealed class BoquilhasService : IBoquilhasService
                 $"A produção foi alterada depois de observada (versão esperada {command.ExpectedJobOnVersion}, atual {ficha.Version}); nada foi associado.");
         }
 
-        // Tool validation happens inside IJobOnService.UpdateAsync (ResolveToolAsync -> the closed
-        // TOOL_NOT_FOUND / TOOL_TYPE_MISMATCH codes).
         var update = await _jobOns.UpdateAsync(
             new UpdateJobOnCommand(
                 command.JobOnId,
@@ -818,14 +526,12 @@ public sealed class BoquilhasService : IBoquilhasService
     // ------------------------------------------------------------------ ficha composition
 
     /// <summary>
-    /// Builds the ficha read model: the aggregate facts plus the anchor traversal (frozen
-    /// <c>bq_contexts</c> triple for production-linked aggregates / live canonical Tool projection
-    /// for standalone aggregates) and the real production context via <c>bq_id → job_ons</c> — the
-    /// read-only composition pattern (review N1 resolution; no foreign writes, no cross-module
-    /// HTTP).
+    /// Builds the register ficha: the register facts plus the production context via the REAL
+    /// <c>bq_id → bq_contexts → job_ons</c> chain (frozen triple + production facts) — the accepted
+    /// read-only composition pattern (no foreign writes, no cross-module HTTP).
     /// </summary>
-    private async Task<BoquilhasFichaReadModel> BuildFichaAsync(
-        BoquilhaAggregate aggregate,
+    private async Task<RegisterFichaReadModel> BuildFichaAsync(
+        BoquilhaRegister register,
         CancellationToken cancellationToken)
     {
         AnchorContextReadModel? anchor = null;
@@ -833,69 +539,38 @@ public sealed class BoquilhasService : IBoquilhasService
         string? reference = null;
         string? lot = null;
 
-        if (aggregate.BqId is { } bqId)
+        var context = await _bqContexts.GetBqContextAsync(register.BqId, cancellationToken);
+        if (context is not null)
         {
-            var context = await _bqContexts.GetBqContextAsync(bqId, cancellationToken);
-            if (context is not null)
-            {
-                anchor = new AnchorContextReadModel(
-                    context.ToolId,
-                    context.ToolType,
-                    context.ToolReference,
-                    context.ToolLot,
-                    LiveToolReference: null,
-                    LiveToolLot: null,
-                    Processo: null,
-                    ToolQuantity: null,
-                    CompatibleMachines: []);
-                reference = context.ToolReference;
-                lot = context.ToolLot;
+            anchor = new AnchorContextReadModel(
+                context.ToolId,
+                context.ToolType,
+                context.ToolReference,
+                context.ToolLot);
+            reference = context.ToolReference;
+            lot = context.ToolLot;
 
-                var jobOnResult = await _jobOns.GetAsync(context.JobOnId, cancellationToken);
-                if (jobOnResult is JobOnResult.Ficha(var jobOnFicha))
-                {
-                    production = new ProductionContextReadModel(
-                        jobOnFicha.Reference,
-                        jobOnFicha.ProductionNumber,
-                        jobOnFicha.Machine,
-                        jobOnFicha.ProductionDate);
-                }
-            }
-        }
-        else if (aggregate.ToolId is { } toolId)
-        {
-            var toolResult = await _tools.GetAsync(toolId, cancellationToken);
-            if (toolResult is ToolResult.Found(var toolFicha))
+            var jobOnResult = await _jobOns.GetAsync(context.JobOnId, cancellationToken);
+            if (jobOnResult is JobOnResult.Ficha(var jobOnFicha))
             {
-                anchor = new AnchorContextReadModel(
-                    toolFicha.ToolId,
-                    ToolTokens.ToToken(toolFicha.Type),
-                    string.Empty,
-                    string.Empty,
-                    toolFicha.Reference,
-                    toolFicha.Lot,
-                    ToolTokens.ToToken(toolFicha.Processo),
-                    toolFicha.Quantity,
-                    toolFicha.CompatibleMachines.Select(machine => machine.Value).ToList());
-                reference = toolFicha.Reference;
-                lot = toolFicha.Lot;
+                production = new ProductionContextReadModel(
+                    jobOnFicha.Reference,
+                    jobOnFicha.ProductionNumber,
+                    jobOnFicha.Machine,
+                    jobOnFicha.ProductionDate);
             }
         }
 
-        var balance = aggregate.Balance;
         var saldo = 0;
 
-        var movements = aggregate.Ledger
+        var movements = register.Ledger
             .Select(movement =>
             {
-                if (movement.Kind == MovementKind.Entrada)
+                saldo += movement.Kind switch
                 {
-                    saldo += movement.Quantity;
-                }
-                else if (movement.Kind == MovementKind.Saida)
-                {
-                    saldo -= movement.Quantity;
-                }
+                    MovementKind.Saida => movement.Quantity,
+                    _ => -movement.Quantity,
+                };
 
                 return new MovementReadModel(
                     movement.MovementId.Value,
@@ -906,112 +581,26 @@ public sealed class BoquilhasService : IBoquilhasService
                     movement.RecordedByUserId,
                     movement.Machine,
                     movement.RepairerId,
-                    movement.ExpectedReturnQuantity,
-                    movement.ExcessReceivedQuantity,
                     movement.Observations,
                     movement.Version,
                     saldo);
             })
             .ToList();
 
-        return new BoquilhasFichaReadModel(
-            aggregate.BoquilhasId.Value,
-            aggregate.Version,
-            BoquilhaStatusTokens.ToToken(aggregate.Status),
-            aggregate.BqId,
-            aggregate.ToolId,
+        return new RegisterFichaReadModel(
+            register.BoquilhasId.Value,
+            register.BqId,
             reference,
             lot,
-            aggregate.Machines.Select(machine => machine.Value).ToList(),
-            aggregate.OpeningDate,
-            aggregate.UtilisationPercent,
-            aggregate.Observations,
-            aggregate.CreatedByUserId,
-            aggregate.CreatedAt,
+            register.Outstanding,
+            register.CreatedByUserId,
+            register.CreatedAt,
             anchor,
             production,
-            new BalanceReadModel(balance.Disponivel, balance.EmReparacao, balance.Irreparavel, balance.EntradaExcecional),
-            movements,
-            aggregate.LastClose is { } close
-                ? new CloseSnapshotReadModel(
-                    close.CloseSnapshotId,
-                    close.ClosedByUserId,
-                    close.ClosedAt,
-                    close.InitialQuantity,
-                    close.OpeningDate,
-                    close.Disponivel,
-                    close.EmReparacao,
-                    close.Irreparavel,
-                    close.EntradaExcecional,
-                    close.UtilisationPercent)
-                : null,
-            aggregate.LastReopen is { } reopen
-                ? new ReopeningReadModel(
-                    reopen.ReopenId,
-                    reopen.CloseSnapshotId,
-                    reopen.ReopenedByUserId,
-                    reopen.ReopenedAt,
-                    reopen.Reason)
-                : null);
+            movements);
     }
 
     // ------------------------------------------------------------------ decision helpers
-
-    /// <summary>
-    /// §17.2 rules 3–4 over a replay: the Saída/Irreparável balance refusals computed from the
-    /// supplied before-state ledger, the machine membership rule and the external-Saída required
-    /// facts. Returns a typed result to return, or <c>null</c> when the movement is valid.
-    /// </summary>
-    private static BoquilhasResult? ValidateMovementAgainstLedger(
-        BoquilhaAggregate aggregate,
-        IReadOnlyList<BoquilhaMovement> beforeState,
-        MovementKind kind,
-        int quantity,
-        string? machine,
-        Guid? repairerId)
-    {
-        if (kind == MovementKind.Saida)
-        {
-            if (machine is null)
-            {
-                return new BoquilhasResult.ValidationFailed([BoquilhasValidationErrors.MachineRequired]);
-            }
-
-            if (repairerId is null)
-            {
-                return new BoquilhasResult.ValidationFailed([BoquilhasValidationErrors.RepairerRequired]);
-            }
-        }
-
-        if (machine is not null
-            && !aggregate.Machines.Any(candidate =>
-                string.Equals(candidate.Value, machine, StringComparison.Ordinal)))
-        {
-            return new BoquilhasResult.ValidationFailed(
-                [BoquilhasValidationErrors.MachineNotInAggregate]);
-        }
-
-        if (kind == MovementKind.Saida || kind == MovementKind.Irreparavel)
-        {
-            var before = BalanceProjection.Replay(beforeState);
-
-            if (kind == MovementKind.Saida && quantity > before.Disponivel)
-            {
-                return Refuse(
-                    BoquilhasRefusalReason.SaidaExceedsAvailable,
-                    $"A quantidade de Saída ({quantity}) excede o Disponível ({before.Disponivel}); nada foi guardado.");
-            }
-
-            if (kind == MovementKind.Irreparavel && quantity > before.EmReparacao)
-            {
-                return Refuse(
-                    BoquilhasRefusalReason.IrreparavelExceedsInRepair,
-                    $"A quantidade de Irreparável ({quantity}) excede o Em reparação ({before.EmReparacao}); nada foi guardado.");
-            }
-        }
-
-        return null;
-    }
 
     /// <summary>Repairer existence against the consumed register read (never administered here).</summary>
     private async Task<BoquilhasResult?> ValidateRepairerAsync(
@@ -1031,49 +620,6 @@ public sealed class BoquilhasService : IBoquilhasService
 
         return null;
     }
-
-    /// <summary>
-    /// §23.3 steps 7–8 (UX pre-checks): this aggregate must hold the most recent close among
-    /// aggregates sharing its anchor, and no OTHER active aggregate may share the anchor. The
-    /// repository re-asserts both authoritatively inside the reopen transaction (and the partial
-    /// unique index is the race-safe backstop).
-    /// </summary>
-    private async Task<BoquilhasResult?> ReopenEligibilityAsync(
-        BoquilhaAggregate aggregate,
-        CancellationToken cancellationToken)
-    {
-        var anchorLastClose = await _boquilhas.GetLastCloseSnapshotIdForAnchorAsync(
-            aggregate.BqId,
-            aggregate.ToolId,
-            cancellationToken);
-
-        if (aggregate.LastClose is null || anchorLastClose != aggregate.LastClose.CloseSnapshotId)
-        {
-            return Refuse(
-                BoquilhasRefusalReason.NotLastClosed,
-                "Este registo não é o último registo fechado deste contexto BQ; apenas o último fechado pode ser reaberto.");
-        }
-
-        if (await HasActiveAggregateForAnchorAsync(
-                aggregate.BqId,
-                aggregate.ToolId,
-                aggregate.BoquilhasId.Value,
-                cancellationToken))
-        {
-            return Refuse(
-                BoquilhasRefusalReason.ActiveAggregateExists,
-                "Já existe um registo ativo para este contexto BQ; nada foi reaberto.");
-        }
-
-        return null;
-    }
-
-    private Task<bool> HasActiveAggregateForAnchorAsync(
-        Guid? bqId,
-        Guid? toolId,
-        Guid excludeBoquilhasId,
-        CancellationToken cancellationToken) =>
-        _boquilhas.HasActiveAggregateForAnchorAsync(bqId, toolId, excludeBoquilhasId, cancellationToken);
 
     /// <summary>
     /// The backend actor of every Boquilhas write: the current USER account id
@@ -1096,38 +642,13 @@ public sealed class BoquilhasService : IBoquilhasService
     private static BoquilhasResult Map(BoquilhasPersistenceException exception) =>
         exception.Reason switch
         {
-            BoquilhasPersistenceFailureReason.ActiveAggregateExists => Refuse(
-                BoquilhasRefusalReason.ActiveAggregateExists,
-                "Já existe um registo ativo para este contexto BQ; nada foi guardado."),
-            BoquilhasPersistenceFailureReason.AlreadyClosed => Refuse(
-                BoquilhasRefusalReason.AlreadyClosed,
-                "O registo já está fechado."),
-            BoquilhasPersistenceFailureReason.NotClosed => Refuse(
-                BoquilhasRefusalReason.NotClosed,
-                "O registo não está fechado; apenas registos fechados podem ser reabertos."),
-            BoquilhasPersistenceFailureReason.NotLastClosed => Refuse(
-                BoquilhasRefusalReason.NotLastClosed,
-                "Este registo não é o último registo fechado deste contexto BQ."),
-            BoquilhasPersistenceFailureReason.AggregateClosed => Refuse(
-                BoquilhasRefusalReason.AggregateClosed,
-                "O registo está fechado; reabra-o antes de continuar."),
-            BoquilhasPersistenceFailureReason.OnlyOneInicio => Refuse(
-                BoquilhasRefusalReason.OnlyOneInicio,
-                "O Início é criado com o registo; não pode ser registado um segundo Início."),
-            BoquilhasPersistenceFailureReason.SaidaExceedsAvailable => Refuse(
-                BoquilhasRefusalReason.SaidaExceedsAvailable,
-                "A quantidade de Saída excede o Disponível; nada foi guardado."),
-            BoquilhasPersistenceFailureReason.IrreparavelExceedsInRepair => Refuse(
-                BoquilhasRefusalReason.IrreparavelExceedsInRepair,
-                "A quantidade de Irreparável excede o Em reparação; nada foi guardado."),
+            BoquilhasPersistenceFailureReason.RegisterExists => Refuse(
+                BoquilhasRefusalReason.RegisterExists,
+                "Já existe um registo de Boquilhas para esta produção; nada foi criado."),
             BoquilhasPersistenceFailureReason.ConstraintViolation => new BoquilhasResult.ValidationFailed(
                 [exception.ValidatorToken ?? BoquilhasValidationErrors.FilterInvalid]),
             BoquilhasPersistenceFailureReason.BqContextNotFound => new BoquilhasResult.ValidationFailed(
                 [BoquilhasValidationErrors.BqContextNotFound]),
-            BoquilhasPersistenceFailureReason.ToolNotFound => new BoquilhasResult.ValidationFailed(
-                [BoquilhasValidationErrors.ToolNotFound]),
-            BoquilhasPersistenceFailureReason.ToolTypeMismatch => new BoquilhasResult.ValidationFailed(
-                [BoquilhasValidationErrors.ToolTypeMismatch]),
             BoquilhasPersistenceFailureReason.RepairerNotFound => new BoquilhasResult.ValidationFailed(
                 [BoquilhasValidationErrors.RepairerNotFound]),
             _ => throw new ArgumentOutOfRangeException(

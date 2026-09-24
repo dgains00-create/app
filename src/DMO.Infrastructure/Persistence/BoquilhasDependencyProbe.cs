@@ -48,9 +48,9 @@ public sealed class BoquilhasDependencyProbe : IJobOnDependencyProbe
             .Select(id => id!.Value)
             .ToList();
 
-        // A Boquilhas aggregate is production-linked exactly when it anchors a real bq_contexts row
-        // of the target occurrence; standalone aggregates (tool_id anchor) are out of scope here
-        // (their protection is the tools RESTRICT FK).
+        // A Boquilhas register is production-linked exactly when it anchors a real bq_contexts row
+        // of the target occurrence (the ONLY anchor after the Owner clarification removed the
+        // standalone flow; its protection is the bq_contexts RESTRICT FK).
         if (bqContextIds.Count == 0)
         {
             return JobOnDependencyReport.None(SourceName);
@@ -58,9 +58,9 @@ public sealed class BoquilhasDependencyProbe : IJobOnDependencyProbe
 
         var dependents = await _context.Set<BoquilhaEntity>()
             .AsNoTracking()
-            .Where(aggregate => aggregate.BqId != null && bqContextIds.Contains(aggregate.BqId!.Value))
-            .Select(aggregate => new { aggregate.BoquilhasId })
-            .OrderBy(aggregate => aggregate.BoquilhasId)
+            .Where(register => bqContextIds.Contains(register.BqId))
+            .Select(register => new { register.BoquilhasId })
+            .OrderBy(register => register.BoquilhasId)
             .ToListAsync(cancellationToken);
 
         return dependents.Count == 0

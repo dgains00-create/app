@@ -3,37 +3,36 @@
 @using DMO.Web.Frontend.Shared.Contracts
 @{
     ViewData["Title"] = "Boquilhas — Histórico";
-    var stateFilterAll = string.IsNullOrWhiteSpace(Model.State);
-    var stateFilterActive = Model.State == "active";
-    var stateFilterClosed = Model.State == "closed";
     var movementFilterAll = string.IsNullOrWhiteSpace(Model.MovementType);
-    var movementFilterInicio = Model.MovementType == "inicio";
     var movementFilterSaida = Model.MovementType == "saida";
     var movementFilterEntrada = Model.MovementType == "entrada";
-    var movementFilterIrreparavel = Model.MovementType == "irreparavel";
+    var movementFilterSemReparacao = Model.MovementType == "entrada_sem_reparacao";
 }
 <partial name="~/Pages/Shared/Components/_SharedComponentAssets.cshtml" />
 <link rel="stylesheet" href="~/css/dmo-boquilhas.css" asp-append-version="true" />
 <script src="~/js/dmo-boquilhas.js" defer></script>
 
 @*
-    P2-T07 Histórico surface (contract §25.3 regions H1–H3, §24).
+    P2-T07 Histórico surface (OWNER CLARIFICATION).
 
-    HISTÓRICO (local) inside the Boquilhas module — NEVER HISTÓRICO GLOBAL (`historia` is deferred
-    by design; AC-H2). Fixed desktop composition at the binding 1366 × 768 viewport; the wide
-    history table uses local keyboard-reachable overflow; no breakpoint variant, no card conversion,
-    no required-column hiding and no action relocation exists (AC-L1/L2).
+    HISTÓRICO (local) inside the Boquilhas module — NEVER HISTÓRICO GLOBAL. Fixed desktop
+    composition at the binding 1366 × 768 viewport; the wide history table uses local
+    keyboard-reachable overflow; no breakpoint variant, no card conversion, no required-column
+    hiding and no action relocation exists anywhere in this surface (AC-L1/L2).
 
-    Every filter is a backend SQL predicate (route 18) — never client-side filtering of a fetched
-    set; unknown/ill-formed values are refused with FILTER_INVALID, never a silent full list
-    (AC-H1). Paging is 1-based with the deterministic technical order (created_at DESC,
-    boquilhas_id DESC) and the total is the backend count for the same predicate (AC-H5). The table
-    is a selection surface: single click selects, double click opens the exact aggregate; actions
-    (Abrir/Reabrir) live OUTSIDE the table (AC-H3).
+    The history is the CHRONOLOGICAL MOVEMENT HISTORY of the production/BQ contexts: each row is
+    one movement with its production context (reference/lot/production number), movement type,
+    quantity, business_date, recorded_at, repairer, line and observations. Movement vocabulary:
+    Saída, Entrada, Entrada sem reparação — no Início, no Irreparável, no active/closed/reopened
+    state. Every filter is a backend SQL predicate (never client-side filtering of a fetched set);
+    unknown/ill-formed values are refused with FILTER_INVALID. Paging is 1-based with the
+    deterministic chronological order and the total is the backend count for the same predicate.
+    The table is a selection surface: single click selects, double click opens the exact register
+    (H3); no per-row action grid.
 *@
 <section class="dmo-boquilhas" data-dmo-boquilhas-surface="historico" data-dmo-boquilhas-root="true">
 
-    @* ---- H1 — Filters (the exact §24.2 set; backend-applied) --------------------------------- *@
+    @* ---- Filters (backend-applied) --------------------------------------------------------- *@
     <div class="dmo-boquilhas__region" data-dmo-boquilhas-region="filters" aria-label="Filtros">
         <form class="dmo-boquilhas__filters" method="get" action="/boquilhas/historico" data-dmo-boquilhas-filters="true">
             <label class="dmo-boquilhas__label" for="dmo-boquilhas-reference">Referência</label>
@@ -45,12 +44,6 @@
             <label class="dmo-boquilhas__label" for="dmo-boquilhas-machine">Máquina</label>
             <input class="dmo-boquilhas__input" id="dmo-boquilhas-machine" name="machine" type="text"
                    value="@Model.Machine" data-dmo-filter-machine="true" />
-            <label class="dmo-boquilhas__label" for="dmo-boquilhas-state">Estado</label>
-            <select class="dmo-boquilhas__input" id="dmo-boquilhas-state" name="state" data-dmo-filter-state="true">
-                <option value="" selected="@stateFilterAll">Todos</option>
-                <option value="active" selected="@stateFilterActive">Ativo</option>
-                <option value="closed" selected="@stateFilterClosed">Fechado</option>
-            </select>
             <label class="dmo-boquilhas__label" for="dmo-boquilhas-date-from">Data de negócio desde</label>
             <input class="dmo-boquilhas__input" id="dmo-boquilhas-date-from" name="businessDateFrom" type="date"
                    value="@(Model.BusinessDateFrom?.ToString("yyyy-MM-dd"))" data-dmo-filter-date-from="true" />
@@ -60,10 +53,9 @@
             <label class="dmo-boquilhas__label" for="dmo-boquilhas-movement-type">Movimento</label>
             <select class="dmo-boquilhas__input" id="dmo-boquilhas-movement-type" name="movementType" data-dmo-filter-movement-type="true">
                 <option value="" selected="@movementFilterAll">Todos</option>
-                <option value="inicio" selected="@movementFilterInicio">Início</option>
                 <option value="saida" selected="@movementFilterSaida">Saída</option>
                 <option value="entrada" selected="@movementFilterEntrada">Entrada</option>
-                <option value="irreparavel" selected="@movementFilterIrreparavel">Irreparável</option>
+                <option value="entrada_sem_reparacao" selected="@movementFilterSemReparacao">Entrada sem reparação</option>
             </select>
             <label class="dmo-boquilhas__label" for="dmo-boquilhas-repairer">Reparador</label>
             <input class="dmo-boquilhas__input" id="dmo-boquilhas-repairer" name="repairerId" type="text"
@@ -93,42 +85,31 @@
         }
         else if (Model.ValidationErrors.Count == 0)
         {
-            <p class="dmo-boquilhas__empty" data-dmo-boquilhas-empty="true">Sem registos no Histórico para os filtros indicados.</p>
+            <p class="dmo-boquilhas__empty" data-dmo-boquilhas-empty="true">Sem movimentos no Histórico para os filtros indicados.</p>
         }
     </div>
 
-    @* ---- H3 — Detail (the exact aggregate ficha) + outside-table actions per state ----------- *@
-    @if (Model.Ficha is { } fichaView)
+    @* ---- Register detail (opened by double click on the history row) ----------------------- *@
+    @if (Model.Register is { } registerView)
     {
-        var ficha = fichaView.Ficha;
+        var ficha = registerView.Ficha;
 
         <div class="dmo-boquilhas__region" data-dmo-boquilhas-region="detail" aria-label="Registo"
-             data-dmo-boquilhas-id="@ficha.BoquilhasId" data-dmo-version="@Model.ObservedVersion">
+             data-dmo-boquilhas-id="@ficha.BoquilhasId">
             <h2 class="dmo-boquilhas__title">
                 Boquilhas @ficha.BoquilhasId — @(ficha.Reference ?? "(sem contexto)")
             </h2>
-            <dl class="dmo-boquilhas__facts">
-                <div class="dmo-boquilhas__fact"><dt>Estado</dt><dd data-dmo-state="true">@(ficha.State == "closed" ? "Fechado" : "Ativo")</dd></div>
-                <div class="dmo-boquilhas__fact"><dt>Data de abertura</dt><dd data-dmo-opening-date="true">@ficha.OpeningDate.ToString("yyyy-MM-dd")</dd></div>
-                <div class="dmo-boquilhas__fact"><dt>Máquinas</dt><dd data-dmo-machines="true">@string.Join(", ", ficha.Machines)</dd></div>
-                <div class="dmo-boquilhas__fact"><dt>% utilização (fecho)</dt><dd data-dmo-utilisation="true">@(ficha.LastClose?.UtilisationPercent?.ToString("0.##") + "%" ?? "—")</dd></div>
-            </dl>
 
-            <dl class="dmo-boquilhas__balance" data-dmo-boquilhas-balance="true">
-                <div class="dmo-boquilhas__fact"><dt>Disponível</dt><dd data-dmo-disponivel="true" class="@(ficha.Balance.Disponivel < 0 ? "dmo-boquilhas__negative" : "")">@ficha.Balance.Disponivel</dd></div>
-                <div class="dmo-boquilhas__fact"><dt>Em reparação</dt><dd data-dmo-em-reparacao="true" class="@(ficha.Balance.EmReparacao < 0 ? "dmo-boquilhas__negative" : "")">@ficha.Balance.EmReparacao</dd></div>
-                <div class="dmo-boquilhas__fact"><dt>Irreparável</dt><dd data-dmo-irreparavel="true">@ficha.Balance.Irreparavel</dd></div>
-                <div class="dmo-boquilhas__fact"><dt>Entrada excecional</dt><dd data-dmo-entrada-excecional="true">@ficha.Balance.EntradaExcecional</dd></div>
+            <dl class="dmo-boquilhas__panel-facts" data-dmo-boquilhas-panel="true" aria-label="Contexto de produção">
+                @if (ficha.Production is { } production)
+                {
+                    <div class="dmo-boquilhas__fact"><dt>Referência</dt><dd data-dmo-panel-reference="true">@production.Reference</dd></div>
+                    <div class="dmo-boquilhas__fact"><dt>Produção</dt><dd data-dmo-panel-production="true">@production.ProductionNumber</dd></div>
+                    <div class="dmo-boquilhas__fact"><dt>Máquina</dt><dd data-dmo-panel-machine="true">@production.Machine</dd></div>
+                    <div class="dmo-boquilhas__fact"><dt>Data de produção</dt><dd data-dmo-panel-production-date="true">@(production.ProductionDate?.ToString("yyyy-MM-dd") ?? "—")</dd></div>
+                }
+                <div class="dmo-boquilhas__fact"><dt>Pendente de reparação</dt><dd data-dmo-outstanding="true" class="@(ficha.Outstanding < 0 ? "dmo-boquilhas__negative" : "")">@ficha.Outstanding</dd></div>
             </dl>
-
-            @if (ficha.LastClose is { } close)
-            {
-                <dl class="dmo-boquilhas__facts" data-dmo-close-facts="true">
-                    <div class="dmo-boquilhas__fact"><dt>Fechado em</dt><dd data-dmo-closed-at="true">@close.ClosedAt.ToString("yyyy-MM-dd HH:mm") UTC</dd></div>
-                    <div class="dmo-boquilhas__fact"><dt>Fechado por</dt><dd data-dmo-closed-by="true">@close.ClosedByUserId</dd></div>
-                    <div class="dmo-boquilhas__fact"><dt>Snapshot (D/ER/I/EE)</dt><dd data-dmo-snapshot-buckets="true">@close.Disponivel / @close.EmReparacao / @close.Irreparavel / @close.EntradaExcecional</dd></div>
-                </dl>
-            }
 
             <div class="dmo-boquilhas__ledger-scroll" role="region" tabindex="0" aria-label="Movimentos">
                 <table class="dmo-boquilhas__ledger" data-dmo-movement-table="true">
@@ -136,44 +117,32 @@
                         <tr>
                             <th>Movimento</th>
                             <th>Quantidade</th>
-                            <th>Data</th>
+                            <th>Data de negócio</th>
+                            <th>Registado em</th>
                             <th>Reparador</th>
                             <th>Linha</th>
+                            <th>Observações</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var movement in ficha.Movements)
                         {
                             <tr data-dmo-movement-row="@movement.MovementId" data-dmo-movement-type="@movement.MovementType">
-                                <td>@fichaView.Label(movement.MovementType)</td>
+                                <td>@registerView.Label(movement.MovementType)</td>
                                 <td>@movement.Quantity</td>
                                 <td>@movement.BusinessDate.ToString("yyyy-MM-dd")</td>
+                                <td>@movement.RecordedAt.ToString("yyyy-MM-dd HH:mm") UTC</td>
                                 <td>@(movement.RepairerId?.ToString() ?? "—")</td>
                                 <td>@(movement.Machine ?? "—")</td>
+                                <td>@(movement.Observations ?? "—")</td>
                             </tr>
                         }
                     </tbody>
                 </table>
             </div>
 
-            @* Outside-table actions per state (no per-row action grid; AC-H3) *@
-            <div class="dmo-boquilhas__actions" data-dmo-boquilhas-region="actions" aria-label="Ações do registo">
-                <a class="dmo-boquilhas__button" href="/boquilhas?boquilhasId=@ficha.BoquilhasId"
-                   data-dmo-open-in-registo="true">Abrir no Registo</a>
-
-                @if (Model.Reopen is { } reopen && reopen.Available)
-                {
-                    <button type="button" class="dmo-boquilhas__button" data-dmo-reopen-submit="true">Reabrir</button>
-                    <div class="dmo-boquilhas__reason" data-dmo-reason-region="true" hidden>
-                        <label class="dmo-boquilhas__label" for="dmo-boquilhas-reopen-reason">Motivo (obrigatório)</label>
-                        <input class="dmo-boquilhas__input" id="dmo-boquilhas-reopen-reason" type="text"
-                               data-dmo-reopen-reason-input="true" maxlength="2000" />
-                    </div>
-                }
-
-                @* Page-owned failure surface (conflict = message + explicit reload recovery, D2) *@
-                <div class="dmo-boquilhas__state" data-dmo-boquilhas-state="true" hidden></div>
-            </div>
+            @* Page-owned failure surface (conflict = message + explicit reload recovery, D2) *@
+            <div class="dmo-boquilhas__state" data-dmo-boquilhas-state="true" hidden></div>
         </div>
     }
 </section>

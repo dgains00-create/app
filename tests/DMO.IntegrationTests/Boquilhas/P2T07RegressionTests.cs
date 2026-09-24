@@ -1,29 +1,27 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
 using DMO.Application.Access;
-using DMO.Application.Boquilhas;
 using DMO.Domain.Boquilhas;
 using DMO.IntegrationTests.JobOn;
 using DMO.Web.Endpoints;
 using DMO.Web.Pages.Boquilhas;
-using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 
 namespace DMO.IntegrationTests.Boquilhas;
 
 /// <summary>
-/// P2-T07 boundary/regression block (contract §26 BND-B1…BND-B10 and §29 rows N1–N7/R4/H2/A6):
-/// interim runtime state, protected-file byte identity, excluded vocabularies, the exact
-/// route/policy set, mechanical scans of the write paths and the fixed-desktop static rules.
+/// P2-T07 boundary/regression rows (OWNER CLARIFICATION): availability honesty, the recalculated
+/// route matrix (12 endpoints + 3 pages), the superseded-lifecycle absence, the negative-scope
+/// scans (N1–N7), the movement vocabulary, the false-identity scan and the protected-file pins.
 /// </summary>
 public sealed class P2T07RegressionTests
 {
-    // ------------------------------------------------------------------- N4 (AC-N4)
-
     /// <summary>
-    /// N4/BND-B4 — the current-build availability list is still honest: <c>CurrentBuildAvailable</c>
-    /// stays <c>[]</c> after P2-T07; no destination/route registration exists; the production
-    /// registry resolves zero available Modules.
+    /// N4 — the current-build availability list is still honest: <c>CurrentBuildAvailable</c> stays
+    /// <c>[]</c> after P2-T07; no destination/route registration exists; the production registry
+    /// resolves zero available Modules.
     /// </summary>
     [Fact]
     public void N4_CurrentBuildAvailableStaysEmptyAndNoP2T07RegistrationExists()
@@ -42,29 +40,18 @@ public sealed class P2T07RegressionTests
     // ------------------------------------------------------------------- route count / policies (AC-A1/A6)
 
     /// <summary>
-    /// A1/A6 — the P2-T07 route inventory is EXACTLY the eighteen contracted routes (3 pages + 15
-    /// minimal-API endpoints), all carrying exactly the canonical <c>boquilhas</c> policy, with no
-    /// alias route and no second policy anywhere in the endpoint surface.
+    /// A1/A6 — the P2-T07 route inventory is EXACTLY the final fifteen routes (3 pages + 12
+    /// minimal-API endpoints — RECALCULATED after removing close/reopen/opening-facts, never the
+    /// old eighteen), all carrying exactly the canonical <c>boquilhas</c> policy, with no alias
+    /// route and no second policy.
     /// </summary>
     [Fact]
-    public void A1A6_ExactlyEighteenRoutesAllCarryingTheCanonicalBoquilhasPolicy()
+    public void A1A6_ExactlyFifteenRoutesAllCarryingTheCanonicalBoquilhasPolicy()
     {
         var canonical = DMO.Web.Authorization.ModuleAuthorizationPolicies.PolicyName(ModuleCatalog.Boquilhas);
         Assert.Equal("dmo.module.boquilhas", canonical);
 
-        // The 15 contracted minimal-API endpoints, exact (contract §13.2 routes 4–18).
-        var endpointMethods = typeof(BoquilhasEndpoints)
-            .GetMethods(BindingFlags.Public | BindingFlags.Static)
-            .Where(method => method.Name.StartsWith("Map", StringComparison.Ordinal))
-            .Select(method => method.Name)
-            .ToList();
-
-        // The single Map extension carries all 15 routes; the route COUNT is asserted through the
-        // endpoint data source of a granted host (each MapGet/MapPost/MapPut below).
-        Assert.Contains("MapBoquilhasEndpoints", endpointMethods);
-
-        // The three Razor pages (routes 1–3) each declare the exactly pinned policy constant
-        // (asserted through the page types' [Authorize] attributes).
+        // The three Razor pages (routes 1–3) each declare the exactly pinned policy constant.
         var pages = new[]
         {
             typeof(DMO.Web.Pages.Boquilhas.IndexModel),
@@ -74,7 +61,7 @@ public sealed class P2T07RegressionTests
 
         foreach (var page in pages)
         {
-            var attribute = page.GetCustomAttribute<Microsoft.AspNetCore.Authorization.AuthorizeAttribute>();
+            var attribute = page.GetCustomAttribute<AuthorizeAttribute>();
             Assert.NotNull(attribute);
             Assert.Equal(BoquilhasPolicyNames.Boquilhas, attribute.Policy);
         }
@@ -85,30 +72,36 @@ public sealed class P2T07RegressionTests
     }
 
     /// <summary>
-    /// A6/R4 (AC-A6/AC-R4) — the endpoint surface is EXACTLY the fifteen contracted routes (3 pages +
-    /// 15 endpoints = 18 overall; the pages are asserted by access/rendering rows), with no second
-    /// Tool search/create route, no settings route, no repairer/assignment write route and no
-    /// PDF/file/email/document/availability route.
+    /// A6/R4 — the endpoint surface is EXACTLY the twelve routes (the old 15 is superseded), with
+    /// no close/reopen/opening-facts route, no second Tool search/create route, no settings route,
+    /// no repairer/assignment write route and no PDF/file/email/document/availability route.
     /// </summary>
     [Fact]
-    public void A6R4_NoSecondToolNoSettingsNoRepairerWriteNoDocumentRouteExists()
+    public void A6R4_ExactlyTwelveEndpoints_NoLifecycleNoSettingsNoDocumentRoutes()
     {
         var source = P2T04ProductionScan.Read("src/DMO.Web/Endpoints/BoquilhasEndpoints.cs");
+        var code = P2T04ProductionScan.WithoutRazorComments(source);
 
-        // Exactly fifteen route handlers: the MapGet/MapPost/MapPut calls of the group (the
-        // accepted route-count discipline — contract §13.2 routes 4–18).
+        // Exactly twelve route handlers: the MapGet/MapPost/MapPut calls of the group.
         var handlers = Regex.Matches(source, @"group\.(Map(Get|Post|Put))\(")
             .Count;
 
-        Assert.Equal(15, handlers);
+        Assert.Equal(12, handlers);
 
-        // The Boquilhas surface declares no OTHER module route surface (comment-aware code scan):
-        // no /ferramentas route (the only Tool search/create stays on the P2-T04 routes 12/13), no
-        // settings/definicoes route, no repairer/assignment write route, no PDF/file/email/
-        // document/send/availability/registration route.
-        var code = P2T04ProductionScan.WithoutRazorComments(source);
+        // No lifecycle route survives: close/reopen/opening-facts are gone.
+        foreach (var token in new[] { "/close", "/reopen", "opening-facts", "\"close\"", "\"reopen\"" })
+        {
+            var occurrences = P2T04ProductionScan.SubstringOccurrences(code, token).Count;
+            Assert.True(
+                occurrences == 0,
+                $"The lifecycle route token '{token}' survived in the Boquilhas endpoint surface ({occurrences}).");
+        }
 
-        foreach (var token in new[] { "/ferramentas", "\"settings", "definicoes", "\"pdf", "\"email", "\"document", "\"send", "\"availability", "\"register" })
+        // No other module route surface: no /ferramentas route (the only Tool search/create stays
+        // on the P2-T04 routes), no settings/definicoes route, no repairer/assignment write route
+        // and no PDF/file/email/document/send/availability route (the register-identity route IS
+        // a legitimate Boquilhas route and is excluded from this token set by construction).
+        foreach (var token in new[] { "/ferramentas", "\"settings", "definicoes", "\"pdf", "\"email", "\"document", "\"send", "\"availability" })
         {
             var occurrences = P2T04ProductionScan.SubstringOccurrences(code, token).Count;
             Assert.True(
@@ -116,9 +109,38 @@ public sealed class P2T07RegressionTests
                 $"The forbidden route token '{token}' appears {occurrences} time(s) in the Boquilhas endpoint surface.");
         }
 
-        // No second policy and no write to another module's gate: the group requires exactly the
-        // canonical policy constant.
+        // No second policy: the group requires exactly the canonical policy constant.
         Assert.Contains("RequireAuthorization(Policy)", source, StringComparison.Ordinal);
+    }
+
+    // ------------------------------------------------------------------- superseded lifecycle absent
+
+    /// <summary>
+    /// B1-superseded — the entire lifecycle machinery is ABSENT everywhere: no close/reopen/
+    /// snapshot/reopening/active-anchor/opening-facts token, no <c>boquilha_close_snapshots</c> /
+    /// <c>boquilha_reopenings</c> / <c>boquilha_machines</c> table and no active partial unique
+    /// index exists in any P2-T07 production source (the B1 correction is superseded: its
+    /// underlying invariant no longer exists, and no replacement lock was introduced).
+    /// </summary>
+    [Fact]
+    public void B1Superseded_NoLifecycleMachineryExists_NoActiveAnchorIndexes()
+    {
+        foreach (var token in P2T07ProductionScan.LifecycleTokens)
+        {
+            var offenders = P2T07ProductionScan.CodeSourcePaths
+                .Where(path => P2T04ProductionScan.CodeOccurrences(
+                    P2T04ProductionScan.Read(path), token).Count > 0)
+                .ToList();
+
+            Assert.True(
+                offenders.Count == 0,
+                $"The superseded-lifecycle token '{token}' appears in code/markup of: {string.Join(", ", offenders)}.");
+        }
+
+        // The migration itself carries no status column and no partial-index predicate.
+        var migration = P2T04ProductionScan.Read(P2T07ProductionScan.MigrationSourcePaths[0]);
+        Assert.DoesNotContain("\"status\"", migration, StringComparison.Ordinal);
+        Assert.DoesNotContain("WHERE", migration, StringComparison.Ordinal);
     }
 
     // ------------------------------------------------------------------- N2/BND-B2 (P2-T08 boundary)
@@ -147,8 +169,8 @@ public sealed class P2T07RegressionTests
     // ------------------------------------------------------------------- N3/H2/BND-B3 (HISTÓRICO GLOBAL)
 
     /// <summary>
-    /// N3/H2 (AC-N3/AC-H2) — no HISTÓRICO GLOBAL (<c>historia</c>) route/entry/registration
-    /// exists; the Boquilhas History lives only inside the module (routes 3/18).
+    /// N3/H2 — no HISTÓRICO GLOBAL (<c>historia</c>) route/entry/registration exists; the
+    /// Boquilhas History lives only inside the module.
     /// </summary>
     [Fact]
     public void N3H2_NoHistoricoGlobalRouteOrEntryExists()
@@ -169,9 +191,9 @@ public sealed class P2T07RegressionTests
     // ------------------------------------------------------------------- N1/R4 (no settings / no repairer administration)
 
     /// <summary>
-    /// N1/R4 (AC-N1/AC-R4) — no Boquilhas settings/Admin surface and no repairer/assignment
-    /// administration: the only consumed reads are the register list and the assignments list; no
-    /// write route, member or type exists in the P2-T07 surface.
+    /// N1/R4 — no Boquilhas settings/Admin surface and no repairer/assignment administration: the
+    /// only consumed reads are the register list and the assignments list; no write route, member
+    /// or type exists in the P2-T07 surface.
     /// </summary>
     [Fact]
     public void N1R4_NoSettingsOrRepairerAdministrationSurfaceExists()
@@ -192,12 +214,12 @@ public sealed class P2T07RegressionTests
     // ------------------------------------------------------------------- N6/V1 (movement vocabulary)
 
     /// <summary>
-    /// N6/V1 (AC-N6/AC-V1) — no fifth movement type, no legacy type and no annulment/delete path
-    /// exists in code, schema or routes; the closed token set is exactly
-    /// <c>inicio|saida|entrada|irreparavel</c>.
+    /// N6/V1 — the closed token set is EXACTLY <c>saida|entrada|entrada_sem_reparacao</c>: no
+    /// Início, no Irreparável, no legacy type and no annulment/delete path exists in code, schema
+    /// or routes.
     /// </summary>
     [Fact]
-    public void N6V1_NoFifthTypeNoLegacyTypeAndNoAnnulmentPathExists()
+    public void N6V1_ExactlyThreeTypes_NoSupersededOrLegacyVocabulary()
     {
         foreach (var token in P2T07ProductionScan.MovementLeakageTokens)
         {
@@ -211,20 +233,26 @@ public sealed class P2T07RegressionTests
                 $"The movement-leakage token '{token}' appears in code/markup of: {string.Join(", ", offenders)}.");
         }
 
-        // The enum has exactly four members; the tokens map exactly (enum order).
+        // The enum has exactly three members; the tokens map exactly.
         var kinds = Enum.GetValues<MovementKind>();
-        Assert.Equal(4, kinds.Length);
+        Assert.Equal(3, kinds.Length);
         Assert.Equal(
-            new[] { "inicio", "saida", "entrada", "irreparavel" },
+            new[] { "saida", "entrada", "entrada_sem_reparacao" },
             kinds.Select(MovementKindTokens.ToToken).ToArray());
+
+        // The migration CHECK carries exactly the closed three-type set.
+        var migration = P2T04ProductionScan.Read(P2T07ProductionScan.MigrationSourcePaths[0]);
+        Assert.Contains(
+            "('saida','entrada','entrada_sem_reparacao')",
+            migration,
+            StringComparison.Ordinal);
     }
 
     // ------------------------------------------------------------------- I4/BND-B8 (false identities)
 
     /// <summary>
-    /// I4 (AC-I4) — no production_id, no job_on_revision_id, no reverse-ID arrays, no per-piece BQ
-    /// UUID, no module-specific Tool id and no client-minted id exists anywhere in the P2-T07
-    /// sources.
+    /// I4 — no production_id, no job_on_revision_id, no reverse-ID arrays, no per-piece BQ UUID,
+    /// no module-specific Tool id and no client-minted id exists anywhere in the P2-T07 sources.
     /// </summary>
     [Fact]
     public void I4_NoFalseIdentityTokenExists()
@@ -245,17 +273,15 @@ public sealed class P2T07RegressionTests
     // ------------------------------------------------------------------- B1/BND-B7 (no second balance authority)
 
     /// <summary>
-    /// B1 (AC-B1) — no second mutable balance authority: the migration creates no balance table or
-    /// balance column; the bucket names exist only in read models and the close snapshot.
+    /// B1 — no second mutable balance authority: the migration creates no balance table or balance
+    /// column and no expected/excess fact pair; the outstanding is derived by replay at read time
+    /// and never stored.
     /// </summary>
     [Fact]
     public void B1_NoSecondBalanceAuthorityExists()
     {
         var migration = P2T04ProductionScan.Read(P2T07ProductionScan.MigrationSourcePaths[0]);
 
-        // No balance table/column in the migration: the only bucket-named columns are the close
-        // snapshot's frozen summary (disponivel/em_reparacao/irreparavel/entrada_excecional there —
-        // §6.5, never a live authority).
         foreach (var token in P2T07ProductionScan.BalanceTokens)
         {
             Assert.DoesNotContain(token, migration, StringComparison.OrdinalIgnoreCase);
@@ -294,16 +320,13 @@ public sealed class P2T07RegressionTests
     // ------------------------------------------------------------------- N7/BND-B10 (protected files)
 
     /// <summary>
-    /// N7 (AC-N7) — the protected files are byte-identical: migrations 001–006 (incl. Designers),
-    /// <c>DmoDbContext.cs</c> and the closed P2-T04/P2-T05/P2-T06 sources. The migration hash
-    /// register is pin-asserted against the protected-file scan helper.
+    /// N7 — the protected files are byte-identical: migrations 001–006 (incl. Designers) and
+    /// <c>DmoDbContext.cs</c> are untouched by the P2-T07 change set (the migration 007 pair is
+    /// REPLACED pre-closure per the Owner clarification — the old 007 is not a protected file).
     /// </summary>
     [Fact]
     public void N7_ProtectedFilesRemainByteIdentical()
     {
-        // Migrations 001–006 + Designers + DmoDbContext are untouched (the git-status proof of the
-        // working tree at the response close is the operative evidence; here we pin the protected
-        // files list of the accepted scan helpers and assert none of OUR changed paths overlap).
         var protectedPaths = P2T04ProductionScan.MigrationSourcePaths
             .Concat(
             [
@@ -320,13 +343,13 @@ public sealed class P2T07RegressionTests
             Assert.False(changed, $"The protected file '{path}' must not be in the P2-T07 change set.");
         }
 
-        // The documented additive non-new files are exactly the three accepted ones (App. A).
+        // The documented additive non-new files are exactly the three accepted ones.
         Assert.Equal(
             3,
             P2T07ProductionScan.DocumentedAdditiveSourcePaths.Count);
     }
 
-    // ------------------------------------------------------------------- BND-B5/N5 (no fake sidebar) — rendered row covers it
+    // ------------------------------------------------------------------- BND-B5/N5 (no fake sidebar)
 
     /// <summary>
     /// BND-B5 (static facet) — the P2-T07 assets/pages carry no simulated Job On sidebar markup

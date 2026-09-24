@@ -1,162 +1,132 @@
+using DMO.Domain.Boquilhas;
+
 namespace DMO.Application.Boquilhas;
 
 /// <summary>
-/// The Boquilhas read models: the Registo lot-grid row, the local Histórico row, the aggregate
-/// ficha, the movement audit item and the consumed repairer/assignment reads.
+/// The Boquilhas read models: the register list row, the local Histórico movement row, the
+/// register ficha, the movement audit item and the consumed repairer/assignment reads.
 /// </summary>
 /// <remarks>
-/// Authority: P2-T07 contract §12.1 (result union carriers), §15.5 (ficha shapes), §24.2
-/// (HistoryItemReadModel, exact) and §21 (resolution reads).
+/// Authority: P2-T07 OWNER CLARIFICATION (the production movement register).
 /// <para>
-/// Balance buckets are always <b>derived projections</b> computed by replay at read time — they are
-/// never stored and never a second balance authority (§18, AC-B1). Reference/lot facts are traversal
-/// facts: frozen <c>bq_contexts</c> triple for production-linked aggregates, live <c>tools</c> facts
-/// for standalone aggregates — never a reference/lot copy on the aggregate (Q-REFLOT).</para>
+/// The outstanding repair quantity is always a <b>derived projection</b> computed by replay at
+/// read time — never stored and never a second balance authority. Reference/lot/production facts
+/// are traversal facts through the REAL <c>bq_contexts → job_ons</c> chain: the frozen BQ triple
+/// plus the real production facts — never a copy on the register.</para>
+/// <para>
+/// <b>Superseded (Owner clarification):</b> the balance buckets (Disponível / Em reparação /
+/// Irreparável / Entrada excecional), the lifecycle state token and the machine set read shapes
+/// are removed; the single derived value is the outstanding repair quantity.</para>
 /// </remarks>
 
-/// <summary>
-/// One Registo lot-grid row (route 4, §25.1 R1 columns). Balance buckets are replay-derived at
-/// read time.
-/// </summary>
-public sealed record BoquilhaListItem(
+/// <summary>One register-list row (route 1): the production context + the derived outstanding.</summary>
+public sealed record RegisterListItem(
     Guid BoquilhasId,
-    int Version,
-    string State,
-    Guid? BqId,
-    Guid? ToolId,
+    Guid BqId,
     string? Reference,
     string? Lot,
-    IReadOnlyList<string> Machines,
-    DateOnly OpeningDate,
-    int InitialQuantity,
-    int Disponivel,
-    int EmReparacao,
-    int Irreparavel,
-    int EntradaExcecional)
+    string? ProductionNumber,
+    string? ProductionMachine,
+    DateOnly? ProductionDate,
+    int Outstanding,
+    int MovementCount,
+    DateTimeOffset? LastMovementAt)
 {
-    /// <summary>Exactly one of the two anchors is non-null (exclusive-anchor truthfulness).</summary>
-    public bool HasExclusiveAnchor =>
-        (BqId is not null) != (ToolId is not null);
+    /// <summary>Whether the row carries the REAL production context (always true — every register
+    /// belongs to a real Job On/BQ context).</summary>
+    public bool HasProductionContext => ProductionNumber is not null;
 }
 
-/// <summary>The route 4 result carrier item (contract §12.1).</summary>
-public sealed record BoquilhaListItemReadModel(
+/// <summary>The route 1 result carrier item.</summary>
+public sealed record RegisterListItemReadModel(
     Guid BoquilhasId,
-    int Version,
-    string State,
-    Guid? BqId,
-    Guid? ToolId,
+    Guid BqId,
     string? Reference,
     string? Lot,
-    IReadOnlyList<string> Machines,
-    DateOnly OpeningDate,
-    int InitialQuantity,
-    int Disponivel,
-    int EmReparacao,
-    int Irreparavel,
-    int EntradaExcecional);
-
-/// <summary>
-/// One local Histórico row (route 18, §24.2 exact row shape): the aggregate facts plus the
-/// traversal facts and the replay-derived balance of the exact aggregate.
-/// </summary>
-public sealed record HistoryItem(
-    Guid BoquilhasId,
-    int Version,
-    string State,
-    Guid? BqId,
-    Guid? ToolId,
-    string? Reference,
-    string? Lot,
-    IReadOnlyList<string> Machines,
-    DateOnly OpeningDate,
-    int InitialQuantity,
-    int Disponivel,
-    int EmReparacao,
-    int Irreparavel,
-    int EntradaExcecional,
+    string? ProductionNumber,
+    string? ProductionMachine,
+    DateOnly? ProductionDate,
+    int Outstanding,
     int MovementCount,
-    DateTimeOffset? ClosedAt,
-    Guid? ClosedByUserId,
-    DateTimeOffset? LastMovementAt);
-
-/// <summary>The route 18 result carrier item (contract §12.1 + §24.2).</summary>
-public sealed record HistoryItemReadModel(
-    Guid BoquilhasId,
-    int Version,
-    string State,
-    Guid? BqId,
-    Guid? ToolId,
-    string? Reference,
-    string? Lot,
-    IReadOnlyList<string> Machines,
-    DateOnly OpeningDate,
-    int InitialQuantity,
-    int Disponivel,
-    int EmReparacao,
-    int Irreparavel,
-    int EntradaExcecional,
-    int MovementCount,
-    DateTimeOffset? ClosedAt,
-    Guid? ClosedByUserId,
     DateTimeOffset? LastMovementAt);
 
 /// <summary>
-/// The aggregate ficha read model (route 5, §25.1 R2/R5/R6 content): anchor context, machines,
-/// opening facts, status/version, derived balance buckets, the movement ledger and the
-/// close-snapshot/reopen presence.
+/// One local Histórico row (route 12): ONE MOVEMENT with its register's production context —
+/// chronological movement history (production/BQ context → movement history).
 /// </summary>
-public sealed record BoquilhasFichaReadModel(
+public sealed record HistoryMovementItem(
+    Guid MovementId,
     Guid BoquilhasId,
-    int Version,
-    string State,
-    Guid? BqId,
-    Guid? ToolId,
-    string? Reference,
-    string? Lot,
-    IReadOnlyList<string> Machines,
-    DateOnly OpeningDate,
-    decimal? UtilisationPercent,
+    string MovementType,
+    int Quantity,
+    DateOnly BusinessDate,
+    DateTimeOffset RecordedAt,
+    Guid RecordedByUserId,
+    string? Machine,
+    Guid? RepairerId,
     string? Observations,
+    string? Reference,
+    string? Lot,
+    string? ProductionNumber,
+    string? ProductionMachine)
+{
+    /// <summary>Whether this movement is an Entrada sem reparação (remains explicitly identifiable).</summary>
+    public bool IsEntradaSemReparacao => string.Equals(MovementType, "entrada_sem_reparacao", StringComparison.Ordinal);
+}
+
+/// <summary>The route 12 result carrier item.</summary>
+public sealed record HistoryMovementItemReadModel(
+    Guid MovementId,
+    Guid BoquilhasId,
+    string MovementType,
+    int Quantity,
+    DateOnly BusinessDate,
+    DateTimeOffset RecordedAt,
+    Guid RecordedByUserId,
+    string? Machine,
+    Guid? RepairerId,
+    string? Observations,
+    string? Reference,
+    string? Lot,
+    string? ProductionNumber,
+    string? ProductionMachine);
+
+/// <summary>
+/// The register ficha read model (route 2): the production context, the movement ledger and the
+/// derived outstanding — NO lifecycle state.
+/// </summary>
+public sealed record RegisterFichaReadModel(
+    Guid BoquilhasId,
+    Guid BqId,
+    string? Reference,
+    string? Lot,
+    int Outstanding,
     Guid CreatedByUserId,
     DateTimeOffset CreatedAt,
     AnchorContextReadModel? Anchor,
     ProductionContextReadModel? Production,
-    BalanceReadModel Balance,
-    IReadOnlyList<MovementReadModel> Movements,
-    CloseSnapshotReadModel? LastClose,
-    ReopeningReadModel? LastReopen)
+    IReadOnlyList<MovementReadModel> Movements)
 {
-    /// <summary>Whether the aggregate is production-linked (real <c>bq_contexts</c> anchor).</summary>
-    public bool IsProductionLinked => BqId is not null && ToolId is null;
-
-    /// <summary>Whether the aggregate is standalone (real canonical BQ Tool anchor).</summary>
-    public bool IsStandalone => ToolId is not null && BqId is null;
-
-    /// <summary>The single Início of the ledger, or <c>null</c>.</summary>
-    public MovementReadModel? Inicio =>
-        Movements.FirstOrDefault(movement => movement.MovementType == "inicio");
+    /// <summary>The movement-type label of one ledger row (presentation only).</summary>
+    public string Label(string movementType) =>
+        MovementKindTokens.Parse(movementType) is { } kind
+            ? MovementKindTokens.ToLabel(kind)
+            : movementType;
 }
 
 /// <summary>
-/// The anchor context of a ficha: the frozen BQ triple (production-linked, presented as
-/// historical/production fact) or the live canonical Tool projection (standalone) — never both,
-/// never a copy on the aggregate.
+/// The anchor context of a register: the frozen BQ triple (presented as historical/production
+/// fact) with the direct canonical Tool relation — never a copy on the register.
 /// </summary>
 public sealed record AnchorContextReadModel(
     Guid ToolId,
     string FrozenToolType,
     string FrozenToolReference,
-    string FrozenToolLot,
-    string? LiveToolReference,
-    string? LiveToolLot,
-    string? Processo,
-    int? ToolQuantity,
-    IReadOnlyList<string> CompatibleMachines);
+    string FrozenToolLot);
 
 /// <summary>
-/// The production-line contextual facts of a production-linked ficha (read-only real Job On
-/// context via <c>bq_id → job_ons</c>; null for standalone aggregates — no simulated state).
+/// The real production context of the register (via <c>bq_id → job_ons</c>): applying a movement
+/// AFTER the production end date stays valid — the production remains the historical context.
 /// </summary>
 public sealed record ProductionContextReadModel(
     string Reference,
@@ -164,14 +134,7 @@ public sealed record ProductionContextReadModel(
     string Machine,
     DateOnly? ProductionDate);
 
-/// <summary>The derived balance buckets of a ficha (never stored; §18).</summary>
-public sealed record BalanceReadModel(
-    int Disponivel,
-    int EmReparacao,
-    int Irreparavel,
-    int EntradaExcecional);
-
-/// <summary>One movement of the ficha ledger, with the display-only per-movement Saldo projection.</summary>
+/// <summary>One movement of the register ledger, with the display-only cumulative saldo projection.</summary>
 public sealed record MovementReadModel(
     Guid MovementId,
     string MovementType,
@@ -181,35 +144,12 @@ public sealed record MovementReadModel(
     Guid RecordedByUserId,
     string? Machine,
     Guid? RepairerId,
-    int? ExpectedReturnQuantity,
-    int? ExcessReceivedQuantity,
     string? Observations,
     int Version,
     int Saldo);
 
-/// <summary>The last close of a ficha, when closed (undefined for an active aggregate).</summary>
-public sealed record CloseSnapshotReadModel(
-    Guid CloseSnapshotId,
-    Guid ClosedByUserId,
-    DateTimeOffset ClosedAt,
-    int InitialQuantity,
-    DateOnly OpeningDate,
-    int Disponivel,
-    int EmReparacao,
-    int Irreparavel,
-    int EntradaExcecional,
-    decimal? UtilisationPercent);
-
-/// <summary>The last reopen record of a ficha, when present.</summary>
-public sealed record ReopeningReadModel(
-    Guid ReopenId,
-    Guid CloseSnapshotId,
-    Guid ReopenedByUserId,
-    DateTimeOffset ReopenedAt,
-    string Reason);
-
 /// <summary>
-/// One movement edit/audit item (route 6 / R5 AuditTrail): the exact before/after values of every
+/// One movement edit/audit item (route 3 / R5 AuditTrail): the exact before/after values of every
 /// editable field plus the backend editor/time. Audit entries never render as movements.
 /// </summary>
 public sealed record MovementAuditItemReadModel(
@@ -229,8 +169,8 @@ public sealed record MovementAuditItemReadModel(
     string? AfterObservations);
 
 /// <summary>
-/// One current machine → repairer assignment read (route 16, §21.3): an absent assignment row is
-/// the explicit <c>assignmentUnavailable</c> state — never an error, never a default repairer.
+/// One current machine → repairer assignment read (route 10): an absent assignment row is the
+/// explicit <c>assignmentUnavailable</c> state — never an error, never a default repairer.
 /// </summary>
 public sealed record MachineRepairerAssignmentReadModel(
     string Machine,
@@ -238,5 +178,5 @@ public sealed record MachineRepairerAssignmentReadModel(
     string? RepairerName,
     bool AssignmentUnavailable);
 
-/// <summary>One repairer-register read (route 17; consumed, never administered).</summary>
+/// <summary>One repairer-register read (route 11; consumed, never administered).</summary>
 public sealed record RepairerReadModel(Guid RepairerId, string Name);

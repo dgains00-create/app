@@ -1,4 +1,3 @@
-using System.Text.Json;
 using DMO.Application.Access;
 using DMO.IntegrationTests.Navigation;
 using DMO.Web.Authorization;
@@ -9,10 +8,10 @@ using Microsoft.AspNetCore.Mvc.Testing;
 namespace DMO.IntegrationTests.Boquilhas;
 
 /// <summary>
-/// P2-T07 access tests (contract §29 rows A1–A6, AC-A1…AC-A6): every P2-T07 route carries exactly
-/// the canonical <c>boquilhas</c> gate; a grant to any unrelated module never satisfies a P2-T07
-/// route; direct-route denial is server-side; ADMIN gains no operational access; denial is never an
-/// empty list/blank surface.
+/// P2-T07 access tests (the OWNER CLARIFICATION route matrix; AC-A1…AC-A6 preserved): every
+/// P2-T07 route carries exactly the canonical <c>boquilhas</c> gate; a grant to any unrelated
+/// module never satisfies a P2-T07 route; direct-route denial is server-side; ADMIN gains no
+/// operational access; denial is never an empty list/blank surface.
 /// </summary>
 public sealed class BoquilhasAccessTests
 {
@@ -25,9 +24,9 @@ public sealed class BoquilhasAccessTests
 
     private static readonly string[] EndpointRoutes =
     [
-        "/boquilhas/aggregates",
-        "/boquilhas/aggregates/00000000-0000-0000-0000-000000000001",
-        "/boquilhas/aggregates/00000000-0000-0000-0000-000000000001/movements/00000000-0000-0000-0000-000000000002/audit",
+        "/boquilhas/registers",
+        "/boquilhas/registers/00000000-0000-0000-0000-000000000001",
+        "/boquilhas/registers/00000000-0000-0000-0000-000000000001/movements/00000000-0000-0000-0000-000000000002/audit",
         "/boquilhas/productions?reference=X",
         "/boquilhas/jobons/00000000-0000-0000-0000-000000000003",
         "/boquilhas/machine-assignments",
@@ -69,8 +68,7 @@ public sealed class BoquilhasAccessTests
 
     /// <summary>
     /// A3 (AC-A3) — a caller with NO module grant at all is denied every P2-T07 route by direct
-    /// URL; an unknown/absent module availability still denies (the test registry grants only the
-    /// supplied set; the production registry stays empty).
+    /// URL; an unknown/absent module availability still denies.
     /// </summary>
     [Fact]
     public async Task A3_ANonGrantedCallerIsDeniedEveryRouteByDirectUrl()
@@ -120,12 +118,11 @@ public sealed class BoquilhasAccessTests
     }
 
     /// <summary>
-    /// A6 (AC-A6) — no P2-T07 route carries a second policy: the endpoint group declares exactly
-    /// the canonical <c>boquilhas</c> policy (the pinned constant), inspected through the endpoint
-    /// map of the granted host.
+    /// A6 (AC-A6) — a grated caller can exercise the surface (the canonical policy is exactly the
+    /// one declared gate).
     /// </summary>
     [Fact]
-    public async Task A6_EndpointsCarryExactlyTheCanonicalPolicy()
+    public async Task A6_AGrantedCallerExercisesTheCanonicalSurface()
     {
         using var factory = P2T07TestHost.ForUser(P2T07TestHost.AllGranted());
         using var client = factory.CreateClient();

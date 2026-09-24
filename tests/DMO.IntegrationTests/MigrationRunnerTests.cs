@@ -40,8 +40,9 @@ public sealed class MigrationRunnerTests
         // the same single DbContext, growing the modelled set by exactly one table. P2-T06
         // (disclosed extension, P2-T06 contract Â§25): the one decision table is mapped by the same
         // single DbContext, growing the modelled set by exactly one table. P2-T07 (disclosed
-        // extension, P2-T07 contract Â§28): the SIX Boquilhas tables are mapped by the same single
-        // DbContext, growing the modelled set by exactly those six tables. The assertion is not
+        // extension, P2-T07 OWNER CLARIFICATION): the THREE Boquilhas register tables are mapped by
+        // the same single DbContext, growing the modelled set by exactly those three tables (the
+        // unreviewed 007 lifecycle tables are gone). The assertion is not
         // weakened â€” it still pins the complete modelled table set, and the forbidden-table
         // non-effect below is unchanged.
         var modelled = context.Model.GetEntityTypes()
@@ -52,8 +53,7 @@ public sealed class MigrationRunnerTests
         Assert.Equal(
             new[]
             {
-                "admin_accounts", "boquilha_close_snapshots", "boquilha_machines",
-                "boquilha_movement_audit", "boquilha_movements", "boquilha_reopenings", "boquilhas",
+                "admin_accounts", "boquilha_movement_audit", "boquilha_movements", "boquilhas",
                 "bq_contexts", "cm_contexts", "email_list_recipients", "email_lists",
                 "email_templates", "glass_density_settings", "job_ons", "machine_repairer_assignments",
                 "mf_contexts", "pdf_directory_settings", "peso_measurement_rows", "peso_review_decisions", "pesos", "repairers",

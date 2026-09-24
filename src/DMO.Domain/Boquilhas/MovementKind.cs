@@ -1,73 +1,73 @@
 namespace DMO.Domain.Boquilhas;
 
 /// <summary>
-/// The closed movement-type set of the Boquilhas ledger: exactly four values.
+/// The closed movement-type set of the Boquilhas production movement register: exactly three
+/// values.
 /// </summary>
 /// <remarks>
-/// Authority: P2-T07 contract §3.1.
+/// Authority: P2-T07 OWNER CLARIFICATION (the production movement register). The final operational
+/// movement types are <c>saida | entrada | entrada_sem_reparacao</c> (Saída / Entrada / Entrada sem
+/// reparação).
 /// <para>
-/// The four write movement types are <c>inicio | saida | entrada | irreparavel</c>
-/// (Início/Saída/Entrada/Irreparável). <b><c>Editar</c> is an action on an existing movement, never
-/// a movement type</b> — no token, enum value or CHECK value exists for it. No obsolete/legacy type
-/// is carried forward (no <c>contagem</c>, no "Fabricar/Reparar" choice) and no fifth type exists.
+/// <b>Superseded (Owner clarification):</b> <c>inicio</c> (the register never manufactures a
+/// quantity movement to establish existence) and <c>irreparavel</c> (Entrada sem reparação replaced
+/// it: X boquilhas returned from the repairer but NOT repaired — a normal historical movement
+/// record that returns quantity from repair with the distinct meaning; it never marks the Tool
+/// irreparable, never creates a permanent Tool state, never separates/destroys the Tool identity
+/// and never creates an irreparable bucket). <c>Editar</c> is an action, never a movement type.
 /// </para>
 /// <para>
-/// ASCII domain tokens with canonical Portuguese labels for presentation (the accepted P2-T06 §3.2
-/// convention). The mapping is explicit and ordinal: no case folding and no fuzzy matching.
+/// ASCII domain tokens with canonical Portuguese labels for presentation. The mapping is explicit
+/// and ordinal: no case folding and no fuzzy matching.
 /// </para>
 /// </remarks>
 public enum MovementKind
 {
-    /// <summary>Início — the opening quantity of the aggregate (created once, with the aggregate).</summary>
-    Inicio,
-
-    /// <summary>Saída — external repair dispatch (quantity ≤ Disponível; machine + repairer required).</summary>
+    /// <summary>Saída — boquilhas dispatched to the external repairer (machine + repairer recorded).</summary>
     Saida,
 
-    /// <summary>Entrada — repair return (recorded in full, never clamped/rejected for exceeding the expected amount).</summary>
+    /// <summary>Entrada — repaired boquilhas returned (quantity leaves the outstanding repair).</summary>
     Entrada,
 
-    /// <summary>Irreparável — declared irreparable (quantity ≤ Em reparação).</summary>
-    Irreparavel,
+    /// <summary>Entrada sem reparação — boquilhas returned from the repairer but NOT repaired
+    /// (quantity leaves the outstanding repair; the history records they are not chargeable).</summary>
+    EntradaSemReparacao,
 }
 
 /// <summary>
 /// The stored ASCII tokens of the closed <see cref="MovementKind"/> set.
 /// </summary>
 /// <remarks>
-/// Authority: P2-T07 contract §3.1 (exact tokens <c>inicio|saida|entrada|irreparavel</c>) and §7.4
-/// (<c>boquilha_movements_type_check</c>). Only these four tokens are writable; any other value is
-/// refused with <c>MOVEMENT_TYPE_INVALID</c>.
+/// Authority: P2-T07 OWNER CLARIFICATION (exact tokens <c>saida|entrada|entrada_sem_reparacao</c>;
+/// the <c>boquilha_movements_type_check</c> backstop). Only these three tokens are writable; any
+/// other value is refused with <c>MOVEMENT_TYPE_INVALID</c>.
 /// </remarks>
 public static class MovementKindTokens
 {
     /// <summary>The stored token of one movement kind.</summary>
     public static string ToToken(MovementKind kind) => kind switch
     {
-        MovementKind.Inicio => "inicio",
         MovementKind.Saida => "saida",
         MovementKind.Entrada => "entrada",
-        MovementKind.Irreparavel => "irreparavel",
+        MovementKind.EntradaSemReparacao => "entrada_sem_reparacao",
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown movement kind."),
     };
 
     /// <summary>Parses a stored movement token, or <c>null</c> when it is not in the closed set.</summary>
     public static MovementKind? Parse(string? token) => token switch
     {
-        "inicio" => MovementKind.Inicio,
         "saida" => MovementKind.Saida,
         "entrada" => MovementKind.Entrada,
-        "irreparavel" => MovementKind.Irreparavel,
+        "entrada_sem_reparacao" => MovementKind.EntradaSemReparacao,
         _ => null,
     };
 
     /// <summary>The canonical Portuguese label of one movement kind (presentation only).</summary>
     public static string ToLabel(MovementKind kind) => kind switch
     {
-        MovementKind.Inicio => "Início",
         MovementKind.Saida => "Saída",
         MovementKind.Entrada => "Entrada",
-        MovementKind.Irreparavel => "Irreparável",
+        MovementKind.EntradaSemReparacao => "Entrada sem reparação",
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown movement kind."),
     };
 }

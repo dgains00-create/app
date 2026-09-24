@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DMO.Infrastructure.Migrations
 {
     [DbContext(typeof(DmoDbContext))]
-    [Migration("20260924031924_BoquilhasDomain")]
+    [Migration("20260924051151_BoquilhasDomain")]
     partial class BoquilhasDomain
     {
         /// <inheritdoc />
@@ -95,76 +95,6 @@ namespace DMO.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.BoquilhaCloseSnapshotEntity", b =>
-                {
-                    b.Property<Guid>("CloseSnapshotId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("close_snapshot_id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<Guid>("BoquilhasId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("boquilhas_id");
-
-                    b.Property<DateTimeOffset>("ClosedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("closed_at");
-
-                    b.Property<Guid>("ClosedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("closed_by_user_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<int>("Disponivel")
-                        .HasColumnType("integer")
-                        .HasColumnName("disponivel");
-
-                    b.Property<int>("EmReparacao")
-                        .HasColumnType("integer")
-                        .HasColumnName("em_reparacao");
-
-                    b.Property<int>("EntradaExcecional")
-                        .HasColumnType("integer")
-                        .HasColumnName("entrada_excecional");
-
-                    b.Property<int>("InitialQuantity")
-                        .HasColumnType("integer")
-                        .HasColumnName("initial_quantity");
-
-                    b.Property<int>("Irreparavel")
-                        .HasColumnType("integer")
-                        .HasColumnName("irreparavel");
-
-                    b.Property<DateOnly>("OpeningDate")
-                        .HasColumnType("date")
-                        .HasColumnName("opening_date");
-
-                    b.Property<decimal?>("UtilisationPercent")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("utilisation_percent");
-
-                    b.HasKey("CloseSnapshotId");
-
-                    b.HasIndex("ClosedByUserId");
-
-                    b.HasIndex("BoquilhasId", "ClosedAt")
-                        .HasDatabaseName("IX_boquilha_close_snapshots_boquilhas_id");
-
-                    b.ToTable("boquilha_close_snapshots", null, t =>
-                        {
-                            t.HasCheckConstraint("boquilha_close_snapshots_entrada_excecional_check", "entrada_excecional >= 0");
-
-                            t.HasCheckConstraint("boquilha_close_snapshots_utilisation_check", "utilisation_percent IS NULL OR (utilisation_percent >= 0 AND utilisation_percent <= 100)");
-                        });
-                });
-
             modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.BoquilhaEntity", b =>
                 {
                     b.Property<Guid>("BoquilhasId")
@@ -173,7 +103,7 @@ namespace DMO.Infrastructure.Migrations
                         .HasColumnName("boquilhas_id")
                         .HasDefaultValueSql("gen_random_uuid()");
 
-                    b.Property<Guid?>("BqId")
+                    b.Property<Guid>("BqId")
                         .HasColumnType("uuid")
                         .HasColumnName("bq_id");
 
@@ -187,97 +117,18 @@ namespace DMO.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("created_by_user_id");
 
-                    b.Property<string>("Observations")
-                        .HasColumnType("text")
-                        .HasColumnName("observations");
-
-                    b.Property<DateOnly>("OpeningDate")
-                        .HasColumnType("date")
-                        .HasColumnName("opening_date");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("status");
-
-                    b.Property<Guid?>("ToolId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tool_id");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<decimal?>("UtilisationPercent")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("utilisation_percent");
-
-                    b.Property<int>("Version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(1)
-                        .HasColumnName("version");
-
                     b.HasKey("BoquilhasId");
 
                     b.HasIndex("BqId")
                         .IsUnique()
-                        .HasDatabaseName("IX_boquilhas_active_bq_id")
-                        .HasFilter("\"status\" = 'active' AND \"bq_id\" IS NOT NULL");
+                        .HasDatabaseName("boquilhas_bq_id_key");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("IX_boquilhas_created_at");
 
                     b.HasIndex("CreatedByUserId");
 
-                    b.HasIndex("Status")
-                        .HasDatabaseName("IX_boquilhas_status");
-
-                    b.HasIndex("ToolId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_boquilhas_active_tool_id")
-                        .HasFilter("\"status\" = 'active' AND \"tool_id\" IS NOT NULL");
-
-                    b.ToTable("boquilhas", null, t =>
-                        {
-                            t.HasCheckConstraint("boquilhas_anchor_exclusive_check", "((bq_id IS NULL)::int + (tool_id IS NULL)::int) = 1");
-
-                            t.HasCheckConstraint("boquilhas_observations_check", "observations IS NULL OR btrim(observations) <> ''");
-
-                            t.HasCheckConstraint("boquilhas_status_check", "status IN ('active','closed')");
-
-                            t.HasCheckConstraint("boquilhas_utilisation_range_check", "utilisation_percent IS NULL OR (utilisation_percent >= 0 AND utilisation_percent <= 100)");
-                        });
-                });
-
-            modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.BoquilhaMachineEntity", b =>
-                {
-                    b.Property<Guid>("BoquilhaMachineId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("boquilha_machine_id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<Guid>("BoquilhasId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("boquilhas_id");
-
-                    b.Property<string>("Machine")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("machine");
-
-                    b.HasKey("BoquilhaMachineId");
-
-                    b.HasIndex("BoquilhasId", "Machine")
-                        .IsUnique()
-                        .HasDatabaseName("boquilha_machines_boquilhas_machine_key");
-
-                    b.ToTable("boquilha_machines", null, t =>
-                        {
-                            t.HasCheckConstraint("boquilha_machines_machine_check", "machine IN ('B1','B2','B3','C1','C2','C3')");
-                        });
+                    b.ToTable("boquilhas", (string)null);
                 });
 
             modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.BoquilhaMovementAuditEntity", b =>
@@ -381,14 +232,6 @@ namespace DMO.Infrastructure.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<int?>("ExcessReceivedQuantity")
-                        .HasColumnType("integer")
-                        .HasColumnName("excess_received_quantity");
-
-                    b.Property<int?>("ExpectedReturnQuantity")
-                        .HasColumnType("integer")
-                        .HasColumnName("expected_return_quantity");
-
                     b.Property<string>("Machine")
                         .HasColumnType("text")
                         .HasColumnName("machine");
@@ -442,8 +285,6 @@ namespace DMO.Infrastructure.Migrations
 
                     b.ToTable("boquilha_movements", null, t =>
                         {
-                            t.HasCheckConstraint("boquilha_movements_entrada_facts_check", "(movement_type = 'entrada' AND expected_return_quantity IS NOT NULL AND excess_received_quantity IS NOT NULL AND expected_return_quantity >= 0 AND excess_received_quantity = GREATEST(0, quantity - expected_return_quantity)) OR (movement_type <> 'entrada' AND expected_return_quantity IS NULL AND excess_received_quantity IS NULL)");
-
                             t.HasCheckConstraint("boquilha_movements_machine_check", "machine IS NULL OR machine IN ('B1','B2','B3','C1','C2','C3')");
 
                             t.HasCheckConstraint("boquilha_movements_observations_check", "observations IS NULL OR btrim(observations) <> ''");
@@ -452,59 +293,9 @@ namespace DMO.Infrastructure.Migrations
 
                             t.HasCheckConstraint("boquilha_movements_saida_required_check", "NOT (movement_type = 'saida' AND (machine IS NULL OR repairer_id IS NULL))");
 
-                            t.HasCheckConstraint("boquilha_movements_type_check", "movement_type IN ('inicio','saida','entrada','irreparavel')");
+                            t.HasCheckConstraint("boquilha_movements_type_check", "movement_type IN ('saida','entrada','entrada_sem_reparacao')");
 
                             t.HasCheckConstraint("boquilha_movements_version_check", "version >= 1");
-                        });
-                });
-
-            modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.BoquilhaReopeningEntity", b =>
-                {
-                    b.Property<Guid>("ReopenId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("reopen_id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<Guid>("BoquilhasId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("boquilhas_id");
-
-                    b.Property<Guid>("CloseSnapshotId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("close_snapshot_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("Reason")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("reason");
-
-                    b.Property<DateTimeOffset>("ReopenedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("reopened_at");
-
-                    b.Property<Guid>("ReopenedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("reopened_by_user_id");
-
-                    b.HasKey("ReopenId");
-
-                    b.HasIndex("CloseSnapshotId");
-
-                    b.HasIndex("ReopenedByUserId");
-
-                    b.HasIndex("BoquilhasId", "ReopenedAt")
-                        .HasDatabaseName("IX_boquilha_reopenings_boquilhas_id");
-
-                    b.ToTable("boquilha_reopenings", null, t =>
-                        {
-                            t.HasCheckConstraint("boquilha_reopenings_reason_required_check", "btrim(reason) <> ''");
                         });
                 });
 
@@ -1572,29 +1363,13 @@ namespace DMO.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.BoquilhaCloseSnapshotEntity", b =>
-                {
-                    b.HasOne("DMO.Infrastructure.Persistence.Entities.BoquilhaEntity", null)
-                        .WithMany()
-                        .HasForeignKey("BoquilhasId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("FK_boquilha_close_snapshots_boquilhas_boquilhas_id");
-
-                    b.HasOne("DMO.Infrastructure.Persistence.Entities.UserEntity", null)
-                        .WithMany()
-                        .HasForeignKey("ClosedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("FK_boquilha_close_snapshots_users_closed_by_user_id");
-                });
-
             modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.BoquilhaEntity", b =>
                 {
                     b.HasOne("DMO.Infrastructure.Persistence.Entities.BqContextEntity", null)
                         .WithMany()
                         .HasForeignKey("BqId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
                         .HasConstraintName("FK_boquilhas_bq_contexts_bq_id");
 
                     b.HasOne("DMO.Infrastructure.Persistence.Entities.UserEntity", null)
@@ -1603,22 +1378,6 @@ namespace DMO.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("FK_boquilhas_users_created_by_user_id");
-
-                    b.HasOne("DMO.Infrastructure.Persistence.Entities.ToolEntity", null)
-                        .WithMany()
-                        .HasForeignKey("ToolId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("FK_boquilhas_tools_tool_id");
-                });
-
-            modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.BoquilhaMachineEntity", b =>
-                {
-                    b.HasOne("DMO.Infrastructure.Persistence.Entities.BoquilhaEntity", null)
-                        .WithMany()
-                        .HasForeignKey("BoquilhasId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("FK_boquilha_machines_boquilhas_boquilhas_id");
                 });
 
             modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.BoquilhaMovementAuditEntity", b =>
@@ -1659,30 +1418,6 @@ namespace DMO.Infrastructure.Migrations
                         .HasForeignKey("RepairerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("FK_boquilha_movements_repairers_repairer_id");
-                });
-
-            modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.BoquilhaReopeningEntity", b =>
-                {
-                    b.HasOne("DMO.Infrastructure.Persistence.Entities.BoquilhaEntity", null)
-                        .WithMany()
-                        .HasForeignKey("BoquilhasId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("FK_boquilha_reopenings_boquilhas_boquilhas_id");
-
-                    b.HasOne("DMO.Infrastructure.Persistence.Entities.BoquilhaCloseSnapshotEntity", null)
-                        .WithMany()
-                        .HasForeignKey("CloseSnapshotId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("FK_boquilha_reopenings_boquilha_close_snapshots_close_snapshot_id");
-
-                    b.HasOne("DMO.Infrastructure.Persistence.Entities.UserEntity", null)
-                        .WithMany()
-                        .HasForeignKey("ReopenedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("FK_boquilha_reopenings_users_reopened_by_user_id");
                 });
 
             modelBuilder.Entity("DMO.Infrastructure.Persistence.Entities.BqContextEntity", b =>

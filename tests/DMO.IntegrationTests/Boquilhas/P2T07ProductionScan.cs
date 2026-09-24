@@ -30,31 +30,29 @@ internal static class P2T07ProductionScan
             ])
             .ToList();
 
-    /// <summary>The new P2-T07 persistence sources.</summary>
+    /// <summary>The new P2-T07 persistence sources (OWNER CLARIFICATION: THREE entities/configs —
+    /// register, movement, audit; the machine set, close snapshot and reopening structures are
+    /// superseded and removed).</summary>
     public static IReadOnlyList<string> PersistenceSourcePaths { get; } =
     [
         "src/DMO.Infrastructure/Persistence/BoquilhasRepository.cs",
         "src/DMO.Infrastructure/Persistence/BoquilhasDependencyProbe.cs",
         "src/DMO.Infrastructure/Persistence/DmoBoquilhasContextRead.cs",
         "src/DMO.Infrastructure/Persistence/Entities/BoquilhaEntity.cs",
-        "src/DMO.Infrastructure/Persistence/Entities/BoquilhaMachineEntity.cs",
         "src/DMO.Infrastructure/Persistence/Entities/BoquilhaMovementEntity.cs",
         "src/DMO.Infrastructure/Persistence/Entities/BoquilhaMovementAuditEntity.cs",
-        "src/DMO.Infrastructure/Persistence/Entities/BoquilhaCloseSnapshotEntity.cs",
-        "src/DMO.Infrastructure/Persistence/Entities/BoquilhaReopeningEntity.cs",
         "src/DMO.Infrastructure/Persistence/EntityConfigurations/BoquilhaEntityConfiguration.cs",
-        "src/DMO.Infrastructure/Persistence/EntityConfigurations/BoquilhaMachineEntityConfiguration.cs",
         "src/DMO.Infrastructure/Persistence/EntityConfigurations/BoquilhaMovementEntityConfiguration.cs",
         "src/DMO.Infrastructure/Persistence/EntityConfigurations/BoquilhaMovementAuditEntityConfiguration.cs",
-        "src/DMO.Infrastructure/Persistence/EntityConfigurations/BoquilhaCloseSnapshotEntityConfiguration.cs",
-        "src/DMO.Infrastructure/Persistence/EntityConfigurations/BoquilhaReopeningEntityConfiguration.cs",
     ];
 
-    /// <summary>The single P2-T07 migration and its EF designer (contract §28).</summary>
+    /// <summary>The single P2-T07 migration and its EF designer (the OWNER-CLARIFICATION corrected
+    /// pair replacing the unreviewed 007; migration 007 is not closed, so the schema was corrected
+    /// cleanly — no compensating legacy migration exists).</summary>
     public static IReadOnlyList<string> MigrationSourcePaths { get; } =
     [
-        "src/DMO.Infrastructure/Migrations/20260924031924_BoquilhasDomain.cs",
-        "src/DMO.Infrastructure/Migrations/20260924031924_BoquilhasDomain.Designer.cs",
+        "src/DMO.Infrastructure/Migrations/20260924051151_BoquilhasDomain.cs",
+        "src/DMO.Infrastructure/Migrations/20260924051151_BoquilhasDomain.Designer.cs",
     ];
 
     /// <summary>The new P2-T07 Web surfaces.</summary>
@@ -113,7 +111,7 @@ internal static class P2T07ProductionScan
         "src/DMO.Infrastructure/Persistence/Boquilhas",
         "src/DMO.Infrastructure/Persistence/Entities/Boquilha",
         "src/DMO.Infrastructure/Persistence/EntityConfigurations/Boquilha",
-        "src/DMO.Infrastructure/Migrations/20260924031924_BoquilhasDomain",
+        "src/DMO.Infrastructure/Migrations/20260924051151_BoquilhasDomain",
         "src/DMO.Web/Pages/Boquilhas/",
         "src/DMO.Web/Endpoints/BoquilhasEndpoints.cs",
         "src/DMO.Web/wwwroot/css/dmo-boquilhas.css",
@@ -179,14 +177,40 @@ internal static class P2T07ProductionScan
         string.Concat("machine", "_id"),
     ];
 
+    /// <summary>The superseded lifecycle tokens (OWNER CLARIFICATION): no close/reopen/status/
+    /// snapshot/reopening/active machinery exists anywhere in the P2-T07 surface (the B1
+    /// active-anchor machinery is superseded and removed).</summary>
+    public static IReadOnlyList<string> LifecycleTokens { get; } =
+    [
+        string.Concat("ActiveAggregate", "Exists"),
+        string.Concat("IX", "_boquilhas", "_active", "_tool", "_id"),
+        string.Concat("IX", "_boquilhas", "_active", "_bq", "_id"),
+        string.Concat("boquilha_close", "_snapshots"),
+        string.Concat("boquilha_reopen", "ings"),
+        string.Concat("boquilha_mach", "ines"),
+        string.Concat("CloseSnapshot", "Async"),
+        string.Concat("Reopening", "Record"),
+        string.Concat("OnlyOneIn", "icio"),
+        string.Concat("Irreparavel", "Exceeds", "InRepair"),
+        string.Concat("Saida", "Exceeds", "Available"),
+        string.Concat("Already", "Closed"),
+        string.Concat("NotLast", "Closed"),
+        string.Concat("HasActiveAggregate", "ForAnchor"),
+        string.Concat("UpdateOpeningFacts", "Async"),
+        string.Concat("ReopenBoquilhas", "Command"),
+        string.Concat("CloseBoquilhas", "Command"),
+    ];
+
     /// <summary>The second-balance-authority tokens (BND-B7/B1): no balance table/column in the
-    /// schema; the buckets exist only in read models and the close snapshot.</summary>
+    /// schema; the outstanding value is derived by replay at read time and never stored.</summary>
     public static IReadOnlyList<string> BalanceTokens { get; } =
     [
         string.Concat("balance", "s"),
         string.Concat("balance", "_table"),
         string.Concat("Saldo", "Total"),
         string.Concat("Stored", "Balance"),
+        string.Concat("expected_return", "_quantity"),
+        string.Concat("excess_received", "_quantity"),
     ];
 
     /// <summary>The movement-vocabulary leakage tokens (BND-B6/N6/V1): no fifth/legacy type and no

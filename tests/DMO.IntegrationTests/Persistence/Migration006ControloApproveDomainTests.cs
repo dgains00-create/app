@@ -42,15 +42,15 @@ public sealed class Migration006ControloApproveDomainTests
         "20260923045054_ControloCreateDomain",
         "20260923122429_GlassDensitySettings",
         "20260923171223_ControloApproveDomain",
-        "20260924031924_BoquilhasDomain",
+        "20260924051151_BoquilhasDomain",
     ];
 
     /// <summary>The complete public product-table register after all seven migrations (the closed
-    /// 20-table state + EXACTLY the one decision table + the six Boquilhas tables).</summary>
+    /// 20-table state + EXACTLY the one decision table + the THREE Boquilhas register tables —
+    /// OWNER CLARIFICATION: the unreviewed 007 was corrected pre-closure; no lifecycle tables).</summary>
     private static readonly string[] PublicProductTables =
     [
-        "admin_accounts", "boquilha_close_snapshots", "boquilha_machines",
-        "boquilha_movement_audit", "boquilha_movements", "boquilha_reopenings", "boquilhas",
+        "admin_accounts", "boquilha_movement_audit", "boquilha_movements", "boquilhas",
         "bq_contexts", "cm_contexts", "email_list_recipients", "email_lists",
         "email_templates", "glass_density_settings", "job_ons", "machine_repairer_assignments",
         "mf_contexts", "pdf_directory_settings", "peso_measurement_rows", "peso_review_decisions",
@@ -59,8 +59,8 @@ public sealed class Migration006ControloApproveDomainTests
 
     /// <summary>
     /// MG1 — applying all seven migrations to a reset schema leaves exactly the seven contracted
-    /// migrations in <c>__EFMigrationsHistory</c> and exactly the 27 raw public tables; the
-    /// slice adds exactly ONE table to the closed 20-table state and P2-T07 adds exactly SIX.
+    /// migrations in <c>__EFMigrationsHistory</c> and exactly the 24 raw public tables; the
+    /// slice adds exactly ONE table to the closed 20-table state and P2-T07 adds exactly THREE.
     /// </summary>
     [SkippableFact]
     public async Task MG1_ExactlyOneNewTableAndTheSixthMigrationAreApplied()
@@ -81,7 +81,7 @@ public sealed class Migration006ControloApproveDomainTests
             "SELECT table_name FROM information_schema.tables " +
             "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"));
 
-        Assert.Equal(27, tables.Count); // 26 product tables + history
+        Assert.Equal(24, tables.Count); // 23 product tables + history
         Assert.Equal(Sorted([.. PublicProductTables, MigrationHistoryTable]), tables);
     }
 

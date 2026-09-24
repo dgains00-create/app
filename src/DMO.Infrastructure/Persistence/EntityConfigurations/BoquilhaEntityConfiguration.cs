@@ -5,160 +5,72 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 namespace DMO.Infrastructure.Persistence.EntityConfigurations;
 
 /// <summary>
-/// EF configuration for the <c>boquilhas</c> table: one collective BQ external-repair aggregate.
+/// EF configuration for the <c>boquilhas</c> table: the register identity row of one REAL
+/// production/BQ context.
 /// </summary>
 /// <remarks>
-/// Authority: P2-T07 contract §6.1/§7 (exact columns, CHECKs, FKs all RESTRICT, indexes incl. the
-/// two ACTIVE partial unique indexes of the B1 correction). The exclusive-anchor CHECK guarantees a
-/// row satisfies at most one of the two partial predicates; the partial unique indexes are the
-/// race-safe one-active-per-anchor backstop (create and reopen losers raise 23505 →
-/// <c>Refused(ActiveAggregateExists)</c>, §7.2).
-/// </remarks>
+/// Authority: P2-T07 OWNER CLARIFICATION. <c>bq_id</c> is NOT NULL with a plain UNIQUE key — one
+/// register per production/BQ context, with NO lifecycle machinery (no <c>status</c>, no partial
+/// unique active-anchor indexes). The FK chain <c>boquilhas.bq_id → bq_contexts → job_ons/tools</c>
+/// carries the real production association.</remarks>
 public sealed class BoquilhaEntityConfiguration : IEntityTypeConfiguration<BoquilhaEntity>
 {
-    /// <summary>Database name of the exclusive-anchor CHECK.</summary>
-    public const string AnchorExclusiveCheckConstraintName = "boquilhas_anchor_exclusive_check";
+    /// <summary>Database name of the one-register-per-BQ-context unique key.</summary>
+    public const string BqIdUniqueConstraintName = "boquilhas_bq_id_key";
 
-    /// <summary>Database name of the status CHECK.</summary>
-    public const string StatusCheckConstraintName = "boquilhas_status_check";
-
-    /// <summary>Database name of the utilisation-range CHECK.</summary>
-    public const string UtilisationRangeCheckConstraintName = "boquilhas_utilisation_range_check";
-
-    /// <summary>Database name of the observations CHECK.</summary>
-    public const string ObservationsCheckConstraintName = "boquilhas_observations_check";
-
-    /// <summary>Database name of the production-linked anchor FK.</summary>
+    /// <summary>Database name of the production-anchor FK.</summary>
     public const string BqContextForeignKeyConstraintName = "FK_boquilhas_bq_contexts_bq_id";
-
-    /// <summary>Database name of the standalone anchor FK.</summary>
-    public const string ToolForeignKeyConstraintName = "FK_boquilhas_tools_tool_id";
 
     /// <summary>Database name of the opening-actor FK.</summary>
     public const string CreatedByUserForeignKeyConstraintName = "FK_boquilhas_users_created_by_user_id";
 
-    /// <summary>Database name of the status index (Registo grid + Histórico state filter).</summary>
-    public const string StatusIndexName = "IX_boquilhas_status";
-
-    /// <summary>Database name of the FK-supporting production-linked anchor index.</summary>
-    public const string BqIdIndexName = "IX_boquilhas_bq_id";
-
-    /// <summary>Database name of the FK-supporting standalone anchor index.</summary>
-    public const string ToolIdIndexName = "IX_boquilhas_tool_id";
-
-    /// <summary>
-    /// Database name of the race-safe one-active-per-production-linked-anchor partial unique index
-    /// (WHERE status = 'active' AND bq_id IS NOT NULL; §7.2/§7.5).
-    /// </summary>
-    public const string ActiveBqIdUniqueIndexName = "IX_boquilhas_active_bq_id";
-
-    /// <summary>
-    /// Database name of the race-safe one-active-per-standalone-anchor partial unique index
-    /// (WHERE status = 'active' AND tool_id IS NOT NULL; §7.2/§7.5).
-    /// </summary>
-    public const string ActiveToolIdUniqueIndexName = "IX_boquilhas_active_tool_id";
+    /// <summary>Database name of the FK-supporting index on the register list traversal.</summary>
+    public const string CreatedAtIndexName = "IX_boquilhas_created_at";
 
     /// <inheritdoc />
     public void Configure(EntityTypeBuilder<BoquilhaEntity> builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        builder.ToTable("boquilhas", table =>
-        {
-            table.HasCheckConstraint(
-                AnchorExclusiveCheckConstraintName,
-                "((bq_id IS NULL)::int + (tool_id IS NULL)::int) = 1");
-            table.HasCheckConstraint(
-                StatusCheckConstraintName,
-                "status IN ('active','closed')");
-            table.HasCheckConstraint(
-                UtilisationRangeCheckConstraintName,
-                "utilisation_percent IS NULL OR (utilisation_percent >= 0 AND utilisation_percent <= 100)");
-            table.HasCheckConstraint(
-                ObservationsCheckConstraintName,
-                "observations IS NULL OR btrim(observations) <> ''");
-        });
+        builder.ToTable("boquilhas");
 
-        builder.HasKey(aggregate => aggregate.BoquilhasId);
-        builder.Property(aggregate => aggregate.BoquilhasId)
+        builder.HasKey(register => register.BoquilhasId);
+        builder.Property(register => register.BoquilhasId)
             .HasColumnName("boquilhas_id")
             .HasDefaultValueSql("gen_random_uuid()");
 
-        builder.Property(aggregate => aggregate.BqId)
-            .HasColumnName("bq_id");
-
-        builder.Property(aggregate => aggregate.ToolId)
-            .HasColumnName("tool_id");
-
-        builder.Property(aggregate => aggregate.Status)
-            .HasColumnName("status")
+        builder.Property(register => register.BqId)
+            .HasColumnName("bq_id")
             .IsRequired();
 
-        builder.Property(aggregate => aggregate.OpeningDate)
-            .HasColumnName("opening_date")
-            .IsRequired();
-
-        builder.Property(aggregate => aggregate.UtilisationPercent)
-            .HasColumnName("utilisation_percent")
-            .HasPrecision(5, 2);
-
-        builder.Property(aggregate => aggregate.Observations)
-            .HasColumnName("observations");
-
-        builder.Property(aggregate => aggregate.CreatedByUserId)
+        builder.Property(register => register.CreatedByUserId)
             .HasColumnName("created_by_user_id")
             .IsRequired();
 
-        builder.Property(aggregate => aggregate.Version)
-            .HasColumnName("version")
-            .HasDefaultValue(1)
-            .IsConcurrencyToken();
-
-        builder.Property(aggregate => aggregate.CreatedAt)
+        builder.Property(register => register.CreatedAt)
             .HasColumnName("created_at")
-            .HasDefaultValueSql("now()");
-
-        builder.Property(aggregate => aggregate.UpdatedAt)
-            .HasColumnName("updated_at")
             .HasDefaultValueSql("now()");
 
         builder.HasOne<BqContextEntity>()
             .WithMany()
-            .HasForeignKey(aggregate => aggregate.BqId)
+            .HasForeignKey(register => register.BqId)
             .HasConstraintName(BqContextForeignKeyConstraintName)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne<ToolEntity>()
-            .WithMany()
-            .HasForeignKey(aggregate => aggregate.ToolId)
-            .HasConstraintName(ToolForeignKeyConstraintName)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne<UserEntity>()
             .WithMany()
-            .HasForeignKey(aggregate => aggregate.CreatedByUserId)
+            .HasForeignKey(register => register.CreatedByUserId)
             .HasConstraintName(CreatedByUserForeignKeyConstraintName)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(aggregate => aggregate.Status)
-            .HasDatabaseName(StatusIndexName);
-
-        builder.HasIndex(aggregate => aggregate.BqId)
-            .HasDatabaseName(BqIdIndexName);
-
-        builder.HasIndex(aggregate => aggregate.ToolId)
-            .HasDatabaseName(ToolIdIndexName);
-
-        // The B1-correction race-safe backstops: UNIQUE PARTIAL against ACTIVE rows only — closed/
-        // historical rows are unconstrained (multiple traces over time are legitimate, §7.2).
-        builder.HasIndex(aggregate => aggregate.BqId)
+        // One register per REAL production BQ context (the plain unique key; the lifecycle
+        // ACTIVE partial unique indexes are superseded and removed).
+        builder.HasIndex(register => register.BqId)
             .IsUnique()
-            .HasFilter("\"status\" = 'active' AND \"bq_id\" IS NOT NULL")
-            .HasDatabaseName(ActiveBqIdUniqueIndexName);
+            .HasDatabaseName(BqIdUniqueConstraintName);
 
-        builder.HasIndex(aggregate => aggregate.ToolId)
-            .IsUnique()
-            .HasFilter("\"status\" = 'active' AND \"tool_id\" IS NOT NULL")
-            .HasDatabaseName(ActiveToolIdUniqueIndexName);
+        // The register list technical order (deterministic; creation order).
+        builder.HasIndex(register => register.CreatedAt)
+            .HasDatabaseName(CreatedAtIndexName);
     }
 }

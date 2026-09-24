@@ -549,6 +549,16 @@ internal static class P2T04ProductionScan
         "tests/DMO.IntegrationTests/Persistence/Migration003ToolJobOnDomainCoreTests.cs",
         "tests/DMO.IntegrationTests/Persistence/Migration004ControloCreateDomainTests.cs",
         "tests/DMO.IntegrationTests/Persistence/Migration005GlassDensitySettingsTests.cs",
+        // ---- P2-T07 (disclosed): the pre-existing files the OWNER CLARIFICATION correction
+        // extended ----------------------------------------------------------------
+        // The Job On test store gains ONE additive read-only arrangement member
+        // (<c>ContextsOf</c>): the Boquilhas test composition resolves contexts created through
+        // the REAL association flow from the Job On store's single source of truth instead of
+        // duplicating them in a mirror. The inventory rows (Migration003/004/005/006/
+        // MigrationRunner/DatabaseConnectivity) grow to the corrected THREE-table final schema
+        // (23 product tables; the unreviewed 007 lifecycle tables are gone).
+        "tests/DMO.IntegrationTests/JobOn/P2T04TestStore.cs",
+        "tests/DMO.IntegrationTests/Persistence/Migration006ControloApproveDomainTests.cs",
     ];
 
     /// <summary>The new P2-T04 env-gated persistence test files (contract §20.9/§20.10).</summary>

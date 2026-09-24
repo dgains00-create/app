@@ -8,13 +8,14 @@ namespace DMO.Infrastructure.Persistence.EntityConfigurations;
 /// EF configuration for the <c>boquilha_movements</c> table: the movement/quantity event ledger.
 /// </summary>
 /// <remarks>
-/// Authority: P2-T07 contract §6.3/§7.4 (exact columns, the closed type CHECK, the quantity CHECK,
-/// the machine CHECK, the Saída-required CHECK, the Entrada-facts CHECK, the observations/version
-/// CHECKs, FKs all RESTRICT and the ledger-order index). The row is the single quantity event;
-/// edits replace the same row (version token) and never insert a second row.</remarks>
+/// Authority: P2-T07 OWNER CLARIFICATION + the preserved shapes. The type CHECK fixes the closed
+/// set <c>saida|entrada|entrada_sem_reparacao</c>; the Saída-required CHECK enforces machine +
+/// repairer on external dispatch; there is no expected/excess fact pair (superseded). FKs are all
+/// RESTRICT; the ledger-order index serves the physical receipt order.
+/// </remarks>
 public sealed class BoquilhaMovementEntityConfiguration : IEntityTypeConfiguration<BoquilhaMovementEntity>
 {
-    /// <summary>Database name of the movement-type CHECK (the closed §3.1 set).</summary>
+    /// <summary>Database name of the movement-type CHECK (the closed three-type set).</summary>
     public const string MovementTypeCheckConstraintName = "boquilha_movements_type_check";
 
     /// <summary>Database name of the positive-quantity CHECK.</summary>
@@ -23,11 +24,8 @@ public sealed class BoquilhaMovementEntityConfiguration : IEntityTypeConfigurati
     /// <summary>Database name of the machine-code CHECK.</summary>
     public const string MachineCheckConstraintName = "boquilha_movements_machine_check";
 
-    /// <summary>Database name of the external-Saída-required CHECK (machine + repairer).</summary>
+    /// <summary>Database name of the Saída-required CHECK (machine + repairer on external dispatch).</summary>
     public const string SaidaRequiredCheckConstraintName = "boquilha_movements_saida_required_check";
-
-    /// <summary>Database name of the Entrada expected/excess facts CHECK.</summary>
-    public const string EntradaFactsCheckConstraintName = "boquilha_movements_entrada_facts_check";
 
     /// <summary>Database name of the observations CHECK.</summary>
     public const string ObservationsCheckConstraintName = "boquilha_movements_observations_check";
@@ -35,7 +33,7 @@ public sealed class BoquilhaMovementEntityConfiguration : IEntityTypeConfigurati
     /// <summary>Database name of the movement-version CHECK.</summary>
     public const string VersionCheckConstraintName = "boquilha_movements_version_check";
 
-    /// <summary>Database name of the owning-aggregate FK.</summary>
+    /// <summary>Database name of the owning-register FK.</summary>
     public const string BoquilhasForeignKeyConstraintName = "FK_boquilha_movements_boquilhas_boquilhas_id";
 
     /// <summary>Database name of the repairer FK.</summary>
@@ -44,7 +42,7 @@ public sealed class BoquilhaMovementEntityConfiguration : IEntityTypeConfigurati
     /// <summary>Database name of the recording-actor FK.</summary>
     public const string RecordedByUserForeignKeyConstraintName = "FK_boquilha_movements_users_recorded_by_user_id";
 
-    /// <summary>Database name of the ledger-order index (FK-supporting + replay order).</summary>
+    /// <summary>Database name of the ledger-order index (FK-supporting + physical receipt order).</summary>
     public const string BoquilhasLedgerIndexName = "IX_boquilha_movements_boquilhas_id";
 
     /// <inheritdoc />
@@ -56,7 +54,7 @@ public sealed class BoquilhaMovementEntityConfiguration : IEntityTypeConfigurati
         {
             table.HasCheckConstraint(
                 MovementTypeCheckConstraintName,
-                "movement_type IN ('inicio','saida','entrada','irreparavel')");
+                "movement_type IN ('saida','entrada','entrada_sem_reparacao')");
             table.HasCheckConstraint(
                 QuantityCheckConstraintName,
                 "quantity > 0");
@@ -66,13 +64,6 @@ public sealed class BoquilhaMovementEntityConfiguration : IEntityTypeConfigurati
             table.HasCheckConstraint(
                 SaidaRequiredCheckConstraintName,
                 "NOT (movement_type = 'saida' AND (machine IS NULL OR repairer_id IS NULL))");
-            table.HasCheckConstraint(
-                EntradaFactsCheckConstraintName,
-                "(movement_type = 'entrada' AND expected_return_quantity IS NOT NULL "
-                + "AND excess_received_quantity IS NOT NULL AND expected_return_quantity >= 0 "
-                + "AND excess_received_quantity = GREATEST(0, quantity - expected_return_quantity)) "
-                + "OR (movement_type <> 'entrada' AND expected_return_quantity IS NULL "
-                + "AND excess_received_quantity IS NULL)");
             table.HasCheckConstraint(
                 ObservationsCheckConstraintName,
                 "observations IS NULL OR btrim(observations) <> ''");
@@ -116,12 +107,6 @@ public sealed class BoquilhaMovementEntityConfiguration : IEntityTypeConfigurati
         builder.Property(movement => movement.RepairerId)
             .HasColumnName("repairer_id");
 
-        builder.Property(movement => movement.ExpectedReturnQuantity)
-            .HasColumnName("expected_return_quantity");
-
-        builder.Property(movement => movement.ExcessReceivedQuantity)
-            .HasColumnName("excess_received_quantity");
-
         builder.Property(movement => movement.Observations)
             .HasColumnName("observations");
 
@@ -156,7 +141,8 @@ public sealed class BoquilhaMovementEntityConfiguration : IEntityTypeConfigurati
             .HasConstraintName(RecordedByUserForeignKeyConstraintName)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // FK-supporting + the deterministic replay order (recorded_at ASC, movement_id ASC, §18.2).
+        // FK-supporting + the deterministic physical receipt order (recorded_at ASC,
+        // movement_id ASC) of the derived outstanding replay and the ledger display.
         builder.HasIndex(movement => new { movement.BoquilhasId, movement.RecordedAt, movement.MovementId })
             .HasDatabaseName(BoquilhasLedgerIndexName);
     }

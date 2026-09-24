@@ -69,12 +69,14 @@ public sealed class Migration003ToolJobOnDomainCoreTests
     private const string PesoReviewDecisionsTable = "peso_review_decisions";
 
     /// <summary>
-    /// The six Boquilhas tables of migration 007 (disclosed extension, P2-T07 contract §28).
+    /// The THREE Boquilhas tables of migration 007 (disclosed extension; the P2-T07 OWNER
+    /// CLARIFICATION corrected the unreviewed 007 pre-closure — the lifecycle tables
+    /// <c>boquilha_close_snapshots</c>/<c>boquilha_reopenings</c>/<c>boquilha_machines</c> are
+    /// gone and the final product-table count is 23).
     /// </summary>
     private static readonly string[] BoquilhasTables =
     [
-        "boquilha_close_snapshots", "boquilha_machines", "boquilha_movement_audit",
-        "boquilha_movements", "boquilha_reopenings", "boquilhas",
+        "boquilha_movement_audit", "boquilha_movements", "boquilhas",
     ];
 
     /// <summary>EF's own migration bookkeeping table (never a product table).</summary>
@@ -232,8 +234,9 @@ public sealed class Migration003ToolJobOnDomainCoreTests
         // Controlo tables (migration 004); the post-closure glass-density correction adds
         // exactly the one approved settings table (migration 005); the P2-T06 Controlo Approve
         // migration 006 adds exactly the one review-decision table; the P2-T07 Boquilhas
-        // migration 007 adds exactly the six Boquilhas tables. The P2-T04 rows keep
-        // pinning the complete set.
+        // migration 007 adds exactly the THREE Boquilhas register tables (OWNER CLARIFICATION:
+        // the unreviewed 007 was corrected pre-closure — the lifecycle tables are gone; the
+        // final product-table count is 23). The P2-T04 rows keep pinning the complete set.
         Assert.Equal(
             Sorted([.. FoundationTables, .. DomainCoreTables, .. ControloTables, GlassDensitySettingsTable, PesoReviewDecisionsTable, .. BoquilhasTables, MigrationHistoryTable]),
             tables);
@@ -602,7 +605,9 @@ public sealed class Migration003ToolJobOnDomainCoreTests
         // The snapshot and the CONTROL migration designers record exactly the eighteen product tables
         // (disclosed P2-T05 extension: ten prior + eight Controlo); the snapshot ALSO records the
         // one correction table (nineteen product tables after migration 005) and the one review
-        // decision table (P2-T06) and the SIX Boquilhas tables (P2-T07). The P2-T04 migration's
+        // decision table (P2-T06) and the THREE Boquilhas register tables (P2-T07 OWNER
+        // CLARIFICATION: the unreviewed 007 was corrected pre-closure — no lifecycle tables; the
+        // final product-table count is 23). The P2-T04 migration's
         // OWN designer is a frozen historical artifact of its generation time and still records
         // the ten tables it shipped with.
         var expectedTables = Sorted([.. FoundationTables, .. DomainCoreTables, .. ControloTables]);
