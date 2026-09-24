@@ -176,3 +176,34 @@ replacement aggregate.
 ## 13. Downstream dependents
 
 P2-T08, P2-T10.
+
+## 14. Contract-authored record
+
+**Status: AUTHORED — AWAITING ARCHITECT PLAN REVIEW** (contract-authoring task, planning gate
+only; **no implementation**).
+
+The implementation contract is `plans/contracts/P2-T07_BOQUILHAS_CONTRACT.md` (authoring
+response `dev/responses/P2_T07_CONTRACT_AUTHORING_RESPONSE.md`). It fixes — over the accepted,
+**CLOSED** P2-T04/P2-T05 state and the settled delta — the identity core (DB-enforced exclusive
+anchor `boquilhas_id → bq_id` production-linked | `boquilhas_id → tool_id` standalone; no fake
+Job On/`bq_id`; no `production_id`/reverse arrays), the shared Tool orchestration consumption
+(BQ-only candidates, no auto-select, contextual create returning to origin, no second
+registry), exactly the four movement types (`Editar` never a type; Início created with the
+aggregate), the replay-derived balance buckets (no second mutable balance authority; Saída ≤
+available and Irreparável ≤ in-repair as 409 refusals; excess Entrada recorded; negative saldo
+non-blocking), edit-with-audit on the same `movement_id` (no double balance effect;
+`movement_type`/`recorded_at` immutable), `business_date` ⊥ `recorded_at`, repairer consumption
+(automatic resolution from the machine's current independent assignment; final selected
+`repairer_id` stored with historical retention; no administration), close/reopen on the same
+`boquilhas_id` (immutable snapshot; atomic failed close; recorded reopen), the manual
+`% utilização` still, the local Histórico (backend filters; HISTÓRICO GLOBAL boundary), SIX new
+tables in ONE additive migration (007), exactly 18 routes all gated `dmo.module.boquilhas`, and
+a complete test-to-acceptance matrix (**83 AC ↔ 83 rows; missing 0, dangling 0, orphan 0**) with
+12 NON-BLOCKING authority questions carrying pinned defaults (Q-EDIT-FIELDS, Q-MACHINE,
+Q-INICIO, Q-EXCESS, Q-ORDER, Q-CREATE, Q-REOPEN-ELIG, Q-REFLOT, Q-UTIL, Q-LINE, Q-CLOSE-DATE,
+Q-ANUL) — **0 BLOCKING, 0 REQUIRES OWNER DECISION**.
+
+The contract is **not** self-accepted: it awaits the Architect PLAN review per
+`dmo-beta-master/WORKFLOW.md` step 6 (B3 remains OPEN until PLAN ACCEPT). Implementation is
+**NOT STARTED — NOT AUTHORIZED**. `ModuleRegistrations.CurrentBuildAvailable` remains `[]`.
+**P2-T08 / P2-T10 remain NOT AUTHORIZED.**
